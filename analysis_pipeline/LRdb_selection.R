@@ -4,8 +4,9 @@
 ##
 ## cyril.lagger@liverpool.ac.uk - June 2020
 ##
-## Compare the Ligand-Receptors from the various
-## databases
+## Compare the Ligand-Receptor pairs from the various
+## databases. Select the most relevant ones for
+## the aging analysis.
 ##
 ####################################################
 ##
