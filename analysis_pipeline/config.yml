@@ -1,0 +1,42 @@
+default:
+    
+    DATA_PATH: "../test_and_comparison/data_results_diffcom_down.rds"
+    RESULTS_DIR: "downstream_test/"
+    
+    # CUTOFFS
+    # detection
+    CUTOFF_SCORE_YOUNG: 0.5
+    CUTOFF_SCORE_OLD: 0.5
+    CUTOFF_CPDB_PVAL_YOUNG: 0.05
+    CUTOFF_CPDB_PVAL_OLD: 0.05
+    # significance
+    CUTOFF_PVAL_ADJ: 0.05
+    CUTOFF_LOGFC: 0.5
+    
+    # COLUMNS' NAMES
+    COL_TISSUES: "Tissue"
+    COL_LR_GENES: "LR_pair"
+    COL_L_GENE: "ligand"
+    COL_R_GENE: "receptor"
+    COL_LIGAND_CELLTYPE: "Ligand_cell_type"
+    COL_RECEPTOR_CELLTYPE: "Receptor_cell_type"
+    COL_LIGAND_RECEPTOR_CELLTYPES: "Ligand_Receptor_cell_types"
+    COL_LR_SCORE_YOUNG: "LR_score_young"
+    COL_LR_SCORE_OLD: "LR_score_old"
+    COL_LOGFC: "LR_diff"
+    COL_LOGFC_ABS: "LR_diff_abs"
+    COL_BH_PVAL: "BH_pvals_diff"
+    COL_RAW_PVAL: "pvals_diff"
+    COL_LR_DETECTED_YOUNG: "LR_detec_young"
+    COL_LR_DETECTED_OLD: "LR_detec_old"
+    COL_LIGAND_EXPRESSION_YOUNG: "Ligand_expr_young"
+    COL_LIGAND_EXPRESSION_OLD: "Ligand_expr_old"
+    COL_LIGAND_DETECTED_YOUNG: "Ligand_detec_rate_young"
+    COL_LIGAND_DETECTED_OLD: "Ligand_detec_rate_old"
+    COL_RECEPTOR_EXPRESSION_YOUNG: "Receptor_expr_young"
+    COL_RECEPTOR_EXPRESSION_OLD: "Receptor_expr_old"
+    COL_RECEPTOR_DETECTED_YOUNG: "Receptor_detec_rate_young"
+    COL_RECEPTOR_DETECTED_OLD: "Receptor_detec_rate_old"
+    COL_RAW_PVAL_SPECIFICITY_YOUNG: "BH_pvals_young"
+    COL_RAW_PVAL_SPECIFICITY_OLD: "BH_pvals_old"
+    
