@@ -23,9 +23,9 @@ library(doParallel)
 
 
 #parameters
-dataset <- "tms_facs" # c("tms_facs", "tms_droplet", "calico")
+dataset <- "tms_droplet" # c("tms_facs", "tms_droplet", "calico")
 LR_db <- "mixed" # c("all", "scsr", "sctensor", "nichenet", "mixed")
-normalization <-  "size_factor" #c("size_factor", "sctransform")
+normalization <- "size_factor" #c("size_factor", "sctransform")
 is_log <- TRUE
 n_iter <- 10000
 run_test <- FALSE
@@ -33,7 +33,7 @@ calico_subtype <- FALSE
 
 #paths
 paths <- c(
-  ms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_facs.rds",
+  tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_facs.rds",
   tms_droplet = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_droplet.rds",
   calico_kidney = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_kidney.rds",
   calico_lung = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_lung.rds",
