@@ -46,14 +46,14 @@ load_globals_from_config <- function(R_CONFIG_ACTIVE) {
   Sys.setenv(R_CONFIG_ACTIVE = R_CONFIG_ACTIVE)
   
   #assign("DATA_PATH", config::get("DATA_PATH"), envir=.GlobalEnv)
-  assign("RESULTS_DIR", config::get("RESULTS_DIR"), envir=.GlobalEnv)
+  #assign("RESULTS_DIR", config::get("RESULTS_DIR"), envir=.GlobalEnv)
   # CUTOFFS
-  assign("CUTOFF_PVAL_ADJ", config::get("CUTOFF_PVAL_ADJ"), envir=.GlobalEnv)
-  assign("CUTOFF_SCORE_YOUNG", config::get("CUTOFF_SCORE_YOUNG"), envir=.GlobalEnv)
-  assign("CUTOFF_SCORE_OLD", config::get("CUTOFF_SCORE_OLD"), envir=.GlobalEnv)
-  assign("CUTOFF_LOGFC", config::get("CUTOFF_LOGFC"), envir=.GlobalEnv)
-  assign("CUTOFF_CPDB_PVAL_YOUNG", config::get("CUTOFF_CPDB_PVAL_YOUNG"), envir=.GlobalEnv)
-  assign("CUTOFF_CPDB_PVAL_OLD", config::get("CUTOFF_CPDB_PVAL_OLD"), envir=.GlobalEnv)
+  #assign("CUTOFF_PVAL_ADJ", config::get("CUTOFF_PVAL_ADJ"), envir=.GlobalEnv)
+  #assign("CUTOFF_SCORE_YOUNG", config::get("CUTOFF_SCORE_YOUNG"), envir=.GlobalEnv)
+  #assign("CUTOFF_SCORE_OLD", config::get("CUTOFF_SCORE_OLD"), envir=.GlobalEnv)
+  #assign("CUTOFF_LOGFC", config::get("CUTOFF_LOGFC"), envir=.GlobalEnv)
+  #assign("CUTOFF_CPDB_PVAL_YOUNG", config::get("CUTOFF_CPDB_PVAL_YOUNG"), envir=.GlobalEnv)
+  #assign("CUTOFF_CPDB_PVAL_OLD", config::get("CUTOFF_CPDB_PVAL_OLD"), envir=.GlobalEnv)
   # COLUMNS' NAMES
   assign("COL_TISSUES", config::get("COL_TISSUES"), envir=.GlobalEnv)
   assign("COL_LR_GENES", config::get("COL_LR_GENES"), envir=.GlobalEnv)

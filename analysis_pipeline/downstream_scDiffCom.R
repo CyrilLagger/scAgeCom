@@ -18,14 +18,14 @@ library(data.table)
 library(config)
 library(conflicted)
 library(circlize)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(gtable)
+library(clusterProfiler)
+library(org.Mm.eg.db)
 
-source("downstream_script/src/utils.R")
-
-# `merge` from config is in conflict with base merge used in downstream.R
-conflicted::conflict_prefer(name = "merge", winner = "base")
-
-#load parameters
-load_globals_from_config(R_CONFIG_ACTIVE = "default")
+LRone2one <- LRall$LRall_one2one
 
 #Function to add useful column (and remove others) and rbind all tissues in a single data.table
 bind_tissues <- function(
@@ -59,17 +59,20 @@ bind_tissues <- function(
   )
 }
 
+#####
 #datasets of interest
-datasets <- c("calico", "tms_facs", "tms_droplet")
+datasets <- c("calico", "calico_sub", "tms_facs", "tms_droplet")
 #path of datasets
 data_path <- list(
-  calico = "scDiffCom_results/diffcom_calico_size_factor_log_10000iter_mixed",
-  tms_facs = "scDiffCom_results/diffcom_tms_facs_size_factor_log_10000iter_mixed",
-  tms_droplet = "scDiffCom_results/diffcom_tms_droplet_size_factor_log_10000iter_mixed"
+  calico = "../data_scAgeCom/scDiffCom_results/diffcom_calico_size_factor_log_10000iter_mixed",
+  calico_sub = "../data_scAgeCom/scDiffCom_results/diffcom_calico_subtype_size_factor_log_10000iter_mixed",
+  tms_facs = "../data_scAgeCom/scDiffCom_results/diffcom_tms_facs_size_factor_log_10000iter_mixed",
+  tms_droplet = "../data_scAgeCom/scDiffCom_results/diffcom_tms_droplet_size_factor_log_10000iter_mixed"
 )
 #tissues of interest
 tissue_list <- list(
-  calico = c("kidney", "lung", "spleen"),
+  calico = c("Kidney", "Lung", "Spleen"),
+  calico_sub = c("Kidney", "Lung", "Spleen"),
   tms_facs = c("Aorta", "BAT", "Bladder", "Brain_Myeloid",
                "Brain_Non-Myeloid", "Diaphragm", "GAT",
                "Heart", "Kidney", "Large_Intestine",
@@ -88,29 +91,29 @@ diffcom_results <- mapply(bind_tissues, data_path, tissue_list, SIMPLIFY = FALSE
 #diffcom_results <- lapply(diffcom_results, setDF)
 
 #check that the format and colnames are OK
-check_representation_inv(diffcom_results$calico)
+#check_representation_inv(diffcom_results$calico)
 
 #Cutoff exploration
-df_detec_in_young_and_old <- lapply(
-  diffcom_results,
-  remove_undetected_interactions
-)
+#df_detec_in_young_and_old <- lapply(
+#  diffcom_results,
+#  remove_undetected_interactions
+#)
 #calico
-explore_cutoffs_dir_calico <- "test_and_comparison/explore_cutoffs/calico/"
-create_dir(explore_cutoffs_dir_calico)
-explore_calico <- explore_filter_cutoffs(df_detec_in_young_and_old$calico, explore_cutoffs_dir_calico) 
+#explore_cutoffs_dir_calico <- "test_and_comparison/explore_cutoffs/calico/"
+#create_dir(explore_cutoffs_dir_calico)
+#explore_calico <- explore_filter_cutoffs(df_detec_in_young_and_old$calico, explore_cutoffs_dir_calico) 
 #tms FACS
-explore_cutoffs_dir_tms_facs <- "test_and_comparison/explore_cutoffs/tms_facs/"
-create_dir(explore_cutoffs_dir_tms_facs)
-explore_tms_facs <- explore_filter_cutoffs(df_detec_in_young_and_old$tms_facs, explore_cutoffs_dir_tms_facs) 
+#explore_cutoffs_dir_tms_facs <- "test_and_comparison/explore_cutoffs/tms_facs/"
+#create_dir(explore_cutoffs_dir_tms_facs)
+#explore_tms_facs <- explore_filter_cutoffs(df_detec_in_young_and_old$tms_facs, explore_cutoffs_dir_tms_facs) 
 #tms Droplet
-explore_cutoffs_dir_tms_droplet <- "test_and_comparison/explore_cutoffs/tms_droplet/"
-create_dir(explore_cutoffs_dir_tms_droplet)
-explore_tms_droplet <- explore_filter_cutoffs(df_detec_in_young_and_old$tms_droplet, explore_cutoffs_dir_tms_droplet)
+#explore_cutoffs_dir_tms_droplet <- "test_and_comparison/explore_cutoffs/tms_droplet/"
+#create_dir(explore_cutoffs_dir_tms_droplet)
+#explore_tms_droplet <- explore_filter_cutoffs(df_detec_in_young_and_old$tms_droplet, explore_cutoffs_dir_tms_droplet)
 
-explore_calico
-explore_tms_facs
-explore_tms_droplet
+#explore_calico
+#explore_tms_facs
+#explore_tms_droplet
 
 # Filtering process
 filter_CCI <- function(
@@ -215,57 +218,74 @@ reassign_CCI <- function(
   )]
 }
 
+hist(diffcom_results$tms_facs[LR_DETECTED_young == TRUE,]$LR_SCORE_young, breaks = 50)
 quantile(diffcom_results$tms_facs[LR_DETECTED_young == TRUE,]$LR_SCORE_young, probs = seq(0, 1, 0.1))
 quantile(diffcom_results$tms_facs[LR_DETECTED_old == TRUE,]$LR_SCORE_old, probs = seq(0, 1, 0.1))
-quantile(diffcom_results$tms_droplet[LR_DETECTED_young == TRUE,]$LR_SCORE_young, probs = seq(0, 1, 0.1))
-quantile(diffcom_results$tms_droplet[LR_DETECTED_old == TRUE,]$LR_SCORE_old, probs = seq(0, 1, 0.1))
-quantile(diffcom_results$calico[LR_DETECTED_young == TRUE,]$LR_SCORE_young, probs = seq(0, 1, 0.1))
-quantile(diffcom_results$calico[LR_DETECTED_old == TRUE ,]$LR_SCORE_old, probs = seq(0, 1, 0.1))
-
 filter_CCI(
   dt = diffcom_results$tms_facs,
-  CUTOFF_SCORE_YOUNG = 0.85, #case dependent
-  CUTOFF_SCORE_OLD = 0.85, # case dependent
+  CUTOFF_SCORE_YOUNG = 0.9, #case dependent
+  CUTOFF_SCORE_OLD = 0.9, # case dependent
   CUTOFF_CPDB_PVAL_YOUNG = 0.05,
   CUTOFF_CPDB_PVAL_OLD = 0.05,
   CUTOFF_PVAL_ADJ = 0.05,
-  CUTOFF_LOGFC = log(1.5)
+  CUTOFF_LOGFC = log(1.1)
 )
 
+hist(diffcom_results$tms_droplet[LR_DETECTED_young == TRUE,]$LR_SCORE_young, breaks = 50)
+quantile(diffcom_results$tms_droplet[LR_DETECTED_young == TRUE,]$LR_SCORE_young, probs = seq(0, 1, 0.1))
+quantile(diffcom_results$tms_droplet[LR_DETECTED_old == TRUE,]$LR_SCORE_old, probs = seq(0, 1, 0.1))
 filter_CCI(
   dt = diffcom_results$tms_droplet,
-  CUTOFF_SCORE_YOUNG = 1.0, #case dependent
-  CUTOFF_SCORE_OLD = 1.0, # case dependent
+  CUTOFF_SCORE_YOUNG = 1.5, #case dependent
+  CUTOFF_SCORE_OLD = 1.5, # case dependent
   CUTOFF_CPDB_PVAL_YOUNG = 0.05,
   CUTOFF_CPDB_PVAL_OLD = 0.05,
   CUTOFF_PVAL_ADJ = 0.05,
   CUTOFF_LOGFC = log(1.1)
 )
 
+hist(diffcom_results$calico[LR_DETECTED_young == TRUE,]$LR_SCORE_young, breaks = 50)
+quantile(diffcom_results$calico[LR_DETECTED_young == TRUE,]$LR_SCORE_young, probs = seq(0, 1, 0.1))
+quantile(diffcom_results$calico[LR_DETECTED_old == TRUE ,]$LR_SCORE_old, probs = seq(0, 1, 0.1))
 filter_CCI(
   dt = diffcom_results$calico,
-  CUTOFF_SCORE_YOUNG = 0.8, #case dependent
-  CUTOFF_SCORE_OLD = 0.8, # case dependent
+  CUTOFF_SCORE_YOUNG = 1.3, #case dependent
+  CUTOFF_SCORE_OLD = 1.3, # case dependent
   CUTOFF_CPDB_PVAL_YOUNG = 0.05,
   CUTOFF_CPDB_PVAL_OLD = 0.05,
   CUTOFF_PVAL_ADJ = 0.05,
   CUTOFF_LOGFC = log(1.1)
 )
 
+
+hist(diffcom_results$calico_sub[LR_DETECTED_young == TRUE,]$LR_SCORE_young, breaks = 50)
+quantile(diffcom_results$calico_sub[LR_DETECTED_young == TRUE,]$LR_SCORE_young, probs = seq(0, 1, 0.1))
+quantile(diffcom_results$calico_sub[LR_DETECTED_old == TRUE ,]$LR_SCORE_old, probs = seq(0, 1, 0.1))
+filter_CCI(
+  dt = diffcom_results$calico_sub,
+  CUTOFF_SCORE_YOUNG = 1.3, #case dependent
+  CUTOFF_SCORE_OLD = 1.3, # case dependent
+  CUTOFF_CPDB_PVAL_YOUNG = 0.05,
+  CUTOFF_CPDB_PVAL_OLD = 0.05,
+  CUTOFF_PVAL_ADJ = 0.05,
+  CUTOFF_LOGFC = log(1.1)
+)
+
+#reassign
 diffcom_results_detected <- list(
   tms_facs = reassign_CCI(
     dt = diffcom_results$tms_facs[LR_KEEP_young == TRUE | LR_KEEP_old == TRUE,],
-    CUTOFF_SCORE_YOUNG = 0.85, #case dependent
-    CUTOFF_SCORE_OLD = 0.85, # case dependent
+    CUTOFF_SCORE_YOUNG = 0.9, #case dependent
+    CUTOFF_SCORE_OLD = 0.9, # case dependent
     CUTOFF_CPDB_PVAL_YOUNG = 0.05,
     CUTOFF_CPDB_PVAL_OLD = 0.05,
     CUTOFF_PVAL_ADJ = 0.05,
-    CUTOFF_LOGFC = log(1.5)
+    CUTOFF_LOGFC = log(1.1)
   ),
   tms_droplet = reassign_CCI(
     dt = diffcom_results$tms_droplet[LR_KEEP_young == TRUE | LR_KEEP_old == TRUE,],
-    CUTOFF_SCORE_YOUNG = 1.0, #case dependent
-    CUTOFF_SCORE_OLD = 1.0, # case dependent
+    CUTOFF_SCORE_YOUNG = 1.5, #case dependent
+    CUTOFF_SCORE_OLD = 1.5, # case dependent
     CUTOFF_CPDB_PVAL_YOUNG = 0.05,
     CUTOFF_CPDB_PVAL_OLD = 0.05,
     CUTOFF_PVAL_ADJ = 0.05,
@@ -273,14 +293,485 @@ diffcom_results_detected <- list(
   ),
   calico = reassign_CCI(
     dt = diffcom_results$calico[LR_KEEP_young == TRUE | LR_KEEP_old == TRUE,],
-    CUTOFF_SCORE_YOUNG = 0.8, #case dependent
-    CUTOFF_SCORE_OLD = 0.8, # case dependent
+    CUTOFF_SCORE_YOUNG = 1.3, #case dependent
+    CUTOFF_SCORE_OLD = 1.3, # case dependent
+    CUTOFF_CPDB_PVAL_YOUNG = 0.05,
+    CUTOFF_CPDB_PVAL_OLD = 0.05,
+    CUTOFF_PVAL_ADJ = 0.05,
+    CUTOFF_LOGFC = log(1.1)
+  ),
+  calico_sub = reassign_CCI(
+    dt = diffcom_results$calico_sub[LR_KEEP_young == TRUE | LR_KEEP_old == TRUE,],
+    CUTOFF_SCORE_YOUNG = 1.3, #case dependent
+    CUTOFF_SCORE_OLD = 1.3, # case dependent
     CUTOFF_CPDB_PVAL_YOUNG = 0.05,
     CUTOFF_CPDB_PVAL_OLD = 0.05,
     CUTOFF_PVAL_ADJ = 0.05,
     CUTOFF_LOGFC = log(1.1)
   )
 )
+
+
+
+#####
+#a data.frame summarizing the 6 possible scenarios
+six_scenarios <- data.frame(
+  Young = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE),
+  Old = c(TRUE, TRUE, TRUE, FALSE, TRUE, FALSE),
+  Diff = c(TRUE, TRUE, FALSE, TRUE, TRUE, FALSE),
+  Direction = c("Up", "Down", "", "Down", "UP", "")
+)
+g_six <- tableGrob(six_scenarios, rows = NULL)
+grid.newpage()
+grid.draw(g_six)
+ggsave(filename = "../data_scAgeCom/scenario_tables.png", plot = g_six, scale = 1.5)
+
+#distribution of detection per dataset
+distr_scenar <- merge.data.table(
+  merge.data.table(
+  diffcom_results_detected$tms_facs[,.N, by = SIG_TYPE],
+  diffcom_results_detected$tms_droplet[,.N, by = SIG_TYPE],
+  by = "SIG_TYPE"
+  ),
+  diffcom_results_detected$calico[,.N, by = SIG_TYPE],
+  by = "SIG_TYPE"
+)
+colnames(distr_scenar) <- c("SIG_TYPE", "TMS FACS", "TMS Droplet", "Calico")
+setDT(six_scenarios)
+six_scenarios[, SIG_TYPE := c("TTTU", "TTTD", "TTF", "TFT", "FTT", "FFF")]
+distr_scenar <- merge.data.table(
+  six_scenarios,
+  distr_scenar,
+  by = "SIG_TYPE",
+  sort = FALSE
+)
+distr_scenar[, SIG_TYPE := NULL]
+setcolorder(distr_scenar, neworder = c("Young", "Old", "Diff", "Direction", "TMS FACS", "TMS Droplet", "Calico"))
+g_distr_all <- tableGrob(distr_scenar, rows = NULL)
+grid.newpage()
+grid.draw(g_distr_all)
+ggsave(filename = "../data_scAgeCom/distr_scenarios_all_data.png", plot = g_distr_all, scale = 1.5)
+
+######
+#Some sub-datatables
+diffcom_results_detected_strong <- lapply(
+  diffcom_results_detected,
+  function(x) {
+    dt <- x[!(SIG_TYPE == "FFF"),]
+  }
+)
+
+diffcom_results_significant <- lapply(
+  diffcom_results_detected_strong,
+  function(x){
+    dt <- x[SIG_TYPE %in% c("FTT", "TFT", "TTTD", "TTTU"),]
+  }
+)
+
+##enrichment on all results
+L_Up <- list(
+  tms_facs = unique(diffcom_results_detected$tms_facs[SIG_TYPE %in% c("TTTU", "FTT"),]$L_GENE),
+  tms_droplet = unique(diffcom_results_detected$tms_droplet[SIG_TYPE %in% c("TTTU", "FTT"),]$L_GENE),
+  calico = unique(diffcom_results_detected$calico[SIG_TYPE %in% c("TTTU", "FTT"),]$L_GENE)
+)
+R_Up <- list(
+  tms_facs = unique(diffcom_results_detected$tms_facs[SIG_TYPE %in% c("TTTU", "FTT"),]$R_GENE),
+  tms_droplet = unique(diffcom_results_detected$tms_droplet[SIG_TYPE %in% c("TTTU", "FTT"),]$R_GENE),
+  calico = unique(diffcom_results_detected$calico[SIG_TYPE %in% c("TTTU", "FTT"),]$R_GENE)
+)
+LR_Up <- list(
+  tms_facs = unique(c(L_Up$tms_facs, R_Up$tms_facs) ),
+  tms_droplet = unique(c(L_Up$tms_droplet, R_Up$tms_droplet) ),
+  calico = unique(c(L_Up$calico, R_Up$calico) )
+)
+
+L_Down <- list(
+  tms_facs = unique(diffcom_results_detected$tms_facs[SIG_TYPE %in% c("TTTD", "TFT"),]$L_GENE),
+  tms_droplet = unique(diffcom_results_detected$tms_droplet[SIG_TYPE %in% c("TTTD", "TFT"),]$L_GENE),
+  calico = unique(diffcom_results_detected$calico[SIG_TYPE %in% c("TTTD", "TFT"),]$L_GENE)
+)
+R_Down <- list(
+  tms_facs = unique(diffcom_results_detected$tms_facs[SIG_TYPE %in% c("TTTD", "TFT"),]$R_GENE),
+  tms_droplet = unique(diffcom_results_detected$tms_droplet[SIG_TYPE %in% c("TTTD", "TFT"),]$R_GENE),
+  calico = unique(diffcom_results_detected$calico[SIG_TYPE %in% c("TTTD", "TFT"),]$R_GENE)
+)
+LR_Down <- list(
+  tms_facs = unique(c(L_Down$tms_facs, R_Down$tms_facs) ),
+  tms_droplet = unique(c(L_Down$tms_droplet, R_Down$tms_droplet) ),
+  calico = unique(c(L_Down$calico, R_Down$calico) )
+)
+
+universe_enrich_L <- unique(LRone2one[scsr == TRUE | cpdb == TRUE, ]$GENESYMB_L)
+universe_enrich_R <- unique(LRone2one[scsr == TRUE | cpdb == TRUE, ]$GENESYMB_R)
+universe_enrich_LR <- unique(c(universe_enrich_L, universe_enrich_R))
+
+ego_analysis_list <- list(
+  LR_Up$tms_facs, LR_Down$tms_facs,
+  LR_Up$tms_droplet, LR_Down$tms_droplet,
+  LR_Up$calico, LR_Down$calico
+)
+
+ego_BP_overall <- lapply(
+  ego_analysis_list,
+  function(x) {
+    enrichGO(
+      gene = x,
+      OrgDb = org.Mm.eg.db,
+      keyType = 'SYMBOL',
+      ont = "BP",
+      universe = universe_enrich_LR,
+      pAdjustMethod = "BH",
+      pvalueCutoff = 0.01,
+      qvalueCutoff  = 0.05
+    )
+  }
+)
+
+ego_BP_overall_plots <- lapply(
+  ego_BP_overall,
+  function(x) {
+    dotplot(
+      x,
+      showCategory = 10,
+      font.size = 10
+    )
+  }
+)
+
+g_ego_BP_overall <- cowplot::plot_grid(
+  plotlist = ego_BP_overall_plots,
+  ncol = 2,
+  align = "v",
+  labels =  c("TMS FACS Up", "TMS FACS Down",
+              "TMS Droplet Up", "TMS Droplet Down",
+              "Calico Up", "Calico Down"
+              )
+)
+
+ggsave(filename = "../data_scAgeCom/ego_BP_overall.png", plot = g_ego_BP_overall, scale = 1.8)
+
+
+
+#######
+# OVERREPRESENTATION
+
+#load parameters
+load_globals_from_config(R_CONFIG_ACTIVE = "default")
+conflicted::conflict_prefer(name = "merge", winner = "base")
+
+lapply(diffcom_results_detected_strong, function(x) {
+  setDF(x)
+})
+
+lapply(diffcom_results_significant, function(x) {
+  setDF(x)
+})
+#
+overrep_calico <- analyze_overrepresentation(
+  diffcom_results_detected_strong$calico,
+  diffcom_results_significant$calico,
+  adjust_pvals = TRUE
+)
+overrep_calico_tiss <- sapply(unique(diffcom_results_detected_strong$calico$TISSUE), function(tiss) {
+  analyze_overrepresentation(
+    diffcom_results_detected_strong$calico[diffcom_results_detected_strong$calico$TISSUE == tiss,],
+    diffcom_results_significant$calico[diffcom_results_significant$calico$TISSUE == tiss,],
+    exclude_tissue_overrepresentation=TRUE,
+    adjust_pvals=TRUE)
+}, USE.NAMES = TRUE, simplify = FALSE)
+##
+overrep_tms_facs <- analyze_overrepresentation(
+  diffcom_results_detected_strong$tms_facs,
+  diffcom_results_significant$tms_facs,
+  adjust_pvals = TRUE
+)
+overrep_tms_facs_tiss <- sapply(unique(diffcom_results_detected_strong$tms_facs$TISSUE), function(tiss) {
+  analyze_overrepresentation(
+    diffcom_results_detected_strong$tms_facs[diffcom_results_detected_strong$tms_facs$TISSUE == tiss,],
+    diffcom_results_significant$tms_facs[diffcom_results_significant$tms_facs$TISSUE == tiss,],
+    exclude_tissue_overrepresentation=TRUE,
+    adjust_pvals=TRUE)
+}, USE.NAMES = TRUE, simplify = FALSE)
+##
+overrep_tms_droplet <- analyze_overrepresentation(
+  diffcom_results_detected_strong$tms_droplet,
+  diffcom_results_significant$tms_droplet,
+  adjust_pvals = TRUE
+)
+overrep_tms_droplet_tiss <- sapply(unique(diffcom_results_detected_strong$tms_droplet$TISSUE), function(tiss) {
+  analyze_overrepresentation(
+    diffcom_results_detected_strong$tms_droplet[diffcom_results_detected_strong$tms_droplet$TISSUE == tiss,],
+    diffcom_results_significant$tms_droplet[diffcom_results_significant$tms_droplet$TISSUE == tiss,],
+    exclude_tissue_overrepresentation=TRUE,
+    adjust_pvals=TRUE)
+}, USE.NAMES = TRUE, simplify = FALSE)
+
+#oerall K overrep
+overrep_L_overall <- list(
+  tms_facs = overrep_tms_facs$L_GENE,
+  tms_droplet = overrep_tms_droplet$L_GENE,
+  calico = overrep_calico$L_GENE
+)
+lapply(overrep_L_overall, setDT)
+overrep_L_sig <- list(
+  overrep_L_overall$tms_facs[,c("L_GENE", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_L_overall$tms_droplet[,c("L_GENE", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_L_overall$calico[,c("L_GENE", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_L_overall$tms_facs[,c("L_GENE", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_L_overall$tms_droplet[,c("L_GENE", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_L_overall$calico[,c("L_GENE", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,]
+)
+overrep_L_plot <- lapply(overrep_L_sig, function(x)
+  tableGrob(x, rows = NULL)
+)
+g_over_L <- cowplot::plot_grid(
+  plotlist = overrep_L_plot,
+  nrow = 2,
+  align = "v",
+  labels = c("FACS", "Droplet", "Calico", "FACS", "Droplet", "Calico")
+)
+
+#oerall R overrep
+overrep_R_overall <- list(
+  tms_facs = overrep_tms_facs$R_GENE,
+  tms_droplet = overrep_tms_droplet$R_GENE,
+  calico = overrep_calico$R_GENE
+)
+lapply(overrep_R_overall, setDT)
+overrep_R_sig <- list(
+  overrep_R_overall$tms_facs[,c("R_GENE", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_R_overall$tms_droplet[,c("R_GENE", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_R_overall$calico[,c("R_GENE", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_R_overall$tms_facs[,c("R_GENE", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_R_overall$tms_droplet[,c("R_GENE", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_R_overall$calico[,c("R_GENE", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,]
+)
+overrep_R_plot <- lapply(overrep_R_sig, function(x)
+  tableGrob(x, rows = NULL)
+)
+g_over_R <- cowplot::plot_grid(
+  plotlist = overrep_R_plot,
+  nrow = 2,
+  align = "v",
+  labels = c("FACS", "Droplet", "Calico", "FACS", "Droplet", "Calico")
+)
+
+
+#overall LR overrep
+overrep_LR_overall <- list(
+  tms_facs = overrep_tms_facs$LR_GENES,
+  tms_droplet = overrep_tms_droplet$LR_GENES,
+  calico = overrep_calico$LR_GENES
+)
+lapply(overrep_LR_overall, setDT)
+overrep_LR_sig <- list(
+  overrep_LR_overall$tms_facs[,c("LR_GENES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_LR_overall$tms_droplet[,c("LR_GENES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_LR_overall$calico[,c("LR_GENES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_LR_overall$tms_facs[,c("LR_GENES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_LR_overall$tms_droplet[,c("LR_GENES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_LR_overall$calico[,c("LR_GENES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,]
+)
+overrep_LR_plot <- lapply(overrep_LR_sig, function(x)
+  tableGrob(x, rows = NULL)
+)
+g_over_LR <- cowplot::plot_grid(
+  plotlist = overrep_LR_plot,
+  nrow = 2,
+  align = "v",
+  labels = c("FACS", "Droplet", "Calico", "FACS", "Droplet", "Calico")
+)
+
+ggsave(filename = "../data_scAgeCom/overrep_LR_overall.png", plot = g_over_LR, scale = 1.7)
+
+
+#tissue LR overrep
+#facs
+lapply(overrep_tms_facs_tiss, function(x) {
+  setDT(x$LR_GENES)
+})
+overrep_tiss_facs_up <- lapply(overrep_tms_facs_tiss, function(x) {
+  tableGrob(x$LR_GENES[,c("LR_GENES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:5,], rows = NULL)
+})
+overrep_tiss_facs_down <- lapply(overrep_tms_facs_tiss, function(x) {
+  tableGrob(x$LR_GENES[,c("LR_GENES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:5,], rows = NULL)
+})
+g_over_LR_facs_tiss_up <- cowplot::plot_grid(
+  plotlist = overrep_tiss_facs_up,
+  ncol = 5,
+  align = "v",
+  labels = names(overrep_tms_facs_tiss)
+)
+g_over_LR_facs_tiss_down <- cowplot::plot_grid(
+  plotlist = overrep_tiss_facs_down,
+  ncol = 5,
+  align = "v",
+  labels = names(overrep_tms_facs_tiss)
+)
+ggsave(filename = "../data_scAgeCom/overrep_LR_facs_tiss_up.png", plot = g_over_LR_facs_tiss_up, scale = 2)
+ggsave(filename = "../data_scAgeCom/overrep_LR_facs_tiss_down.png", plot = g_over_LR_facs_tiss_down, scale = 2.1)
+#droplet
+lapply(overrep_tms_droplet_tiss, function(x) {
+  setDT(x$LR_GENES)
+})
+overrep_tiss_droplet_up <- lapply(overrep_tms_droplet_tiss, function(x) {
+  tableGrob(x$LR_GENES[,c("LR_GENES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:5,], rows = NULL)
+})
+overrep_tiss_droplet_down <- lapply(overrep_tms_droplet_tiss, function(x) {
+  tableGrob(x$LR_GENES[,c("LR_GENES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:5,], rows = NULL)
+})
+g_over_LR_droplet_tiss_up <- cowplot::plot_grid(
+  plotlist = overrep_tiss_droplet_up,
+  ncol = 4,
+  align = "v",
+  labels = names(overrep_tms_droplet_tiss)
+)
+g_over_LR_droplet_tiss_down <- cowplot::plot_grid(
+  plotlist = overrep_tiss_droplet_down,
+  ncol = 4,
+  align = "v",
+  labels = names(overrep_tms_droplet_tiss)
+)
+ggsave(filename = "../data_scAgeCom/overrep_LR_droplet_tiss_up.png", plot = g_over_LR_droplet_tiss_up, scale = 1.5)
+ggsave(filename = "../data_scAgeCom/overrep_LR_droplet_tiss_down.png", plot = g_over_LR_droplet_tiss_down, scale = 1.7)
+#calico
+lapply(overrep_calico_tiss, function(x) {
+  setDT(x$LR_GENES)
+})
+overrep_tiss_calico_up <- lapply(overrep_calico_tiss, function(x) {
+  tableGrob(x$LR_GENES[,c("LR_GENES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:5,], rows = NULL)
+})
+overrep_tiss_calico_down <- lapply(overrep_calico_tiss, function(x) {
+  tableGrob(x$LR_GENES[,c("LR_GENES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:5,], rows = NULL)
+})
+g_over_LR_calico_tiss_up <- cowplot::plot_grid(
+  plotlist = overrep_tiss_calico_up,
+  ncol = 2,
+  align = "v",
+  labels = names(overrep_calico_tiss)
+)
+g_over_LR_calico_tiss_down <- cowplot::plot_grid(
+  plotlist = overrep_tiss_calico_down,
+  ncol = 2,
+  align = "v",
+  labels = names(overrep_calico_tiss)
+)
+ggsave(filename = "../data_scAgeCom/overrep_LR_calico_tiss_up.png", plot = g_over_LR_calico_tiss_up, scale = 1.1)
+ggsave(filename = "../data_scAgeCom/overrep_LR_calico_tiss_down.png", plot = g_over_LR_calico_tiss_down, scale = 1.1)
+
+#overall CC overrep
+overrep_CC_overall <- list(
+  tms_facs = overrep_tms_facs$LR_CELLTYPES,
+  tms_droplet = overrep_tms_droplet$LR_CELLTYPES,
+  calico = overrep_calico$LR_CELLTYPES
+)
+lapply(overrep_CC_overall, setDT)
+overrep_CC_sig <- list(
+  overrep_CC_overall$tms_facs[,c("LR_CELLTYPES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_CC_overall$tms_droplet[,c("LR_CELLTYPES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_CC_overall$calico[,c("LR_CELLTYPES", "overrepr_pval_UP")][order(overrepr_pval_UP)][1:15,],
+  overrep_CC_overall$tms_facs[,c("LR_CELLTYPES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_CC_overall$tms_droplet[,c("LR_CELLTYPES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,],
+  overrep_CC_overall$calico[,c("LR_CELLTYPES", "overrepr_pval_DOWN")][order(overrepr_pval_DOWN)][1:15,]
+)
+overrep_CC_plot <- lapply(overrep_CC_sig, function(x)
+  tableGrob(x, rows = NULL)
+)
+g_over_CC <- cowplot::plot_grid(
+  plotlist = overrep_CC_plot[c(1,2,4,5)],
+  nrow = 2,
+  align = "v",
+  labels = c("FACS", "Droplet", "FACS", "Droplet")
+)
+ggsave(filename = "../data_scAgeCom/overrep_CC_overall.png", plot = g_over_CC, scale = 2.2)
+
+##
+SCAT_facs <- diffcom_results_detected$tms_facs[TISSUE == "SCAT",]
+
+CCI_chord(SCAT_facs, "flat", TRUE, 10)
+CCI_chord(SCAT_facs, "Up", TRUE, 5)
+CCI_chord(SCAT_facs, "Down", TRUE, 5)
+
+CCI_chord(SCAT_facs, "flat", FALSE, 10)
+CCI_chord(SCAT_facs, "Up", FALSE, 5)
+CCI_chord(SCAT_facs, "Down", FALSE, 5)
+
+CCI_chord(SCAT_facs, "Down", TRUE, 10)
+CCI_chord(SCAT_facs, "Down", FALSE, 10, "../data_scAgeCom/test.png")
+
+gtest <- cowplot::as_grob(CCI_chord(SCAT_facs, "Down", TRUE, 10))
+
+CCI_chord <- function(
+  dt,
+  direction,
+  is_LR,
+  filter,
+  dir = NULL
+) {
+  dt_clean <- dt[SIG_TYPE != "FFF", ]
+  if(direction == "Up") {
+    dt_clean <- dt_clean[SIG_TYPE %in% c("FTT", "TTTU"),  ]
+  } else if(direction == "Down") {
+    dt_clean <- dt_clean[SIG_TYPE %in% c("TFT", "TTTD"),  ]
+  }
+  if(is_LR) {
+    dt_clean <- merge.data.table(
+      x = unique(dt_clean[, c("L_GENE", "R_GENE", "LR_GENES")]),
+      y = dt_clean[,.N, by = "LR_GENES"][N >= filter, ],
+      by = "LR_GENES",
+      all = FALSE
+    )[, LR_GENES := NULL]
+    dt_clean[, L_GENE := paste0("L-", L_GENE)]
+    dt_clean[, R_GENE := paste0("R-", R_GENE)]
+  } else{
+    dt_clean <- merge.data.table(
+      x = unique(dt_clean[, c("L_CELLTYPE", "R_CELLTYPE", "LR_CELLTYPES")]),
+      y = dt_clean[,.N, by = "LR_CELLTYPES"][N >= filter, ],
+      by = "LR_CELLTYPES",
+      all = FALSE
+    )[, LR_CELLTYPES := NULL]
+    dt_clean[, L_CELLTYPE := paste0("L-", L_CELLTYPE)]
+    dt_clean[, R_CELLTYPE := paste0("R-", R_CELLTYPE)]
+  }
+  if(!is.null(dir)) {
+    png(dir, width = 2000, height = 2000, res = 200)
+  }
+  circos.clear()
+  chordDiagram(dt_clean, annotationTrack = "grid", 
+               preAllocateTracks = list(track.height = max(strwidth(unlist(dimnames(dt_clean))))))
+  circos.track(track.index = 1, panel.fun = function(x, y) {
+    circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index, 
+                facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex = 1.2)
+  }, bg.border = NA)
+  
+  if(!is.null(dir)) {
+    dev.off()
+  }
+}
+
+
+###############
+#############
+#########
+
+test_lung_detected <- test_lung[SIG_TYPE %in% c("FTT", "TFT", "TTF", "TTTD", "TTTU"), ]
+test_lung_sig <- test_lung[SIG_TYPE %in% c("FTT", "TFT", "TTTD", "TTTU"),]
+colnames(test_lung_detected)
+
+df_d <- setDF(test_lung_detected)
+df_sig <- setDF(test_lung_sig)
+
+
+ora_test <- analyze_overrepresentation(df_d, df_sig,
+                                       exclude_tissue_overrepresentation=TRUE,
+                                       adjust_pvals=FALSE)
+
+orat_test_LR_GENES <- ora_test$L_GENE
+
+
+#########
+
+as.data.frame.matrix(table(diffcom_results_detected$tms_facs$SIG_TYPE))
 
 #detected interaction by LR_CELLTYPES
 table(diffcom_results_detected$tms_facs[TISSUE == "Liver",]$SIG_TYPE)
@@ -457,7 +948,8 @@ quantile(diffcom_results$tms_facs[((LR_DETECTED_old == TRUE & BH_PVAL_old <= 0.0
                                     BH_PVAL_DIFF <= 0.05,]$LR_LOGFC_ABS, probs = seq(0,1, 0.1))
 
 
-#non immune cells
+########
+##non immune cells
 diffcom_results_detected$tms_facs[, c("L_T_CELLTYPE", "R_T_CELLTYPE") := .(paste(TISSUE, L_CELLTYPE, sep = "_"), paste(TISSUE, R_CELLTYPE, sep = "_"))]
 
 write.csv(unique(diffcom_results_detected$tms_facs[, .(L_T_CELLTYPE)]),
@@ -520,6 +1012,8 @@ test_lung <- tms_facs_nonIm[TISSUE == "Lung",]
 test_lung[SIG_TYPE %in% c("TFT", "FTT", "TTTU", "TTTD") & L_GENE == "Ccl5" & R_GENE == "Cxcr6",]
 test_lung[SIG_TYPE %in% c("TFT", "FTT", "TTTU", "TTTD") & L_GENE == "Mrc1" & R_GENE == "Ptprc" & L_CELLTYPE == "hepatocyte",]
 
+diffcom_results_detected$tms_facs[LR_GENES == "Ltb_Ltbr" & LR_CELLTYPES ==  "B cell_Kupffer cell"]
+test_lung[LR_GENES == "Mrc1_Ptprc" & LR_CELLTYPES == "endothelial cell of hepatic sinusoid_B cell"]
 
 test_lung <- test_lung[, c("L_GENE", "R_GENE", "L_CELLTYPE", "R_CELLTYPE",
                                "LR_KEEP_young", "LR_KEEP_old", "LR_LOGFC", "LR_CELLTYPES", "LR_GENES", "SIG_TYPE")]
@@ -562,6 +1056,8 @@ circos.track(track.index = 1, panel.fun = function(x, y) {
               facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
 }, bg.border = NA) # here set bg.border to NA is important
 circos.clear()
+
+
 
 
 test_lung_up_chord <- data.table::merge.data.table(y = test_lung_d_up[, c("LR_CELLTYPES", "ratio")],
@@ -665,21 +1161,7 @@ for(i in 1:nrow(test_lung_down)) {
 }
 circos.clear()
 
-######ORA
 
-test_lung_detected <- test_lung[SIG_TYPE %in% c("FTT", "TFT", "TTF", "TTTD", "TTTU"), ]
-test_lung_sig <- test_lung[SIG_TYPE %in% c("FTT", "TFT", "TTTD", "TTTU"),]
-colnames(test_lung_detected)
-
-df_d <- setDF(test_lung_detected)
-df_sig <- setDF(test_lung_sig)
-
-
-ora_test <- analyze_overrepresentation(df_d, df_sig,
-                           exclude_tissue_overrepresentation=TRUE,
-                           adjust_pvals=FALSE)
-
-orat_test_LR_GENES <- ora_test$L_GENE
 
 
 
@@ -737,103 +1219,3 @@ sort(table(test[L_GENE == "Apoe" & LR_KEEP_DIFF == TRUE & LR_LOGFC < 0,]$R_GENE)
 
 
 #############
-
-which(test$LR_KEEP_old & !test$LR_KEEP_young & test$LR_KEEP_DIFF & (test$LR_LOGFC < 0))
-
-diffcom_results$tms_facs[16265744, ]
-
-df_detected <- run_filtering(df, filter_detected, 
-                            'raw_to_detected', res_filtering_dir)
-
-
-
-df_significant = run_filtering(df_detected, filter_significant, 
-                               'detected_to_significant', res_filtering_dir)
-
-
-filter_detected(df)
-#summarize
-
-
-df_detected = run_filtering(df, filter_detected, 
-                            'raw_to_detected', res_filtering_dir)
-
-###################################################
-create_dir(RESULTS_DIR)
-copy_config(RESULTS_DIR)
-
-# logging by redirecting output to file
-file_log = paste(RESULTS_DIR, "log.txt", sep='')
-sink(file=file_log)
-
-
-# FILTERING
-res_filtering_dir = paste0(RESULTS_DIR, "/", "FILTERING")
-create_dir(res_filtering_dir)
-df_detected = run_filtering(df, filter_detected, 
-                            'raw_to_detected', res_filtering_dir)
-df_significant = run_filtering(df_detected, filter_significant, 
-                               'detected_to_significant', res_filtering_dir)
-
-ftable(test_d$LR_KEEP_young, test_d$LR_KEEP_old, test_d$LR_KEEP_DIFF, test_d$DIRECTION)
-
-test_inc_TFTU <- test_d[
-  LR_KEEP_young == TRUE &
-    LR_KEEP_old == FALSE &
-    LR_KEEP_DIFF == TRUE &
-    DIRECTION == "UP",]
-ftable(test_inc_TFTU$BH_PVAL_old > 0.05,
-       test_inc_TFTU$LR_DETECTED_old == FALSE,
-       test_inc_TFTU$LR_SCORE_old < 0.85)
-
-test_inc_FTTD <- test_d[
-  LR_KEEP_young == FALSE &
-    LR_KEEP_old == TRUE &
-    LR_KEEP_DIFF == TRUE &
-    DIRECTION == "DOWN",]
-ftable(test_inc_FTTD$BH_PVAL_young > 0.05,
-       test_inc_FTTD$LR_DETECTED_young == FALSE,
-       test_inc_FTTD$LR_SCORE_young < 0.85)
-
-
-test_inc_TFFU <- test_d[
-  LR_KEEP_young == TRUE &
-    LR_KEEP_old == FALSE &
-    LR_KEEP_DIFF == FALSE&
-    DIRECTION == "UP",]
-ftable(test_inc_TFFU$BH_PVAL_old > 0.05,
-       test_inc_TFFU$LR_DETECTED_old == FALSE,
-       test_inc_TFFU$LR_SCORE_old < 0.85)
-
-test_inc_TFFD <- test_d[
-  LR_KEEP_young == TRUE &
-    LR_KEEP_old == FALSE &
-    LR_KEEP_DIFF == FALSE&
-    DIRECTION == "DOWN",]
-ftable(test_inc_TFFD$BH_PVAL_old > 0.05,
-       test_inc_TFFD$LR_DETECTED_old == FALSE,
-       test_inc_TFFD$LR_SCORE_old < 0.85)
-
-ftable(test_inc_TFFD$BH_PVAL_old > 0.05,
-       test_inc_TFFD$LR_DETECTED_old == TRUE,
-       test_inc_TFFD$LR_SCORE_old < 0.85)
-
-#
-test_inc_FTFD <- test_d[
-  LR_KEEP_young == FALSE &
-    LR_KEEP_old == TRUE &
-    LR_KEEP_DIFF == FALSE&
-    DIRECTION == "DOWN",]
-ftable(test_inc_FTFD$BH_PVAL_young > 0.05,
-       test_inc_FTFD$LR_DETECTED_young == FALSE,
-       test_inc_FTFD$LR_SCORE_young < 0.85)
-
-test_inc_FTFU <- test_d[
-  LR_KEEP_young == FALSE &
-    LR_KEEP_old == TRUE &
-    LR_KEEP_DIFF == FALSE&
-    DIRECTION == "UP",]
-ftable(test_inc_FTFU$BH_PVAL_young > 0.05,
-       test_inc_FTFU$LR_DETECTED_young == FALSE,
-       test_inc_FTFU$LR_SCORE_young < 0.85)
-

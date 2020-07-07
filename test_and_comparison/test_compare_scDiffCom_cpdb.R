@@ -16,13 +16,13 @@ library(ggplot2)
 #read results of both packages
 #both results have been obtained from the liver tissue of TMS FACS data, size-factor normalization, not log-normalized
 #both results obtained from 1000 iterations for the shake of comparison
-diffcom_test <- readRDS("test_and_comparison/data_results_diffcom.rds")
-cpdb_test <- read.table("test_and_comparison/data_results_cpdb.txt",
+diffcom_test <- readRDS("../data_scAgeCom/data_results_diffcom.rds")
+cpdb_test <- read.table("../data_scAgeCom/data_results_cpdb.txt",
                         header = TRUE,
                         sep = "\t")
 
 #convert the two tables to comparable tables
-orthologs <- read.table(file = "test_and_comparison/data_ortholgos_cpdb.txt",
+orthologs <- read.table(file = "../data_scAgeCom/data_ortholgos_cpdb.txt",
                     header = TRUE,
                     sep = "\t")
 #only keep monodimer ligand-receptor interactions for this particular comparison
@@ -55,27 +55,46 @@ comp_dt$sig_young_diffcom <- ifelse(comp_dt$PVAL_young <= 0.05, TRUE, FALSE)
 comp_dt$sig_old_cpdb <- ifelse(comp_dt$pvalue_old <= 0.05, TRUE, FALSE)
 comp_dt$sig_old_diffcom <- ifelse(comp_dt$PVAL_old <= 0.05, TRUE, FALSE)
 #compare LR scores for old cells (only when the CCI is detected)
-ggplot(comp_dt[LR_DETECTED_old == TRUE], aes(x = LR_SCORE_old, y = score_old)) +
+g_score_old <- ggplot(comp_dt[LR_DETECTED_old == TRUE], aes(x = LR_SCORE_old, y = score_old)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) +
   scale_x_log10() +
-  scale_y_log10()
+  scale_y_log10() +
+  xlab(expression(xi["old,scdiffcom"])) +
+  ylab(expression(xi["old,cpdb"])) +
+  theme(text=element_text(size=20)) 
 #compare LR scores for young cells (only when the CCI is detected)
-ggplot(comp_dt[LR_DETECTED_young == TRUE], aes(x = LR_SCORE_young, y = score_young)) +
+g_score_young <- ggplot(comp_dt[LR_DETECTED_young == TRUE], aes(x = LR_SCORE_young, y = score_young)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) +
   scale_x_log10() +
-  scale_y_log10()
+  scale_y_log10() +
+  xlab(expression(xi["young,scdiffcom"])) +
+  ylab(expression(xi["young,cpdb"])) +
+  theme(text=element_text(size=20)) 
 #compare LR pvalues for old cells (only when the CCI is detected)
-ggplot(comp_dt[LR_DETECTED_old == TRUE], aes(x = PVAL_old, y = pvalue_old)) +
-  geom_point() +
-  geom_abline(slope = 1, intercept = 0) 
-#compare LR pvalues for young cells (only when the CCI is detected)
-ggplot(comp_dt[LR_DETECTED_young == TRUE], aes(x = PVAL_young, y = pvalue_young)) +
+g_p_old <- ggplot(comp_dt[LR_DETECTED_old == TRUE], aes(x = PVAL_old, y = pvalue_old)) +
   geom_point() +
   geom_abline(slope = 1, intercept = 0) +
-  xlim(0, 0.05) +
-  ylim(0, 0.05)
+  xlab(expression(p["old,scdiffcom"])) +
+  ylab(expression(p["old,cpdb"])) +
+  theme(text=element_text(size=20)) 
+#compare LR pvalues for young cells (only when the CCI is detected)
+g_p_young <- ggplot(comp_dt[LR_DETECTED_young == TRUE], aes(x = PVAL_young, y = pvalue_young)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0) +
+  xlab(expression(p["young,scdiffcom"])) +
+  ylab(expression(p["young,cpdb"])) +
+  theme(text=element_text(size=20)) 
+
+g_all <- cowplot::plot_grid(
+  g_score_young, g_score_old,
+  g_p_young, g_p_old,
+  ncol = 2
+)
+
+ggsave(filename = "../data_scAgeCom/cpdb_scdiffcom_comp.png", plot = g_all, scale = 1)
+
 #Show how many significant p-values for young/old  are returned by each method (only considering detected)
 table(comp_dt[LR_DETECTED_young == TRUE]$sig_young_cpdb, comp_dt[LR_DETECTED_young == TRUE]$sig_young_diffcom)
 table(comp_dt[LR_DETECTED_old == TRUE]$sig_old_cpdb, comp_dt[LR_DETECTED_old == TRUE]$sig_old_diffcom)

@@ -67,7 +67,7 @@ if(!dir.exists(output_dir)) {
 ##
 
 message("Read ligand-receptor database.")
-LR <- LRall$LRall_one2one
+LR <- LRall
 if(LR_db == "all") {
   LR <- LR[, c("GENESYMB_L","GENESYMB_R", "SYMB_LR")]
 } else if(LR_db == "mixed") {
@@ -75,7 +75,6 @@ if(LR_db == "all") {
 } else {
   LR <- LR[LR[[LR_db]], c("GENESYMB_L","GENESYMB_R", "SYMB_LR")]
 }
-
 
 message("Read seurat object.")
 if(dataset %in% c("tms_facs", "tms_droplet")) {

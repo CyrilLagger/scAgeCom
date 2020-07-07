@@ -12,13 +12,14 @@
 
 library(Seurat)
 library(scDiffCom)
+library(ggplot2)
 #library(profvis)
 #library(microbenchmark)
 
 #load a Seurat objects
 #seurat_tms_test_file.rds corresponds to the Liver tissue from TMS FACS data.
 
-seurat_test <- readRDS("../data_seurat_example.rds")
+seurat_test <- readRDS("../data_scAgeCom/data_seurat_example.rds")
 seurat_test <- NormalizeData(seurat_test, assay = "RNA")
 seurat_test$age_group <- ifelse(seurat_test$age %in% c('1m', '3m'), 'young', 'old' )
 seurat_test$cell_ontology_class <- as.character(seurat_test$cell_ontology_class)
@@ -50,14 +51,17 @@ end_time - start_time
 #save the file for future reference
 #saveRDS(object = diffcom_test, file = "test_and_comparison/data_results_diffcom.rds")
 #saveRDS(object = diffcom_test, file = "test_and_comparison/data_results_diffcom_10000iter_log.rds")
-diffcom_test <- readRDS("test_and_comparison/data_results_diffcom.rds")
+diffcom_test <- readRDS("../data_scAgeCom/data_results_diffcom.rds")
+diffcom_test <- readRDS("../data_scAgeCom/data_results_diffcom_10000iter_log.rds")
 
 #Pick 5 random CCI for comparison below
-cci_test_list <- list(diffcom_test[LR_DETECTED_young & LR_DETECTED_old][28],
-                      diffcom_test[!LR_DETECTED_young & LR_DETECTED_old][120],
-                      diffcom_test[LR_DETECTED_young & !LR_DETECTED_old][345],
-                      diffcom_test[!LR_DETECTED_young & !LR_DETECTED_old][90],
-                      diffcom_test[LR_DETECTED_young & LR_DETECTED_old][60])
+cci_test_list <- list(
+  diffcom_test[LR_DETECTED_young & LR_DETECTED_old][28],
+  diffcom_test[!LR_DETECTED_young & LR_DETECTED_old][120],
+  diffcom_test[LR_DETECTED_young & !LR_DETECTED_old][345],
+  diffcom_test[!LR_DETECTED_young & !LR_DETECTED_old][90],
+  diffcom_test[LR_GENES == "Ltb_Ltbr"  & L_CELLTYPE ==  "B cell" & R_CELLTYPE == "Kupffer cell"]
+)
 
 #Manual check that the LR scores are correct
 compare_cci_score_test <- function(cci_test, condition) {
@@ -67,7 +71,7 @@ compare_cci_score_test <- function(cci_test, condition) {
   seurat_sub_r <- subset(seurat_test, features = cci_test[["R_GENE"]],
                          subset = (cell_ontology_class == cci_test[["R_CELLTYPE"]] &
                                      age_group == condition))
-  LR_avg_expr <- (mean(expm1(seurat_sub_l[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r[["RNA"]]@data[1,])))/2
+  LR_avg_expr <- (mean((seurat_sub_l[["RNA"]]@data[1,])) + mean((seurat_sub_r[["RNA"]]@data[1,])))/2
   return(LR_avg_expr - cci_test[[paste0("LR_SCORE_", condition)]])
 }
 
@@ -97,8 +101,8 @@ compare_cci_pvalue_diff_test <- function(seurat_obj, cci_test, iterations) {
     seurat_sub_r_old <- subset(seurat_temp, features = cci_test[["R_GENE"]],
                                  subset = (cell_ontology_class == cci_test[["R_CELLTYPE"]] &
                                              age_group == "old"))
-    LR_diff <- (mean(expm1(seurat_sub_l_old[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r_old[["RNA"]]@data[1,])))/2 - 
-      (mean(expm1(seurat_sub_l_young[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r_young[["RNA"]]@data[1,])))/2
+    LR_diff <- (mean((seurat_sub_l_old[["RNA"]]@data[1,])) + mean((seurat_sub_r_old[["RNA"]]@data[1,])))/2 - 
+      (mean((seurat_sub_l_young[["RNA"]]@data[1,])) + mean((seurat_sub_r_young[["RNA"]]@data[1,])))/2
     return(LR_diff)
   }
   all_LR <- replicate(iterations, get_shuffled_LR(TRUE))
@@ -109,18 +113,25 @@ compare_cci_pvalue_diff_test <- function(seurat_obj, cci_test, iterations) {
 }
 
 start_time <- Sys.time()
-test_pval_diff <- compare_cci_pvalue_diff_test(seurat_test, cci_test_list[[4]], iterations = 1000)
+test_pval_diff <- compare_cci_pvalue_diff_test(seurat_test, cci_test_list[[5]], iterations = 1000)
 end_time <- Sys.time()
 end_time - start_time
 
-cci_test_list[[4]]$pvals_diff
+cci_test_list[[5]]$BH_PVAL_DIFF
 #test$distr
 test_pval_diff$pval
-hist(test_pval_diff$distr)
+hist(test_pval_diff$distr, breaks = 50)
 mean(test_pval_diff$distr)
 mean(test_pval_diff$distr)/sd(test_pval_diff$distr)
+g_diff_histo <- ggplot(data.frame(x=test_pval_diff$distr), aes(x = x)) + geom_histogram(bins = 40) +
+  geom_vline(xintercept = cci_test_list[[5]]$LR_SCORE_old - cci_test_list[[5]]$LR_SCORE_young) +
+  xlab(expression(xi[old]-xi[young])) +
+  ylab("Counts")+
+  theme(text=element_text(size=20)) 
+ggsave(filename = "../data_scAgeCom/diff_permutation_histo.png", plot = g_diff_histo)
 
-#Manual check that the LR differential p-values are correct
+
+#Manual check that the LR specificity p-values are correct
 compare_cci_pvalue_spec_test <- function(seurat_obj, cci_test, iterations, condition) {
   seurat_temp <- subset(seurat_obj, features = c(cci_test[["L_GENE"]], cci_test[["R_GENE"]]),
                         subset =  age_group == condition)
@@ -133,8 +144,8 @@ compare_cci_pvalue_spec_test <- function(seurat_obj, cci_test, iterations, condi
                                  subset = (cell_ontology_class == cci_test[["L_CELLTYPE"]]))
     seurat_sub_r <- subset(seurat_temp, features = cci_test[["R_GENE"]],
                                  subset = (cell_ontology_class == cci_test[["R_CELLTYPE"]]))
-    (mean(expm1(seurat_sub_l[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r[["RNA"]]@data[1,])))/2
-    return((mean(expm1(seurat_sub_l[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r[["RNA"]]@data[1,])))/2)
+    (mean((seurat_sub_l[["RNA"]]@data[1,])) + mean((seurat_sub_r[["RNA"]]@data[1,])))/2
+    return((mean((seurat_sub_l[["RNA"]]@data[1,])) + mean((seurat_sub_r[["RNA"]]@data[1,])))/2)
   }
   all_LR <- replicate(iterations, get_shuffled_LR_ct(TRUE))
   all_LR <- c(all_LR, get_shuffled_LR_ct(FALSE))
@@ -151,7 +162,14 @@ end_time - start_time
 cci_test_list[[5]]$PVAL_old
 #test_pval_spec$distr
 test_pval_spec$pval
-hist(test_pval_spec$distr)
+hist(test_pval_spec$distr, breaks = 50)
+g_spec_histo <- ggplot(data.frame(x=test_pval_spec$distr), aes(x = x)) + geom_histogram(bins = 50) +
+  geom_vline(xintercept = cci_test_list[[5]]$LR_SCORE_old) +
+  xlab(expression(xi[old])) +
+  ylab("Counts")+
+  theme(text=element_text(size=20)) 
+ggsave(filename = "../data_scAgeCom/spec_permutation_histo.png", plot = g_spec_histo)
+
 
 #volcano plot
 library(ggrepel)
