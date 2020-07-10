@@ -4,26 +4,26 @@
 ##
 ## cyril.lagger@liverpool.ac.uk - June 2020
 ##
-## Test how the permutation tests of scDiffCom
-## behaves in various terms. Compare one-tailed
-## to two-tailed p-values, results from log-normalized
-## data vs nonlog-normalized data, etc.
+## Test the behaviour of the the permutation tests
+## in scDiffCom. 
 ##
 ####################################################
 ##
 
+## Libraries ####
 library(Seurat)
 library(scDiffCom)
 library(data.table)
 library(ggplot2)
 library(e1071)
-#library(profvis)
-#library(microbenchmark)
 
-#load a Seurat objects
-#seurat_tms_test_file.rds corresponds to the Liver tissue from TMS FACS data.
-seurat_test <- readRDS("../data_seurat_example.rds")
-#seurat_test <- readRDS("../../../../../seurat_droplet_example_kidney.rds")
+## Data path ####
+dir_data <- "../data_scAgeCom/"
+
+## Load a Seurat objects ####
+
+#here the file corresponds to the Liver tissue from TMS FACS data.
+seurat_test <- readRDS(paste0(dir_data, "data_seurat_example.rds"))
 seurat_test <- NormalizeData(seurat_test, assay = "RNA")
 seurat_test$age_group <- ifelse(seurat_test$age %in% c('1m', '3m'), 'young', 'old' )
 seurat_test$cell_ontology_class <- as.character(seurat_test$cell_ontology_class)
