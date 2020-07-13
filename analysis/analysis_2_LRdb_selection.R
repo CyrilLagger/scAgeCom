@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - June 2020
+## cyril.lagger@liverpool.ac.uk - July 2020
 ##
 ## Compare the Ligand-Receptor pairs from the various
 ## databases. Select the most relevant ones for
@@ -10,6 +10,8 @@
 ##
 ####################################################
 ##
+
+## Librarires ####
 
 library(scDiffCom)
 library(data.table)
@@ -22,12 +24,14 @@ library(gtable)
 library(clusterProfiler)
 library(org.Mm.eg.db)
 
-#load data
+## Data path ####
+dir_data <- "../data_scAgeCom/"
+
+## Load data ####
 data("LRall")
 
-#the dataset can be filtered by orthology type or orthology confidence
+## Summary data.frame ####
 
-#create a summary of the data
 LRdb_summary <- data.frame(
   name = c("SingleCellSignalR", "CellPhoneDB", "NicheNet", "scTensor"),
   original_species = c("Homo Sapiens", "Homo Sapiens", "Homo Sapiens", "Mus Musculus"),
@@ -47,7 +51,8 @@ LRdb_summary <- data.frame(
   )
 )
 
-#visualize the intersection of the LR pair with a venn diagram
+## Venn diagram ####
+
 venn.diagram(
   x = list(
     LRall[scsr == TRUE,]$SYMB_LR,
@@ -56,7 +61,7 @@ venn.diagram(
     LRall[sctensor == TRUE,]$SYMB_LR
   ),
   category.names = c( "SingleCellSignalR", "CellPhoneDB", "NicheNet", "scTensor"),
-  filename = "../data_scAgeCom/LRall_venndiagram.png",
+  filename = paste0(dir_data, "analysis/analysis_2_plot_LR_venn.png"),
   imagetype = "png",
   col = "black",
   fill =  c("#6b7fff",  "#de4dff", "#ff4059", "#2cff21"),
@@ -66,7 +71,7 @@ venn.diagram(
   margin = 0.15
 )
 
-#look at LR pairs only present in one group
+## Look at single LR ####
 sort(table(LRall$source_scsr), decreasing = TRUE)
 sort(table(LRall[sctensor == FALSE &
                         nichenet == FALSE &
@@ -88,8 +93,10 @@ sort(table(LRall[sctensor == TRUE &
                         scsr == FALSE,
                       ]$source_sctensor), decreasing = TRUE)
 
-#look at LR pairs with L==R
+# look at LR pairs with L==R
 LRall[GENESYMB_L == GENESYMB_R,]
+
+## Nice data.frame for presentation ####
 
 #nice data.frame visualization for the paper
 df_tr <- LRdb_summary
@@ -120,37 +127,39 @@ for(i in 2:5) {
 g <- tableGrob(df_tr, rows = NULL)
 grid.newpage()
 grid.draw(g)
-grid.newpage()
-#ggsave(filename = "LRdb_comparison/LRdb_summary_table.png", plot = g, scale = 1.5)
+ggsave(paste0(dir_data, "analysis/analysis_2_plot_LRdb_summary_table.png"),
+       plot = g, scale = 1.5)
 
-#nice data.frame visualization for the talk, subset of LRall
-# a random but interesting selection
+# example data.frame with a few LR pairs
 LRSYMB_forTalk <- c(
   "Gcg_Adora2a",  "Apoe_Sdc4",  "Vegfd_Itga5",  "Thbs1_Itga4",  "Itgb1_Plaur",
   "Hsp90b1_Egfr", "Gip_Pth1r",    "Ccl28_Ackr2",  "Avp_Fshr",     "Apln_Bdkrb1"
 )
-#LR_forTalk <- LRall[scsr == TRUE | nichenet == TRUE | cpdb == TRUE, ][sample(.N, 10), ]
 LR_forTalk <- LRall[SYMB_LR %in% LRSYMB_forTalk,]
 g <- tableGrob(LR_forTalk, rows = NULL)
 grid.newpage()
 grid.draw(g)
-#ggsave(filename = "LRdb_comparison/LRdb_example_subset.png", plot = g, scale = 1.8)
+ggsave(paste0(dir_data, "analysis/analysis_2_plot_LRdb_example_table.png"),
+       plot = g, scale = 2)
 
-#conclusion: we will keep the  union of scsr and cpdb
+## Select relevant LR pairs ####
+
 LR_toKeep <- LRall[scsr == TRUE | cpdb == TRUE, ]
 nrow(LR_toKeep)
 
-#look at orthology
+# look at orthology
 table(LR_toKeep$CONF_L, LR_toKeep$CONF_R)
 table(LR_toKeep$TYPE_L, LR_toKeep$TYPE_R)
 
-#look at the genes in more details
+## Enrichment analysis on LR-pairs ####
+
+# look at the genes in more details
 Ligand_toKeep <- unique(LR_toKeep$GENESYMB_L)
 Receptor_toKeep <- unique(LR_toKeep$GENESYMB_R)
 common_toKeep <- intersect(Ligand_toKeep, Receptor_toKeep)
 all_toKeep <- unique(c(Ligand_toKeep, Receptor_toKeep))
 
-#GO enrichment analysis
+# list of GO analysis
 ego_toEnrich <- list(
   all_MF = list(gene = all_toKeep, ont = "MF"),
   all_BP = list(gene = all_toKeep, ont = "BP"),
@@ -163,6 +172,7 @@ ego_toEnrich <- list(
   R_CC = list(gene = Receptor_toKeep, ont = "CC")
 )
 
+# apply ClusterProfiler
 ego_results <- lapply(
   ego_toEnrich,
   function(x) {
@@ -197,10 +207,9 @@ g <- cowplot::plot_grid(
              "Receptor - Molecular Function", "Receptor - Cellular Component"),
   align = "v"
 )
+ggsave(paste0(dir_data, "analysis/analysis_2_plot_enrichGO_LRKeep.png"),
+       plot = g, scale = 1.8)
 
-#ggsave(filename = "LRdb_comparison/enrichGO_LRKeep.png", plot = g, scale = 1.8)
 
-#heatplot(ego_results$all_MF)
-#upsetplot(ego_results$R_BP)
 
 

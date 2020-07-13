@@ -32,6 +32,9 @@ seurat_path <- c(
   calico_spleen = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_spleen.rds"
 )
 
+## Other data path ####
+dir_data <- "../data_scAgeCom/"
+
 ## Load the Seurat objects (several GBs) #####
 
 seurat_objects <- list(
@@ -81,9 +84,9 @@ head(sort(total_counts$calico_kidney))
 mapply(function(x,y) {identical(x$n_genes,y)}, seurat_objects, unique_genes, SIMPLIFY = FALSE)
 identical(seurat_objects$tms_droplet$n_genes, unique_genes$tms_droplet)
 
-## Distribution of age/tissue/cell-types ####
+## Prepare data for age/tissue/cell-types comparison ####
 
-#add age groups
+# add age groups
 anyNA(seurat_objects$tms_facs$age)
 unique(seurat_objects$tms_facs$age)
 seurat_objects$tms_facs$age_group <- ifelse(seurat_objects$tms_facs$age %in% c('1m', '3m'), 'young', 'old')
@@ -120,7 +123,7 @@ tissue_toKeep <- lapply(seurat_objects, function(obj) {
   tokeep <- apply(
     table(obj$tissue, obj$age_group) >= 5,
     MARGIN = 1,
-    FUN = any
+    FUN = all
   )
   names(tokeep[tokeep])
 })
@@ -154,16 +157,15 @@ seurat_objects_filtered <- mapply(
   tissue_cell_type_toKeep,
   SIMPLIFY = FALSE
 )
- 
 
-
-######################
+# number of tissue-cell type after filtering
 number_tissue_ct <- sapply(seurat_objects_filtered, function(x) {
   length(unique(x$tissue_cell_type))
 })
 number_tissue_ct <- c(number_tissue_ct[1:2], sum(number_tissue_ct[3:5]))
 
-#Create a nice data.frame to be use for talk
+## Summary data.frame ####
+
 seurat_summary <- data.frame(
   name = c("Tabula Muris Senis - FACS", "Tabula Muris Senis - Droplet", "Calico"),
   tissue_number = c(length(unique(seurat_objects_filtered$tms_facs$tissue)),
@@ -174,7 +176,6 @@ seurat_summary <- data.frame(
 seurat_summary<- transpose(seurat_summary, keep.names = "")
 colnames(seurat_summary) <- seurat_summary[1,]
 seurat_summary <- seurat_summary[-c(1),]
-
 seurat_summary$name <- c(
   "Number of tissues",
   "Number of cell types"
@@ -183,9 +184,11 @@ colnames(seurat_summary)[[1]] <- ""
 g_seurat_summary <- tableGrob(seurat_summary, rows = NULL)
 grid.newpage()
 grid.draw(g_seurat_summary)
-ggsave(filename = "../data_scAgeCom/seurat_summary_table.png", plot = g_seurat_summary, scale = 1.5)
+ggsave(filename = paste0(dir_data, "analysis/analysis_1_plot_seurat_summary.png"),
+       plot = g_seurat_summary, scale = 1.5)
 
-#easier to work with each meta.data df
+## Prepare list of meta.data ####
+
 seurat_md <- list(
   tms_facs = seurat_objects_filtered$tms_facs@meta.data,
   tms_droplet = seurat_objects_filtered$tms_droplet@meta.data,
@@ -198,25 +201,24 @@ seurat_md <- list(
   )
 )
 
-#order tissue alphabetically
+# order tissue alphabetically
 seurat_md <- lapply(seurat_md, function(md) {
   md$tissue <- factor(md$tissue, levels = sort(unique(md$tissue), decreasing = TRUE))
   return(md)
 })
 
-#plot of number of cell-types
-cells_per_tissue <- lapply(seurat_md, function(md) {
-  ggplot(md, aes(x = tissue, fill = age_group)) + geom_bar(position = "dodge") +
-    theme(text=element_text(size=28)) +
-    scale_y_log10() +
-    xlab("Tissue") +
-    ylab("Number of cells") +
-    labs(fill = "Age") +
-    coord_flip()
-})
+## Plot number of cell-types ####
 
 g_cells_per_tissue <- cowplot::plot_grid(
-  plotlist = cells_per_tissue,
+  plotlist = lapply(seurat_md, function(md) {
+    ggplot(md, aes(x = tissue, fill = age_group)) + geom_bar(position = "dodge") +
+      theme(text=element_text(size=28)) +
+      scale_y_log10() +
+      xlab("Tissue") +
+      ylab("Number of cells") +
+      labs(fill = "Age") +
+      coord_flip()
+  }),
   ncol = 2,
   labels = c("TMS FACS", "TMS Droplet", "Calico"),
   align = "v",
@@ -224,25 +226,24 @@ g_cells_per_tissue <- cowplot::plot_grid(
   #label_x = 0, label_y = 0,
   #hjust = -0.5, vjust = -0.5
 )
-ggsave(filename = "../data_scAgeCom/cells_per_tissue.png", plot = g_cells_per_tissue, scale = 2.5)
+#ggsave(paste0(dir_data, "analysis/analysis_1_plot_cell_per_tissue.png"),
+#       plot = g_cells_per_tissue, scale = 2.5)
 
-#number of cell-types per tissues
+# number of cell-types per tissues
 celltype_distr <- lapply(seurat_md, function(md) {
   setDT(md)
   unique(md[,c("tissue", "tissue_cell_type")])
 })
 
-celltype_per_tissue <- lapply(celltype_distr, function(md) {
-  ggplot(md, aes(x = tissue)) + geom_bar() +
-    geom_text(stat='count', aes(label=..count..), hjust = -0.1) +
-    theme(text=element_text(size=28)) +
-    xlab("Tissue") +
-    ylab("Number of cell-types") +
-    coord_flip()
-})
-
 g_celltype_per_tissue <- cowplot::plot_grid(
-  plotlist = celltype_per_tissue,
+  plotlist = lapply(celltype_distr, function(md) {
+    ggplot(md, aes(x = tissue)) + geom_bar() +
+      geom_text(stat='count', aes(label=..count..), hjust = -0.1) +
+      theme(text=element_text(size=28)) +
+      xlab("Tissue") +
+      ylab("Number of cell-types") +
+      coord_flip()
+  }),
   ncol = 2,
   labels = c("TMS FACS", "TMS Droplet", "Calico"),
   align = "v",
@@ -250,30 +251,29 @@ g_celltype_per_tissue <- cowplot::plot_grid(
   #label_x = 0, label_y = 0,
   #hjust = -0.5, vjust = -0.5
 )
+ggsave(paste0(dir_data, "analysis/analysis_1_plot_celltypes_per_tissue.png"),
+       plot = g_celltype_per_tissue, scale = 2.4)
 
-ggsave(filename = "../data_scAgeCom/celltypes_per_tissue.png", plot = g_celltype_per_tissue, scale = 2.4)
+## Comparison of common tissues ####
 
-
-#comparison of the cell-types in the three common tisssues
 seurat_common_md <- lapply(seurat_md, function(x) {
   x <- x[x$tissue %in% c("Kidney", "Lung", "Spleen"),]
   x$tissue <- factor(x$tissue, levels = sort(unique(as.character(x$tissue))))
   return(x)
 })
 
-cells_per_celltype <- lapply(seurat_common_md, function(md) {
-  ggplot(md, aes(x = tissue_cell_type, fill = age_group)) + geom_bar(position = "dodge") +
-    theme(text=element_text(size=16),
-          axis.text.y=element_blank()) +
-    xlab("Cell type (Kidney, Lung, Spleen)") +
-    scale_y_log10() +
-    ylab("Number of cells") +
-    labs(fill = "Age") +
-    coord_flip()
-})
-
 g_cells_per_celltype <- cowplot::plot_grid(
-  plotlist = cells_per_celltype,
+  plotlist = lapply(seurat_common_md, function(md) {
+    ggplot(md, aes(x = tissue_cell_type, fill = age_group)) + geom_bar(position = "dodge") +
+      theme(text=element_text(size=16),
+            axis.text.y=element_blank()) +
+      xlab("Cell type (Kidney, Lung, Spleen)") +
+      scale_y_log10() +
+      ylab("Number of cells") +
+      labs(fill = "Age") +
+      coord_flip()
+  })
+  ,
   ncol = 2,
   labels = c("TMS FACS", "TMS Droplet", "Calico"),
   align = "v",
@@ -281,8 +281,8 @@ g_cells_per_celltype <- cowplot::plot_grid(
   #label_x = 0, label_y = 0,
   #hjust = -0.5, vjust = -0.5
 )
-
-ggsave(filename = "../data_scAgeCom/cells_per_celltypes.png", plot = g_cells_per_celltype, scale = 2.4)
+ggsave(paste0(dir_data, "analysis/analysis_1_plot_cell_per_celltypes.png"),
+       plot = g_cells_per_celltype, scale = 2.4)
 
 kidney_celltypes <- list(
   tms_facs = unique(seurat_common_md$tms_facs[tissue == "Kidney",]$tissue_cell_type),
@@ -306,8 +306,7 @@ spleen_celltypes <- list(
 )
 spleen_celltypes
 
-
-#nice data.frame for presentation just the spleen
+# spleen data.frame for presentation
 
 spleen_ct_df <- data.frame(
   tms_facs = c(spleen_celltypes$tms_facs, rep("",6)),
@@ -319,4 +318,6 @@ colnames(spleen_ct_df) <- c("TMS FACS", "TMS Droplet", "Calico", "Calico (subtyp
 g_spleen <- tableGrob(spleen_ct_df, rows = NULL)
 grid.newpage()
 grid.draw(g_spleen)
-ggsave(filename = "../data_scAgeCom/spleen_celltypes.png", plot = g_spleen, scale = 1.5)
+
+ggsave(paste0(dir_data, "analysis/analysis_1_plot_spleen_celltypes.png"),
+       plot = g_spleen, scale = 1.5)

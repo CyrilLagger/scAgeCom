@@ -2,15 +2,14 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - June 2020
+## cyril.lagger@liverpool.ac.uk - July 2020
 ##
-## Combine the results from scDiffCom for the
-## various datasets considered here. Then load the
-## downstream parameters and proceed to filtering
-## and overrepresenation analysis.
+## Combine scDiffCom results and filtering.
 ##
 ####################################################
 ##
+
+
 
 library(Seurat)
 library(scDiffCom)

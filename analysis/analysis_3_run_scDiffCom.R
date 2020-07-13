@@ -2,27 +2,24 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - June 2020
+## cyril.lagger@liverpool.ac.uk - July 2020
 ##
-## Main scAgeCom analysis by running scDiffCom.
-## Creates CCI data.frames to be used for
-## downstream analysis.
+## Apply scDiffCom to all three datasets.
 ##
 ####################################################
 ##
 
-####################################################
-## Source the libraries and parameters 
-####################################################
-##
+## Libraries ####
 
 library(Seurat)
 library(scDiffCom)
 library(foreach)
 library(doParallel)
 
+## Parameters ####
 
-#parameters
+#Note change each time before running the analysis
+
 dataset <- "tms_droplet" # c("tms_facs", "tms_droplet", "calico")
 LR_db <- "mixed" # c("all", "scsr", "sctensor", "nichenet", "mixed")
 normalization <- "size_factor" #c("size_factor", "sctransform")
@@ -30,8 +27,10 @@ is_log <- TRUE
 n_iter <- 10000
 run_test <- FALSE
 calico_subtype <- FALSE
+dir_data_output <- getwd()
 
-#paths
+## Data path ####
+
 paths <- c(
   tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_facs.rds",
   tms_droplet = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_droplet.rds",
@@ -39,17 +38,20 @@ paths <- c(
   calico_lung = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_lung.rds",
   calico_spleen = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_spleen.rds"
 )
+
+## Create output path ####
+
 if(is_log) {
   if(calico_subtype) {
-    output_dir <- paste0(getwd(), "/diffcom_", dataset, "_subtype_", normalization, "_log_", n_iter, "iter_", LR_db)
+    output_dir <- paste0(dir_data_output, "/diffcom_", dataset, "_subtype_", normalization, "_log_", n_iter, "iter_", LR_db)
   } else {
-    output_dir <- paste0(getwd(), "/diffcom_", dataset, "_", normalization, "_log_", n_iter, "iter_", LR_db)
+    output_dir <- paste0(dir_data_output, "/diffcom_", dataset, "_", normalization, "_log_", n_iter, "iter_", LR_db)
   }
 } else {
   if(calico_subtype) {
-    output_dir <- paste0(getwd(), "/diffcom_", dataset, "_subtype_", normalization, "_nlog_", n_iter, "iter_", LR_db)
+    output_dir <- paste0(dir_data_output, "/diffcom_", dataset, "_subtype_", normalization, "_nlog_", n_iter, "iter_", LR_db)
   } else {
-    output_dir <- paste0(getwd(), "/diffcom_", dataset, "_", normalization, "_nlog_", n_iter, "iter_", LR_db)
+    output_dir <- paste0(dir_data_output, "/diffcom_", dataset, "_", normalization, "_nlog_", n_iter, "iter_", LR_db)
   }
 }
 if(run_test) {
@@ -61,10 +63,7 @@ if(!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
 
-####################################################
-## Code starts
-####################################################
-##
+## Read LR-pairs ####
 
 message("Read ligand-receptor database.")
 LR <- LRall
@@ -75,6 +74,8 @@ if(LR_db == "all") {
 } else {
   LR <- LR[LR[[LR_db]], c("GENESYMB_L","GENESYMB_R", "SYMB_LR")]
 }
+
+## Read Seurat object ####
 
 message("Read seurat object.")
 if(dataset %in% c("tms_facs", "tms_droplet")) {
@@ -115,8 +116,12 @@ if(run_test){
   n_tissue <- 2
 }
 
+## Setup parallel environment ####
+
 message("Setup parallel environment.")
 registerDoParallel(cores= min(n_tissue, 30))
+
+## Actual analysis ####
 
 message("Start tissue per tissue scDiffCom analysis")
 foreach(i = 1:n_tissue, .packages = c("Seurat", "scDiffCom")) %dopar% {
