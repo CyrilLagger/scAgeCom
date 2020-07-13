@@ -41,48 +41,6 @@ read_explorecutoffs_arg <- function() {
 }
 
 
-load_globals_from_config <- function(R_CONFIG_ACTIVE) {
-  
-  Sys.setenv(R_CONFIG_ACTIVE = R_CONFIG_ACTIVE)
-  
-  #assign("DATA_PATH", config::get("DATA_PATH"), envir=.GlobalEnv)
-  #assign("RESULTS_DIR", config::get("RESULTS_DIR"), envir=.GlobalEnv)
-  # CUTOFFS
-  #assign("CUTOFF_PVAL_ADJ", config::get("CUTOFF_PVAL_ADJ"), envir=.GlobalEnv)
-  #assign("CUTOFF_SCORE_YOUNG", config::get("CUTOFF_SCORE_YOUNG"), envir=.GlobalEnv)
-  #assign("CUTOFF_SCORE_OLD", config::get("CUTOFF_SCORE_OLD"), envir=.GlobalEnv)
-  #assign("CUTOFF_LOGFC", config::get("CUTOFF_LOGFC"), envir=.GlobalEnv)
-  #assign("CUTOFF_CPDB_PVAL_YOUNG", config::get("CUTOFF_CPDB_PVAL_YOUNG"), envir=.GlobalEnv)
-  #assign("CUTOFF_CPDB_PVAL_OLD", config::get("CUTOFF_CPDB_PVAL_OLD"), envir=.GlobalEnv)
-  # COLUMNS' NAMES
-  assign("COL_TISSUES", config::get("COL_TISSUES"), envir=.GlobalEnv)
-  assign("COL_LR_GENES", config::get("COL_LR_GENES"), envir=.GlobalEnv)
-  assign("COL_L_GENE", config::get("COL_L_GENE"), envir=.GlobalEnv)
-  assign("COL_R_GENE", config::get("COL_R_GENE"), envir=.GlobalEnv)
-  assign("COL_LIGAND_CELLTYPE", config::get("COL_LIGAND_CELLTYPE"), envir=.GlobalEnv)
-  assign("COL_RECEPTOR_CELLTYPE", config::get("COL_RECEPTOR_CELLTYPE"), envir=.GlobalEnv)
-  assign("COL_LIGAND_RECEPTOR_CELLTYPES", config::get("COL_LIGAND_RECEPTOR_CELLTYPES"), envir=.GlobalEnv)
-  assign("COL_LR_SCORE_YOUNG", config::get("COL_LR_SCORE_YOUNG"), envir=.GlobalEnv)
-  assign("COL_LR_SCORE_OLD", config::get("COL_LR_SCORE_OLD"), envir=.GlobalEnv)
-  assign("COL_LOGFC", config::get("COL_LOGFC"), envir=.GlobalEnv)
-  assign("COL_LOGFC_ABS", config::get("COL_LOGFC_ABS"), envir=.GlobalEnv)
-  assign("COL_BH_PVAL", config::get("COL_BH_PVAL"), envir=.GlobalEnv)
-  assign("COL_RAW_PVAL", config::get("COL_RAW_PVAL"), envir=.GlobalEnv)
-  assign("COL_LR_DETECTED_YOUNG", config::get("COL_LR_DETECTED_YOUNG"), envir=.GlobalEnv)
-  assign("COL_LR_DETECTED_OLD", config::get("COL_LR_DETECTED_OLD"), envir=.GlobalEnv)
-  #assign("COL_LIGAND_EXPRESSION_YOUNG", config::get("COL_LIGAND_EXPRESSION_YOUNG"), envir=.GlobalEnv)
-  #assign("COL_LIGAND_EXPRESSION_OLD", config::get("COL_LIGAND_EXPRESSION_OLD"), envir=.GlobalEnv)
-  #assign("COL_LIGAND_DETECTED_YOUNG", config::get("COL_LIGAND_DETECTED_YOUNG"), envir=.GlobalEnv)
-  #assign("COL_LIGAND_DETECTED_OLD", config::get("COL_LIGAND_DETECTED_OLD"), envir=.GlobalEnv)
-  #assign("COL_RECEPTOR_EXPRESSION_YOUNG", config::get("Receptor_expr_young"), envir=.GlobalEnv)
-  #assign("COL_RECEPTOR_EXPRESSION_OLD", config::get("COL_RECEPTOR_EXPRESSION_OLD"), envir=.GlobalEnv)
-  #assign("COL_RECEPTOR_DETECTED_YOUNG", config::get("COL_RECEPTOR_DETECTED_YOUNG"), envir=.GlobalEnv)
-  #assign("COL_RECEPTOR_DETECTED_OLD", config::get("COL_RECEPTOR_DETECTED_OLD"), envir=.GlobalEnv)
-  assign("COL_BH_PVAL_SPECIFICITY_YOUNG", config::get("COL_BH_PVAL_SPECIFICITY_YOUNG"), envir=.GlobalEnv)
-  assign("COL_BH_PVAL_SPECIFICITY_OLD", config::get("COL_BH_PVAL_SPECIFICITY_OLD"), envir=.GlobalEnv)
-}
-
-
 save_list_dfs <- function(l, dir) {
   
   is_not_list = !(class(l) == "list")
