@@ -138,3 +138,83 @@ mm2Hs[mm2Hs$`Gene name` == "IL6R",]
 
 test <- diffcom_results_significant$tms_facs
 test2 <- diffcom_results_significant$tms_droplet
+
+
+
+##volcano plot #####
+library(ggrepel)
+diffcom_1000iter <- readRDS("test_and_comparison/data_results_diffcom_10000iter_log.rds")
+diffcom_1000iter[, LR_DIFF := LR_SCORE_old - LR_SCORE_young]
+ggplot(diffcom_1000iter[(LR_DETECTED_young | LR_DETECTED_old), ], 
+       aes(x = LR_DIFF, y = -log10(BH_PVAL_DIFF + 1E-4))) +
+  geom_point() +
+  geom_vline(xintercept = log(1.1)) +
+  geom_vline(xintercept = -log(1.1)) +
+  geom_hline(yintercept = -log10(0.05))
+
++
+  geom_text(
+    data = diffcom_1000iter[(LR_DETECTED_young | LR_DETECTED_old) & BH_PVAL_DIFF < 0.01 & abs(LR_DIFF) > 0.5, ],
+    aes(label = LR_GENES),
+    size = 5
+    #box.padding = unit(0.35, "lines"),
+    #point.padding = unit(0.3, "lines")
+  )
+
+hist(log10(diffcom_1000iter$LR_SCORE_old), breaks = 100)
+hist(log10(diffcom_1000iter$LR_SCORE_young), breaks = 100)
+
+ggplot(diffcom_1000iter[(LR_DETECTED_young | LR_DETECTED_old) & (BH_PVAL_young <= 0.05 | BH_PVAL_old <= 0.05) & 
+                          (LR_SCORE_young > 0.1 | LR_SCORE_old > 0.1), ], 
+       aes(x = LR_DIFF, y = -log10(BH_PVAL_DIFF + 1E-4))) +
+  geom_point() +
+  geom_vline(xintercept = log(1.1)) +
+  geom_vline(xintercept = -log(1.1)) +
+  geom_hline(yintercept = -log10(0.05))
+
+
++
+  geom_text(
+    data = diffcom_1000iter[(LR_DETECTED_young | LR_DETECTED_old) & BH_PVAL_DIFF < 0.01 & abs(LR_DIFF) > 0.3, ],
+    aes(label = L_CELLTYPE),
+    size = 5
+    #box.padding = unit(0.35, "lines"),
+    #point.padding = unit(0.3, "lines")
+  )
+
+
+
+
+
+
+calico_previous <- bind_tissues(data_path$calico, tissue_list$calico)
+
+calico_new <- bind_tissues("../../../../../scDiffCom_results/diffcom_calico_size_factor_log_10000iter_mixed", tissue_list$calico)
+
+table(calico_new$LR_DETECTED_old, calico_new$LR_DETECTED_young)
+table(calico_previous$LR_DETECTED_old, calico_previous$LR_DETECTED_young)
+
+
+diffcom_results <- mapply(bind_tissues, data_path, tissue_list, SIMPLIFY = FALSE)
+
+facs_previous <- bind_tissues(data_path$tms_facs, tissue_list$tms_facs)
+facs_news <- bind_tissues("../../../../../scDiffCom_results/diffcom_tms_facs_size_factor_log_10000iter_mixed", tissue_list$tms_facs)
+
+facs_previous[, id_col := paste(LR_GENES, L_CELLTYPE, R_CELLTYPE, TISSUE, sep = "_")]
+facs_news[, id_col := paste(LR_GENES, L_CELLTYPE, R_CELLTYPE, TISSUE, sep = "_")]
+
+
+table(facs_news$LR_DETECTED_old, facs_news$LR_DETECTED_young)
+table(facs_previous$LR_DETECTED_old, facs_previous$LR_DETECTED_young)
+
+
+facs_comp <- facs_news[id_col %in% facs_previous$id_col,]
+facs_previous <- unique(facs_previous)
+
+
+table(facs_comp$LR_DETECTED_old, facs_comp$LR_DETECTED_young)
+table(facs_previous$LR_DETECTED_old, facs_previous$LR_DETECTED_young)
+
+
+
+

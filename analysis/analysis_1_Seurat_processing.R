@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - June 2020
+## cyril.lagger@liverpool.ac.uk - July 2020
 ##
 ## Check the scRNA-seq dataset preprocessing.
 ## Provide some useful information about tissue,
@@ -11,6 +11,10 @@
 ####################################################
 ##
 
+# Note: works on the server only due to large file-size
+
+## Libraries ####
+
 library(Seurat)
 library(data.table)
 library(ggplot2)
@@ -18,7 +22,9 @@ library(gridExtra)
 library(grid)
 library(gtable)
 
-paths <- c(
+## Paths of the Seurat objects ####
+
+seurat_path <- c(
   tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_facs.rds",
   tms_droplet = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_droplet.rds",
   calico_kidney = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_kidney.rds",
@@ -26,28 +32,36 @@ paths <- c(
   calico_spleen = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_spleen.rds"
 )
 
-#the Seurat object should already be preprocessed, we check that
+## Load the Seurat objects (several GBs) #####
 
-#load the objects (only possibe on the server!)
 seurat_objects <- list(
-  tms_facs = readRDS(paths[["tms_facs"]]),
-  tms_droplet = readRDS(paths[["tms_droplet"]]),
-  calico_kidney = readRDS(paths[["calico_kidney"]]),
-  calico_lung = readRDS(paths[["calico_lung"]]),
-  calico_spleen = readRDS(paths[["calico_spleen"]])
+  tms_facs = readRDS(seurat_path[["tms_facs"]]),
+  tms_droplet = readRDS(seurat_path[["tms_droplet"]]),
+  calico_kidney = readRDS(seurat_path[["calico_kidney"]]),
+  calico_lung = readRDS(seurat_path[["calico_lung"]]),
+  calico_spleen = readRDS(seurat_path[["calico_spleen"]])
 )
 
-#Q: avalaible assays? (A: only RNA)
+## Check basic contents of Seurat objects ####
+
+# Available assays: "RNA"
 lapply(seurat_objects, function(x) {
   x@assays
 })
 
-#Q: slot counts content? (A: integer-value detection)
+# Content of "counts" slot: integers
 lapply(seurat_objects, function(x) {
   x$RNA@counts[1:5,1:5]
 })
 
-#Q: number of unique genes per cell?
+# Content of metadata
+lapply(seurat_objects, function(x) {
+  colnames(x@meta.data)
+})
+
+## Check QC ####
+
+# Number of unique genes per cell
 unique_genes <- lapply(seurat_objects, function(x) {
   Matrix::colSums(x$RNA@counts > 0)
 })
@@ -55,7 +69,7 @@ unique_genes <- lapply(seurat_objects, function(x) {
 min_genes_per_cell <- lapply(unique_genes, min)
 head(sort(unique_genes$calico_kidney))
 
-#Q: total detection rate per cell?
+# Total number of counts per cell
 total_counts <- lapply(seurat_objects, function(x) {
   Matrix::colSums(x$RNA@counts)
 })
@@ -63,21 +77,13 @@ total_counts <- lapply(seurat_objects, function(x) {
 min_total_count_per_cell <- lapply(total_counts, min)
 head(sort(total_counts$calico_kidney))
 
-#Q: what is stored in meta.data?
-lapply(seurat_objects, function(x) {
-  colnames(x@meta.data)
-})
-
-#Q: are n_counts and n_genes similar to the previous values? (A: no because some genes have been filtered away)
+# Compare counts to previously stored values (some differnce due to early filtering)
 mapply(function(x,y) {identical(x$n_genes,y)}, seurat_objects, unique_genes, SIMPLIFY = FALSE)
 identical(seurat_objects$tms_droplet$n_genes, unique_genes$tms_droplet)
-#should not be a big problem
 
-##
-# So the preprocessing and QC are OK, we can now look at the age, tissue and cell-type content
-# Normalization will be done later on, just before applying scDiffCom.
+## Distribution of age/tissue/cell-types ####
 
-#We had age groups
+#add age groups
 anyNA(seurat_objects$tms_facs$age)
 unique(seurat_objects$tms_facs$age)
 seurat_objects$tms_facs$age_group <- ifelse(seurat_objects$tms_facs$age %in% c('1m', '3m'), 'young', 'old')
@@ -88,7 +94,7 @@ seurat_objects$calico_kidney$age_group <- seurat_objects$calico_kidney$age
 seurat_objects$calico_lung$age_group <- seurat_objects$calico_lung$age
 seurat_objects$calico_spleen$age_group <- seurat_objects$calico_spleen$age
 
-#We had tissue-cell types
+# add tissue-cell types
 seurat_objects[1:2] <- lapply(seurat_objects[1:2], function(x) {
   x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class, sep = "_")
   return(x)
@@ -101,7 +107,7 @@ seurat_objects[3:5] <- lapply(seurat_objects[3:5], function(x) {
   return(x)
 })
 
-#we change some categories to character
+# change some categories to character
 seurat_objects <- lapply(seurat_objects, function(x) {
   x$tissue <- as.character(x$tissue)
   x$age_group <- as.character(x$age_group)
@@ -109,12 +115,12 @@ seurat_objects <- lapply(seurat_objects, function(x) {
   return(x)
 })
 
-#We consider tissues with more than 5 cells 
+# consider tissues with more than 5 cells 
 tissue_toKeep <- lapply(seurat_objects, function(obj) {
   tokeep <- apply(
     table(obj$tissue, obj$age_group) >= 5,
     MARGIN = 1,
-    FUN = all
+    FUN = any
   )
   names(tokeep[tokeep])
 })
@@ -129,12 +135,12 @@ seurat_objects_filtered <- mapply(
   SIMPLIFY = FALSE
 )
 
-#We consider cell types with more than 5 cells per age
+# consider cell types with more than 5 cells per age
 tissue_cell_type_toKeep <- lapply(seurat_objects_filtered, function(obj) {
   tokeep <- apply(
     table(obj$tissue_cell_type, obj$age_group) >= 5,
     MARGIN = 1,
-    FUN = all
+    FUN = any
   )
   names(tokeep[tokeep])
 })
@@ -148,7 +154,10 @@ seurat_objects_filtered <- mapply(
   tissue_cell_type_toKeep,
   SIMPLIFY = FALSE
 )
+ 
 
+
+######################
 number_tissue_ct <- sapply(seurat_objects_filtered, function(x) {
   length(unique(x$tissue_cell_type))
 })
