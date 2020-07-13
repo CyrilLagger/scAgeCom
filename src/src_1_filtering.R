@@ -4,21 +4,57 @@
 ##
 ## cyril.lagger@liverpool.ac.uk - July 2020
 ##
-## Two utility functions to assign the CCI to their
+## Utility functions to assign the CCI to their
 ## correct category based on various cutoffs.
 ##
 ####################################################
 ##
+
+bind_tissues <- function(
+  path,
+  list_of_tissues,
+  is_log
+) {
+  data.table::rbindlist(
+    l = lapply(
+      X = list_of_tissues,
+      FUN = function(
+        tiss
+      ) 
+      {
+        dt <- readRDS(paste0(path, "/diffcom_", tiss, ".rds"))
+        dt[, TISSUE := tiss]
+        if(is_log) {
+          dt[, LR_LOGFC := LR_SCORE_old - LR_SCORE_young]
+        } else {
+          dt[, LR_LOGFC := log(LR_SCORE_old/LR_SCORE_young)]
+        }
+        dt[, LR_LOGFC_ABS := abs(LR_LOGFC)]
+        dt[, LR_CELLTYPES := paste(L_CELLTYPE, R_CELLTYPE, sep = "_")]
+        #dt[, c("L_EXPRESSION_young",
+        #       "L_EXPRESSION_old",
+        #       "R_EXPRESSION_young",
+        #       "R_EXPRESSION_old",
+        #       "L_DETECTED_young",
+        #       "L_DETECTED_old",
+        #       "R_DETECTED_young",
+        #       "R_DETECTED_old",
+        #       "PVAL_old", 
+        #       "PVAL_young") := NULL]
+      }),
+    use.names = TRUE
+  )
+}
 
 # Filtering process
 filter_CCI <- function(
   dt,
   CUTOFF_SCORE_YOUNG,
   CUTOFF_SCORE_OLD,
+  CUTOFF_LOGFC,
   CUTOFF_CPDB_PVAL_YOUNG = 0.05,
   CUTOFF_CPDB_PVAL_OLD = 0.05,
-  CUTOFF_PVAL_ADJ = 0.05,
-  CUTOFF_LOGFC
+  CUTOFF_PVAL_ADJ = 0.05
 ) {
   dt[, LR_KEEP_young := ifelse(
     (LR_DETECTED_young == TRUE & LR_SCORE_young >= CUTOFF_SCORE_YOUNG & BH_PVAL_young <= CUTOFF_CPDB_PVAL_YOUNG),
@@ -53,10 +89,10 @@ reassign_CCI <- function(
   dt,
   CUTOFF_SCORE_YOUNG,
   CUTOFF_SCORE_OLD,
+  CUTOFF_LOGFC,
   CUTOFF_CPDB_PVAL_YOUNG = 0.05,
   CUTOFF_CPDB_PVAL_OLD = 0.05,
-  CUTOFF_PVAL_ADJ = 0.05,
-  CUTOFF_LOGFC
+  CUTOFF_PVAL_ADJ = 0.05
 ) {
   dt[, SIG_TYPE := ifelse(
     LR_KEEP_young == TRUE & LR_KEEP_old == TRUE &  LR_KEEP_DIFF == TRUE,
@@ -111,4 +147,34 @@ reassign_CCI <- function(
       )
     )
   )]
+}
+
+filter_and_reassign_CCI <- function(
+  dt,
+  CUTOFF_SCORE_YOUNG,
+  CUTOFF_SCORE_OLD,
+  CUTOFF_LOGFC,
+  CUTOFF_CPDB_PVAL_YOUNG = 0.05,
+  CUTOFF_CPDB_PVAL_OLD = 0.05,
+  CUTOFF_PVAL_ADJ = 0.05
+) {
+  filter_CCI(
+    dt = dt,
+    CUTOFF_SCORE_YOUNG = CUTOFF_SCORE_YOUNG,
+    CUTOFF_SCORE_OLD = CUTOFF_SCORE_OLD,
+    CUTOFF_LOGFC = CUTOFF_LOGFC,
+    CUTOFF_CPDB_PVAL_YOUNG = CUTOFF_CPDB_PVAL_YOUNG,
+    CUTOFF_CPDB_PVAL_OLD = CUTOFF_CPDB_PVAL_OLD,
+    CUTOFF_PVAL_ADJ = CUTOFF_PVAL_ADJ
+  )
+  res_dt <- reassign_CCI(
+    dt = dt[LR_KEEP_young == TRUE | LR_KEEP_old == TRUE],
+    CUTOFF_SCORE_YOUNG = CUTOFF_SCORE_YOUNG,
+    CUTOFF_SCORE_OLD = CUTOFF_SCORE_OLD,
+    CUTOFF_LOGFC = CUTOFF_LOGFC,
+    CUTOFF_CPDB_PVAL_YOUNG = CUTOFF_CPDB_PVAL_YOUNG,
+    CUTOFF_CPDB_PVAL_OLD = CUTOFF_CPDB_PVAL_OLD,
+    CUTOFF_PVAL_ADJ = CUTOFF_PVAL_ADJ
+  )
+  return(res_dt)
 }
