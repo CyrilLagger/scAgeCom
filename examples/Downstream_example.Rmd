@@ -21,8 +21,8 @@ library(RColorBrewer)
 source("../src/downstream_processing.R")
 
 
-DATA_PATH = "../../single-cell-communication/data/pipeline_output/analysis_4_data_diffcom_filter.rds"
-
+#DATA_PATH = "../../single-cell-communication/data/pipeline_output/analysis_4_data_diffcom_filter.rds"
+DATA_PATH = "../../data_scAgeCom/analysis/analysis_4_data_diffcom_filter.rds"
 
 cols = get_default_colnames()
 datasets = readRDS(DATA_PATH)
@@ -71,9 +71,9 @@ data = analyze_CCI(data,
                        "FTFD" = "FFFD",
                        
                        "FFTU" = "FFFU",
-                       "FFTD" = "FFFD",
-                       # "FFFU" = "FFFU",
-                       # "FFFD" = "FFFD,
+                       "FFTD" = "FFFD"#,
+                        #"FFFU" = "FFFU",
+                       #"FFFD" = "FFFD"
                    ))
 
 data = data[!(CASE_TYPE %in% c("FFFU", "FFFD"))]
@@ -133,8 +133,8 @@ head(fpm$sub2)
 Let's do the heatmaps. First we convert dt_ora to dt_ctypes, a data.table that stores what can be thought of as edge data, where every row describes an edge between a ligand and receptor celltype with edge attributes: OR, OR_UP, OR_DOWN. This data.table is exploited to build the heatmaps.
 
 ```{r}
-
-HEATMAPS_DIR = "../../single-cell-communication/scripts/downstream_processing_dev/notebooks/heatmaps_dir"  # specify with or without "/" as last char :)
+HEATMAPS_DIR = "../../data_scAgeCom/analysis"
+#HEATMAPS_DIR = "../../single-cell-communication/scripts/downstream_processing_dev/notebooks/heatmaps_dir"  # specify with or without "/" as last char :)
 
 dt_ctypes = get_celltypes_enrichment(dt_ora, cols)
 head(dt_ctypes)
