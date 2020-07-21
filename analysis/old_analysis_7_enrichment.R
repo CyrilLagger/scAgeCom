@@ -1,3 +1,29 @@
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(scDiffCom)
+
+diffcom_results <- readRDS("../../data_scAgeCom/analysis/analysis_4_data_diffcom_filter_new.rds")
+
+setorder(diffcom_results$tms_facs, -LR_LOGFC)
+
+
+head(diffcom_results$tms_facs)
+test <- unique(diffcom_results$tms_facs[BH_PVAL_DIFF <= 0.05 & LR_LOGFC >= log(1.1)]$L_GENE)
+
+universe_L <- unique(LRall[scsr == TRUE | cpdb == TRUE]$GENESYMB_L)
+
+ego_test <- enrichGO(
+  gene = test,
+  OrgDb = org.Mm.eg.db,
+  keyType = 'SYMBOL',
+  ont = "MF",
+  universe = universe_L,
+  pAdjustMethod = "BH",
+  pvalueCutoff = 0.01,
+  qvalueCutoff  = 0.05
+)
+
+dotplot(ego_test)
 
 ##old stuff below, not working!!
 
