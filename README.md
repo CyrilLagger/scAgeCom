@@ -1,15 +1,16 @@
-# scAgeCom
+# scAgeCom (in development)
 Analysis of Age-related Changes in Intercellular Communication from scRNA-seq
 
 # Folder/file description
 ### Top level
-* analysis - main folder with detailed analysis
+* analysis - main folder with final analysis
 * src - folder with utility functions
 * test - folder to test and benchmark specific parts of codes
-* config.yml - config file with different sets of parameters 
+* shinyApp - code for the web app
+* old_deprecated - code to keep temporarily (will be removed eventually)
 
 ### analysis
-Note: it should not be necessary to run analysis 1-4 for downstream analysis. Data are already stored.
+Note: it should not be necessary to run analysis 1-4 each time if the data are already stored.
 * analysis_1_Seurat_processing.R - verifies the integrity of Seurat files
     * controls the content of the files
     * checks that QC has been done properly
@@ -21,9 +22,17 @@ Note: it should not be necessary to run analysis 1-4 for downstream analysis. Da
 * analysis_3_run_scDiffCom.R - does scDiffCom analysis on all datasets
     * run in parallel over all tissues (one dataset at a time)
     * need to be called each time for each dataset
-* analysis_4_filtering - binds and filters scDiffCom results
-    * depends on src_1_filtering.R
-    * need to improve the cutoff exploration
+* analysis_3b_run_diffcom_whole_dataset.R - not functional for now...
+    * attempt to consider the entire dataset as a single tissue
+    * not working yet, requires too much memory (even on the server)
+    * not sure if this is a relevant analysis
+* analysis_4_filtering_ora_fpm.Rmd - first downstreamn analysis
+    * perform filtering
+    * perform overrepresentation analysis
+    * perform frequent pattern mining
+    * we need to discuss the choice of cutoffs
+* TODO
+    * add future downstream analysis (general stats, enrichment, more plots, etc)
 
 ### test
 Note: each script can be run independently, as long as some data files are stored. Additional files can also be added if more tests are needed.
@@ -46,4 +55,4 @@ Note: each script can be run independently, as long as some data files are store
     * do test with another file, e.g. from Calico
     * add more test related to LR_score cutoff
     * clarify how test_3 can help us to justify our choice of parameters
-    * clarify the origin of the strang cases whith very low distribution means
+    * clarify the origin of the strange cases whith very low distribution means
