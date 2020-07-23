@@ -1,5 +1,7 @@
 
 
+# need to be done properly. 
+
 diffcom_results <- readRDS("../../data_scAgeCom/analysis/analysis_4_data_diffcom_filter_new.rds")
 
 LRkeep <- LRall[scsr == TRUE | cpdb == TRUE]
