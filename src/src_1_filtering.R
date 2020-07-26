@@ -14,7 +14,7 @@
 bind_tissues <- function(
   path,
   list_of_tissues,
-  is_log
+  pre_filtering = TRUE
 ) {
   data.table::rbindlist(
     l = lapply(
@@ -25,7 +25,10 @@ bind_tissues <- function(
       {
         dt <- readRDS(paste0(path, "/diffcom_", tiss, ".rds"))
         dt[, TISSUE := tiss]
-        dt <- dt[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
+        if(pre_filtering) {
+          dt <- dt[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
+        }
+        return(dt)
         # if(is_log) {
         #   dt[, LR_LOGFC := LR_SCORE_old - LR_SCORE_young]
         # } else {
@@ -80,12 +83,14 @@ analyze_CCI <- function(
   cutoff_specificity_old = 0.05,
   cutoff_pval = 0.05,
   cutoff_logFC_abs = log(1.1),
-  reassignment = NULL
+  reassignment = NULL,
+  is_log = TRUE
 ) {
   
   message("Analyzing CCI...")
+  #data <- copy(data)
   
-  data <- preprocess_results(data, cols)
+  data <- preprocess_results(data, cols, is_log)
   
   data <- analyze_detected(
     data, 
