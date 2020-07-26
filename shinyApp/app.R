@@ -24,7 +24,8 @@ cols_to_show_LRdb <- c("Ligand", "Receptor", "LR", "source_scsr", "source_cpdb",
                        "Ortho. conf. L", "Ortho. type L", "Ortho. conf. R", "Ortho. type R")
 
 #scDiffCom data
-diffcom_data <- readRDS("data/analysis_4_data_diffcom_filter_new.rds")
+#diffcom_data <- readRDS("data/analysis_4_data_diffcom_filter_new.rds")
+diffcom_data <- readRDS("data/analysis_4_data_diffcom_filter_less_stringent.rds")
 diffcom_data <- lapply(diffcom_data, function(data) {
   data[, L_TCT := paste(TISSUE, L_CELLTYPE, sep = "_")]
   data[, R_TCT := paste(TISSUE, R_CELLTYPE, sep = "_")]
@@ -54,7 +55,8 @@ cols_to_show_diffcom <- c("TISSUE", "Ligand", "Receptor", "Emitter cell type", "
 cols_numeric_diffcom <- c("LOG2FC", "Adj. P-value")
 
 #ORA data
-ora_data <- readRDS("data/analysis_4_data_ora.rds")
+#ora_data <- readRDS("data/analysis_4_data_ora.rds")
+ora_data <- readRDS("data/analysis_4_data_ora_less_stringent.rds")
 ora_data <- lapply(ora_data, function(data) {
   setnames(
     data,
