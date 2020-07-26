@@ -53,7 +53,7 @@ datasets <- mapply(
   bind_tissues,
   DIFFCOM_RESULT_PATH,
   TISSUE_DATASET,
-  MoreArgs = list(is_log = TRUE),
+  MoreArgs = list(pre_filtering = FALSE),
   SIMPLIFY = FALSE
 )
 
@@ -69,7 +69,7 @@ datasets <- mapply(
 ```
 
 Let's perform the filtering. There are a couple of variables here that need to be decided upon:
-    - cutoff on LR_SCORE young and old: below it's computed as the 75-percentile on young and old combined.
+    - cutoff on LR_SCORE young and old: below it's computed as the 75-percentile on young and old combined, before any filtering is done
 
 Sticking to a functional programming style, generally functions don't mutate the data tables they act upon. Therefore the step of removing undetected interactions has to be done separately and explicitely (as below).    
 
@@ -80,7 +80,7 @@ cols = get_default_colnames()
 datasets <- lapply(
   datasets,
   function(data) {
-    cutoff <- quantile(c(data[LR_DETECTED_old == TRUE]$LR_SCORE_old, data[LR_DETECTED_young == TRUE]$LR_SCORE_young), 0.75)
+    cutoff <- quantile(c(data$LR_SCORE_old, data$LR_SCORE_young), 0.75)
     data <- analyze_CCI(
       data,
       cutoff_score = cutoff
