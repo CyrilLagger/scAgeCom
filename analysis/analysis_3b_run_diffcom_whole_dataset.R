@@ -22,10 +22,10 @@ library(scDiffCom)
 
 dataset <- "tms_facs" # c("tms_facs", "tms_droplet", "calico")
 LR_db <- "mixed" # c("all", "scsr", "sctensor", "nichenet", "mixed")
-#normalization <- "size_factor" #c("size_factor", "sctransform")
+normalization <- "size_factor" #c("size_factor", "sctransform")
 is_log <- TRUE
-n_iter <- 10000
-#run_test <- FALSE
+n_iter <- 10
+run_test <- FALSE
 calico_subtype <- FALSE
 dir_data_output <- getwd()
 
@@ -85,7 +85,14 @@ if(dataset %in% c("tms_facs", "tms_droplet")) {
   cell_type_id <- "tissue_cell_type"
   #we only keep the tissues with young/old cells
   if(dataset == "tms_facs") {
-    tissue_list <- unique(as.character(seurat_obj$tissue))
+    #tissue_list <- unique(as.character(seurat_obj$tissue))
+    tissue_list <- c("Pancreas", "Heart", "MAT", "SCAT", "GAT")
+    #c("Aorta", "BAT", "Bladder", "Brain_Myeloid",
+    #  "Brain_Non-Myeloid", "Diaphragm", "GAT",
+    #  "Heart", "Kidney", "Large_Intestine",
+    #  "Limb_Muscle", "Liver", "Lung", "Mammary_Gland",
+    #  "Marrow", "MAT", "Pancreas", "SCAT", "Skin",
+    #  "Spleen", "Thymus", "Tongue", "Trachea")
   } else {
     tissue_list <- c(
       "Bladder", "Heart_and_Aorta", "Kidney",
@@ -99,6 +106,7 @@ if(dataset %in% c("tms_facs", "tms_droplet")) {
   Seurat::DefaultAssay(seurat_obj) <- "RNA"
   message("Size-factor normalization:")
   seurat_obj <- Seurat::NormalizeData(seurat_obj, assay = "RNA")
+  message("scDiffCom analysis:")
   dt_res <- scDiffCom::run_diffcom(
     seurat_obj = seurat_obj,
     LR_data = LR,
@@ -114,14 +122,6 @@ if(dataset %in% c("tms_facs", "tms_droplet")) {
     iterations = n_iter,
     return_distr = FALSE
   )
-  
-  
   message("Saving global results.")
   saveRDS(dt_res, file = paste0(output_dir, "/diffcom_global.rds"))
-  
-  
-} else if(dataset == "calico") {
-  stop("Global analysis not supported yet for Calico.")
-} else {
-  stop("Dataset not supported.")
 }
