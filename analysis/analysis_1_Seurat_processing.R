@@ -117,6 +117,8 @@ seurat_objects <- lapply(seurat_objects, function(x) {
   x$tissue_cell_type <- as.character(x$tissue_cell_type)
   return(x)
 })
+seurat_objects$tms_facs$sex <- as.character(seurat_objects$tms_facs$sex)
+seurat_objects$tms_droplet$sex <- as.character(seurat_objects$tms_droplet$sex)
 
 # consider tissues with more than 5 cells 
 tissue_toKeep <- lapply(seurat_objects, function(obj) {
@@ -137,6 +139,15 @@ seurat_objects_filtered <- mapply(
   tissue_toKeep,
   SIMPLIFY = FALSE
 )
+
+tissue_sex_toKeep <- lapply(seurat_objects[c(1,2)], function(obj) {
+  tokeep <- apply(
+    table(obj$tissue, obj$sex) >= 5,
+    MARGIN = 1,
+    FUN = all
+  )
+  names(tokeep[tokeep])
+})
 
 # consider cell types with more than 5 cells per age
 tissue_cell_type_toKeep <- lapply(seurat_objects_filtered, function(obj) {

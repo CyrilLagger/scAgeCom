@@ -21,7 +21,7 @@ library(doParallel)
 
 #Note change each time before running the analysis
 
-dataset <- "tms_droplet" # c("tms_facs", "tms_droplet")
+dataset <- "tms_facs" # c("tms_facs", "tms_droplet")
 LR_db <- "mixed" # c("all", "scsr", "sctensor", "nichenet", "mixed")
 normalization <- "size_factor" #c("size_factor", "sctransform")
 is_log <- TRUE
@@ -81,15 +81,16 @@ if(LR_db == "all") {
 message("Read seurat object.")
 if(dataset %in% c("tms_facs", "tms_droplet")) {
   seurat_obj <- readRDS(paths[[dataset]])
-  #seurat_obj$age_group <- ifelse(seurat_obj$age %in% c('1m', '3m'), 'young', 'old')
+  seurat_obj$sex<- as.character(seurat_obj$sex)
   #we only keep the tissues with female/male cells
   if(dataset == "tms_facs") {
     tissue_list <- unique(as.character(seurat_obj$tissue))
+    tissue_list <- tissue_list[tissue_list != "Mammary_Gland"]
   } else {
     tissue_list <- c(
       "Bladder", "Heart_and_Aorta", "Kidney",
       "Limb_Muscle", "Liver", "Lung",
-      "Mammary_Gland", "Marrow", "Spleen",
+      "Marrow", "Spleen",
       "Thymus", "Tongue"
     )
   }
