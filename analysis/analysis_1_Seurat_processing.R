@@ -140,6 +140,28 @@ seurat_objects_filtered <- mapply(
   SIMPLIFY = FALSE
 )
 
+tissue_female_toKeep <- lapply(seurat_objects[c(1,2)], function(obj) {
+  md <- obj@meta.data
+  md <- md[md$sex == "female", ]
+  tokeep <- apply(
+    table(md$tissue, md$age_group) >= 5,
+    MARGIN = 1,
+    FUN = all
+  )
+  names(tokeep[tokeep])
+})
+
+tissue_male_toKeep <- lapply(seurat_objects[c(1,2)], function(obj) {
+  md <- obj@meta.data
+  md <- md[md$sex == "male", ]
+  tokeep <- apply(
+    table(md$tissue, md$age_group) >= 5,
+    MARGIN = 1,
+    FUN = all
+  )
+  names(tokeep[tokeep])
+})
+
 tissue_sex_toKeep <- lapply(seurat_objects[c(1,2)], function(obj) {
   tokeep <- apply(
     table(obj$tissue, obj$sex) >= 5,

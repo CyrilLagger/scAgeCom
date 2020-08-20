@@ -25,9 +25,15 @@ LR_db <- "mixed" # c("all", "scsr", "sctensor", "nichenet", "mixed")
 normalization <- "size_factor" #c("size_factor", "sctransform")
 is_log <- TRUE
 n_iter <- 10000
+var_sex <- "default" #c("default", "female", "male")
 run_test <- FALSE
 calico_subtype <- FALSE
 dir_data_output <- getwd()
+
+if(dataset == "calico" & var_sex != "default") {
+  message("Calico dataset has only male mice. Setting variable 'var_sex' to 'default'.")
+  var_sex <- "default"
+}
 
 ## Data path ####
 
@@ -53,6 +59,9 @@ if(is_log) {
   } else {
     output_dir <- paste0(dir_data_output, "/diffcom_", dataset, "_", normalization, "_nlog_", n_iter, "iter_", LR_db)
   }
+}
+if(var_sex != "default") {
+  output_dire <- paste0(output_dire, "_", var_sex)
 }
 if(run_test) {
   output_dir <- paste0(output_dir, "_test")
@@ -81,16 +90,25 @@ message("Read seurat object.")
 if(dataset %in% c("tms_facs", "tms_droplet")) {
   seurat_obj <- readRDS(paths[[dataset]])
   seurat_obj$age_group <- ifelse(seurat_obj$age %in% c('1m', '3m'), 'young', 'old')
-  #we only keep the tissues with young/old cells
-  if(dataset == "tms_facs") {
-    tissue_list <- unique(as.character(seurat_obj$tissue))
-  } else {
-    tissue_list <- c(
-      "Bladder", "Heart_and_Aorta", "Kidney",
-      "Limb_Muscle", "Liver", "Lung",
-      "Mammary_Gland", "Marrow", "Spleen",
-      "Thymus", "Tongue"
+  if(var_sex == "default") {
+    if(dataset == "tms_facs") {
+      tissue_list <- unique(as.character(seurat_obj$tissue))
+    } else {
+      tissue_list <- c(
+        "Bladder", "Heart_and_Aorta", "Kidney",
+        "Limb_Muscle", "Liver", "Lung",
+        "Mammary_Gland", "Marrow", "Spleen",
+        "Thymus", "Tongue"
       )
+    }
+  } else if(var_sex == "female") {
+    seurat_obj <- subset(seurat_obj, subset = sex == "female")
+    
+  } else if(var_sex == "male") {
+    seurat_obj <- subset(seurat_obj, subset = sex == "male")
+    
+  } else {
+    stop("Variable var_sex has to be one of the following: 'default', 'female' or 'male'.")
   }
   n_tissue <- length(tissue_list)
 } else if(dataset == "calico") {
