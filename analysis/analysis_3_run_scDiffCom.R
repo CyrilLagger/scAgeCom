@@ -25,7 +25,7 @@ LR_db <- "mixed" # c("all", "scsr", "sctensor", "nichenet", "mixed")
 normalization <- "size_factor" #c("size_factor", "sctransform")
 is_log <- TRUE
 n_iter <- 10000
-var_sex <- "default" #c("default", "female", "male")
+var_sex <- "male" #c("default", "female", "male")
 run_test <- FALSE
 calico_subtype <- FALSE
 dir_data_output <- getwd()
@@ -61,7 +61,7 @@ if(is_log) {
   }
 }
 if(var_sex != "default") {
-  output_dire <- paste0(output_dire, "_", var_sex)
+  output_dir <- paste0(output_dir, "_", var_sex)
 }
 if(run_test) {
   output_dir <- paste0(output_dir, "_test")
@@ -85,31 +85,24 @@ if(LR_db == "all") {
 }
 
 ## Read Seurat object ####
-
 message("Read seurat object.")
 if(dataset %in% c("tms_facs", "tms_droplet")) {
   seurat_obj <- readRDS(paths[[dataset]])
   seurat_obj$age_group <- ifelse(seurat_obj$age %in% c('1m', '3m'), 'young', 'old')
-  if(var_sex == "default") {
-    if(dataset == "tms_facs") {
-      tissue_list <- unique(as.character(seurat_obj$tissue))
-    } else {
-      tissue_list <- c(
-        "Bladder", "Heart_and_Aorta", "Kidney",
-        "Limb_Muscle", "Liver", "Lung",
-        "Mammary_Gland", "Marrow", "Spleen",
-        "Thymus", "Tongue"
-      )
-    }
-  } else if(var_sex == "female") {
+  if(var_sex == "female") {
     seurat_obj <- subset(seurat_obj, subset = sex == "female")
-    
   } else if(var_sex == "male") {
     seurat_obj <- subset(seurat_obj, subset = sex == "male")
-    
-  } else {
+  } else if(var_sex != "default") {
     stop("Variable var_sex has to be one of the following: 'default', 'female' or 'male'.")
   }
+  md_temp <- seurat_obj@meta.data
+  tokeep <- apply(
+    table(as.character(md_temp$tissue), md_temp$age_group) >= 5,
+    MARGIN = 1,
+    FUN = all
+  )
+  tissue_list <- names(tokeep[tokeep])
   n_tissue <- length(tissue_list)
 } else if(dataset == "calico") {
   seurat_kidney <- readRDS(paths[["calico_kidney"]])
