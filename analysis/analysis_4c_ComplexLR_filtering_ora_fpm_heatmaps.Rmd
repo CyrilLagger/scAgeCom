@@ -27,14 +27,8 @@ source("../src/src_1_filtering.R")
 DATA_PATH <- "../data_scAgeCom/"
 
 DIFFCOM_RESULT_PATH <- list(
-  calico = "../../data_scAgeCom/scDiffCom_results/diffcom_calico_size_factor_log_10000iter_mixed",
-  calico_sub = "../../data_scAgeCom/scDiffCom_results/diffcom_calico_subtype_size_factor_log_10000iter_mixed",
-  tms_facs = "../../data_scAgeCom/scDiffCom_results/diffcom_tms_facs_size_factor_log_10000iter_mixed",
-  tms_facs_female = "../../data_scAgeCom/scDiffCom_results_ageBySex/diffcom_tms_facs_size_factor_log_10000iter_mixed_female/",
-  tms_facs_male = "../../data_scAgeCom/scDiffCom_results_ageBySex/diffcom_tms_facs_size_factor_log_10000iter_mixed_male/",
-  tms_droplet = "../../data_scAgeCom/scDiffCom_results/diffcom_tms_droplet_size_factor_log_10000iter_mixed",
-  tms_droplet_female = "../../data_scAgeCom/scDiffCom_results_ageBySex/diffcom_tms_droplet_size_factor_log_10000iter_mixed_female/",
-  tms_droplet_male = "../../data_scAgeCom/scDiffCom_results_ageBySex/diffcom_tms_droplet_size_factor_log_10000iter_mixed_male/"
+  calico = "../../data_scAgeCom/scDiffCom_Complex_results/diffcom_calico_size_factor_log_10000iter_curated/",
+  tms_facs = "../../data_scAgeCom/scDiffCom_Complex_results/diffcom_tms_facs_size_factor_log_10000iter_curated/"
 )
 
 calico_tiss <- c("Kidney", "Lung", "Spleen")
@@ -50,13 +44,13 @@ tms_droplet_base_tiss <- c("Heart_and_Aorta", "Kidney",
 
 TISSUE_DATASET <- list(
   calico = calico_tiss,
-  calico_sub = calico_tiss,
-  tms_facs = sort(c(tms_facs_base_tiss, "Diaphragm", "Mammary_Gland")),
-  tms_facs_female = sort(c(tms_facs_base_tiss, "Mammary_Gland")),
-  tms_facs_male = sort(c(tms_facs_base_tiss, "Diaphragm")),
-  tms_droplet = sort(c(tms_droplet_base_tiss, "Bladder", "Mammary_Gland", "Thymus", "Tongue")),
-  tms_droplet_female = sort(c(tms_droplet_base_tiss, "Mammary_Gland", "Thymus")),
-  tms_droplet_male = sort(c(tms_droplet_base_tiss, "Bladder", "Tongue"))
+  #calico_sub = calico_tiss,
+  tms_facs = sort(c(tms_facs_base_tiss, "Diaphragm", "Mammary_Gland"))#,
+  #tms_facs_female = sort(c(tms_facs_base_tiss, "Mammary_Gland")),
+  #tms_facs_male = sort(c(tms_facs_base_tiss, "Diaphragm")),
+  #tms_droplet = sort(c(tms_droplet_base_tiss, "Bladder", "Mammary_Gland", "Thymus", "Tongue")),
+  #tms_droplet_female = sort(c(tms_droplet_base_tiss, "Mammary_Gland", "Thymus")),
+  #tms_droplet_male = sort(c(tms_droplet_base_tiss, "Bladder", "Tongue"))
 )
 
 message("Combining all tissues together")
@@ -64,7 +58,7 @@ datasets <- mapply(
   bind_tissues,
   DIFFCOM_RESULT_PATH,
   TISSUE_DATASET,
-  MoreArgs = list(pre_filtering = FALSE),
+  MoreArgs = list(pre_filtering = TRUE),
   SIMPLIFY = FALSE
 )
 
@@ -91,7 +85,7 @@ cols = get_default_colnames()
 datasets <- lapply(
   datasets,
   function(data) {
-    cutoff <- quantile(c(data$LR_SCORE_old, data$LR_SCORE_young), 0.75)
+    cutoff <- quantile(c(data$LR_SCORE_old, data$LR_SCORE_young), 0.25)
     data <- analyze_CCI(
       data,
       cutoff_score = cutoff
