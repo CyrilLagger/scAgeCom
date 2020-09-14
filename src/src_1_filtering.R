@@ -47,7 +47,8 @@ bind_tissues <- function(
         #       "PVAL_old", 
         #       "PVAL_young") := NULL]
       }),
-    use.names = TRUE
+    use.names = TRUE,
+    fill = TRUE
   )
 }
 
@@ -86,7 +87,6 @@ analyze_CCI <- function(
   reassignment = NULL,
   is_log = TRUE
 ) {
-  
   message("Analyzing CCI...")
   #data <- copy(data)
   
@@ -142,10 +142,10 @@ preprocess_results <- function(
   
   # Define colnames to fit into data.table syntax. Haven't figured out how to
   #  nicely use the referenced values from the list with data.table.
-  COL_LR_GENES = cols$LR_GENES
-  COL_L_GENE = cols$L_GENE
-  COL_R_GENE = cols$R_GENE
-  COL_LIGAND_RECEPTOR_CELLTYPES = cols$LIGAND_RECEPTOR_CELLTYPES
+  COL_LR_SORTED = cols$LR_SORTED
+  #COL_L_GENE = cols$L_GENE
+  #COL_R_GENE = cols$R_GENE
+  #COL_LIGAND_RECEPTOR_CELLTYPES = cols$LIGAND_RECEPTOR_CELLTYPES
   COL_LIGAND_CELLTYPE = cols$LIGAND_CELLTYPE
   COL_RECEPTOR_CELLTYPE = cols$RECEPTOR_CELLTYPE
   COL_LR_SCORE_OLD = cols$LR_SCORE_OLD
@@ -154,19 +154,19 @@ preprocess_results <- function(
   COL_LOGFC_ABS = cols$LOGFC_ABS
   
   # Add separate columns for ligand and receptor gene name
-  LR_genes = data[[COL_LR_GENES]]
-  splitter = function(string) strsplit(string, "_")[[1]]
-  LR_genes_split = t(sapply(LR_genes, splitter, USE.NAMES=FALSE))
-  data[, (COL_L_GENE) := LR_genes_split[, 1]]
-  data[, (COL_R_GENE) := LR_genes_split[, 2]]
+  #LR_sorted = data[[COL_LR_SORTED]]
+  #splitter = function(string) strsplit(string, "_")[[1]]
+  #LR_genes_split = t(sapply(LR_genes, splitter, USE.NAMES=FALSE))
+  #data[, (COL_L_GENE) := LR_genes_split[, 1]]
+  #data[, (COL_R_GENE) := LR_genes_split[, 2]]
   
   # Add column with joined ligand to receptor cell type
-  data[, (COL_LIGAND_RECEPTOR_CELLTYPES) := paste(
-    get(COL_LIGAND_CELLTYPE), 
-    get(COL_RECEPTOR_CELLTYPE), 
-    sep = " : "  # didn't check if "_" can be found in celltypes names
-  )
-  ]
+  #data[, (COL_LIGAND_RECEPTOR_CELLTYPES) := paste(
+  #  get(COL_LIGAND_CELLTYPE), 
+  #  get(COL_RECEPTOR_CELLTYPE), 
+  #  sep = " : "  # didn't check if "_" can be found in celltypes names
+  #)
+  #]
   
   if(is_log) {
     data[, (COL_LOGFC) := get(COL_LR_SCORE_OLD) - get(COL_LR_SCORE_YOUNG)]
@@ -208,11 +208,11 @@ analyze_detected <- function(
   COL_LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG = cols$LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG
   COL_LR_DETECTED_YOUNG = cols$LR_DETECTED_YOUNG
   COL_LR_SCORE_YOUNG = cols$LR_SCORE_YOUNG
-  COL_RAW_PVAL_SPECIFICITY_YOUNG = cols$RAW_PVAL_SPECIFICITY_YOUNG
+  COL_BH_PVAL_SPECIFICITY_YOUNG = cols$BH_PVAL_SPECIFICITY_YOUNG
   COL_LR_DETECTED_AND_SIGNIFICANT_IN_OLD = cols$LR_DETECTED_AND_SIGNIFICANT_IN_OLD
   COL_LR_DETECTED_OLD = cols$LR_DETECTED_OLD
   COL_LR_SCORE_OLD = cols$LR_SCORE_OLD
-  COL_RAW_PVAL_SPECIFICITY_OLD = cols$RAW_PVAL_SPECIFICITY_OLD
+  COL_BH_PVAL_SPECIFICITY_OLD = cols$BH_PVAL_SPECIFICITY_OLD
   
   
   # Can have separate column for specificity to analyze later, since it
@@ -220,13 +220,13 @@ analyze_detected <- function(
   data[, (COL_LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG) := 
          (get(COL_LR_DETECTED_YOUNG) == TRUE) 
        & (get(COL_LR_SCORE_YOUNG) >=  cutoff_score)
-       & (get(COL_RAW_PVAL_SPECIFICITY_YOUNG) <= cutoff_specificity_young)
+       & (get(COL_BH_PVAL_SPECIFICITY_YOUNG) <= cutoff_specificity_young)
        ]
   
   data[, (COL_LR_DETECTED_AND_SIGNIFICANT_IN_OLD) := 
          (get(COL_LR_DETECTED_OLD) == TRUE) 
        & (get(COL_LR_SCORE_OLD) >=  cutoff_score)
-       & (get(COL_RAW_PVAL_SPECIFICITY_OLD) <= cutoff_specificity_old)
+       & (get(COL_BH_PVAL_SPECIFICITY_OLD) <= cutoff_specificity_old)
        ]
   
   return(data)
@@ -292,10 +292,10 @@ add_case_type <- function(
   COL_DIFFERENTIAL_DIRECTION = cols$DIFFERENTIAL_DIRECTION
   COL_LR_DETECTED_YOUNG = cols$LR_DETECTED_YOUNG
   COL_LR_SCORE_YOUNG = cols$LR_SCORE_YOUNG
-  COL_RAW_PVAL_SPECIFICITY_YOUNG = cols$RAW_PVAL_SPECIFICITY_YOUNG
+  COL_BH_PVAL_SPECIFICITY_YOUNG = cols$BH_PVAL_SPECIFICITY_YOUNG
   COL_LR_DETECTED_OLD = cols$LR_DETECTED_OLD
   COL_LR_SCORE_OLD = cols$LR_SCORE_OLD
-  COL_RAW_PVAL_SPECIFICITY_OLD = cols$RAW_PVAL_SPECIFICITY_OLD
+  COL_BH_PVAL_SPECIFICITY_OLD = cols$BH_PVAL_SPECIFICITY_OLD
   
   # data[, (COL_CASE_TYPE) := paste0(
   #   extract_first_letter(get(COL_LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG)),
@@ -342,7 +342,7 @@ add_case_type <- function(
           get(COL_DIFFERENTIAL_DIRECTION) == "DOWN",
           "TFTD",
           ifelse(
-            sum(c(get(COL_RAW_PVAL_SPECIFICITY_OLD) > cutoff_specificity_old,
+            sum(c(get(COL_BH_PVAL_SPECIFICITY_OLD) > cutoff_specificity_old,
                   !get(COL_LR_DETECTED_OLD),
                   get(COL_LR_SCORE_OLD) < cutoff_score
                   )
@@ -356,7 +356,7 @@ add_case_type <- function(
             !get(COL_LR_DETECTED_AND_SIGNIFICANT_IN_OLD) &  
             !get(COL_DIFFERENTIAL_EXPRESSED),
           ifelse(
-            sum(c(get(COL_RAW_PVAL_SPECIFICITY_OLD) > cutoff_specificity_old,
+            sum(c(get(COL_BH_PVAL_SPECIFICITY_OLD) > cutoff_specificity_old,
                   !get(COL_LR_DETECTED_OLD),
                   get(COL_LR_SCORE_OLD) < cutoff_score
                   )
@@ -376,7 +376,7 @@ add_case_type <- function(
               get(COL_DIFFERENTIAL_DIRECTION) == "UP",
               "FTTU",
               ifelse(
-                sum(c(get(COL_RAW_PVAL_SPECIFICITY_YOUNG) > cutoff_specificity_young,
+                sum(c(get(COL_BH_PVAL_SPECIFICITY_YOUNG) > cutoff_specificity_young,
                       !get(COL_LR_DETECTED_YOUNG),
                       get(COL_LR_SCORE_YOUNG) < cutoff_score
                       )
@@ -390,7 +390,7 @@ add_case_type <- function(
                 get(COL_LR_DETECTED_AND_SIGNIFICANT_IN_OLD) &
                 !get(COL_DIFFERENTIAL_EXPRESSED),
               ifelse(
-                sum(c(get(COL_RAW_PVAL_SPECIFICITY_YOUNG) > cutoff_specificity_young,
+                sum(c(get(COL_BH_PVAL_SPECIFICITY_YOUNG) > cutoff_specificity_young,
                       !get(COL_LR_DETECTED_YOUNG),
                       get(COL_LR_SCORE_YOUNG) < cutoff_score
                       )
@@ -420,30 +420,37 @@ get_default_colnames <- function() {
   
   cols = list(
     "TISSUES" = "TISSUE",
-    "LR_GENES" = "LR_GENES",
-    "L_GENE" = "L_GENE",
-    "R_GENE" = "R_GENE",
+    "LR_SORTED" = "LR_SORTED",
+    
+    #"L_GENE" = "L_GENE",
+    #"R_GENE" = "R_GENE",
+    
     "LIGAND_CELLTYPE" = "L_CELLTYPE",
     "RECEPTOR_CELLTYPE" = "R_CELLTYPE",
-    "LIGAND_RECEPTOR_CELLTYPES" = "LR_CELLTYPES",
     "LR_SCORE_YOUNG" = "LR_SCORE_young",
     "LR_SCORE_OLD" = "LR_SCORE_old",
-    "LOGFC" = "LR_LOGFC",
-    "LOGFC_ABS" = "LR_LOGFC_ABS",
     "BH_PVAL" = "BH_PVAL_DIFF",
     "RAW_PVAL" = "PVAL_DIFF",
     "LR_DETECTED_YOUNG" = "LR_DETECTED_young",
     "LR_DETECTED_OLD" = "LR_DETECTED_old",
-    "LIGAND_EXPRESSION_YOUNG" = "L_EXPRESSION_young",
-    "LIGAND_EXPRESSION_OLD" = "L_EXPRESSION_old",
-    "LIGAND_DETECTED_YOUNG" = "L_DETECTED_young",
-    "LIGAND_DETECTED_OLD" = "L_DETECTED_old",
-    "RECEPTOR_EXPRESSION_YOUNG" = "R_EXPRESSION_young",
-    "RECEPTOR_EXPRESSION_OLD" = "R_EXPRESSION_old",
-    "RECEPTOR_DETECTED_YOUNG" = "R_DETECTED_young",
-    "RECEPTOR_DETECTED_OLD" = "R_DETECTED_old",
-    "RAW_PVAL_SPECIFICITY_YOUNG" = "BH_PVAL_young",
-    "RAW_PVAL_SPECIFICITY_OLD" = "BH_PVAL_old",
+    "BH_PVAL_SPECIFICITY_YOUNG" = "BH_PVAL_young",
+    "BH_PVAL_SPECIFICITY_OLD" = "BH_PVAL_old",
+    
+    
+    "LIGAND_RECEPTOR_CELLTYPES" = "LR_CELLTYPES",
+    "LOGFC" = "LR_LOGFC",
+    "LOGFC_ABS" = "LR_LOGFC_ABS",
+    
+    
+    #"LIGAND_EXPRESSION_YOUNG" = "L_EXPRESSION_young",
+    #"LIGAND_EXPRESSION_OLD" = "L_EXPRESSION_old",
+    #"LIGAND_DETECTED_YOUNG" = "L_DETECTED_young",
+    #"LIGAND_DETECTED_OLD" = "L_DETECTED_old",
+    #"RECEPTOR_EXPRESSION_YOUNG" = "R_EXPRESSION_young",
+    #"RECEPTOR_EXPRESSION_OLD" = "R_EXPRESSION_old",
+    #"RECEPTOR_DETECTED_YOUNG" = "R_DETECTED_young",
+    #"RECEPTOR_DETECTED_OLD" = "R_DETECTED_old",
+    
     # New
     "LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG" = "LR_DETECTED_AND_SIGN_young",
     "LR_DETECTED_AND_SIGNIFICANT_IN_OLD" = "LR_DETECTED_AND_SIGN_old",
@@ -469,7 +476,7 @@ check_columns <- function(
   
   essential_cols = c(
     cols$TISSUES,
-    cols$LR_GENES,
+    cols$LR_SORTED,
     cols$LIGAND_CELLTYPE,
     cols$RECEPTOR_CELLTYPE,
     cols$LR_SCORE_YOUNG,
@@ -477,17 +484,17 @@ check_columns <- function(
     cols$BH_PVAL,
     cols$RAW_PVAL,
     cols$LR_DETECTED_YOUNG,
-    cols$LR_DETECTED_OLD,
-    cols$LIGAND_EXPRESSION_YOUNG,
-    cols$LIGAND_EXPRESSION_OLD,
-    cols$LIGAND_DETECTED_YOUNG,
-    cols$LIGAND_DETECTED_OLD,
-    cols$RECEPTOR_EXPRESSION_YOUNG,
-    cols$RECEPTOR_EXPRESSION_OLD,
-    cols$RECEPTOR_DETECTED_YOUNG,
-    cols$RECEPTOR_DETECTED_OLD,
-    cols$RAW_PVAL_SPECIFICITY_YOUNG,
-    cols$RAW_PVAL_SPECIFICITY_OLD
+    cols$LR_DETECTED_OLD#,
+    #cols$LIGAND_EXPRESSION_YOUNG,
+    #cols$LIGAND_EXPRESSION_OLD,
+    #cols$LIGAND_DETECTED_YOUNG,
+    #cols$LIGAND_DETECTED_OLD,
+    #cols$RECEPTOR_EXPRESSION_YOUNG,
+    #cols$RECEPTOR_EXPRESSION_OLD,
+    #cols$RECEPTOR_DETECTED_YOUNG,
+    #cols$RECEPTOR_DETECTED_OLD,
+    #cols$RAW_PVAL_SPECIFICITY_YOUNG,
+    #cols$RAW_PVAL_SPECIFICITY_OLD
   )
   
   essential_columns_are_detected = all(

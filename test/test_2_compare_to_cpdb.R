@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - July 2020
+## cyril.lagger@liverpool.ac.uk - September 2020
 ##
 ## Check that scDiffCom returns the same values as
 ## CellPhoneDB when used in the same conditions.
@@ -28,6 +28,10 @@ seurat_test_2 <- NormalizeData(seurat_test_2, assay = "RNA")
 seurat_test_2$age_group <- ifelse(seurat_test_2$age %in% c('1m', '3m'), 'young', 'old' )
 seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_class)
 
+## Load the LR database from scDiffCom ####
+LR_test_2 <- scDiffCom::LR6db$LR6db_curated
+LR_test_2 <- LR_test_2[grepl("CELLPHONEDB", DATABASE)]
+
 ## Run CellPhoneDB ####
 
 #Note: the function scDiffCom::run_cpdb_from_seurat is a R wrapper
@@ -50,7 +54,7 @@ seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_cl
 #   input_dir = paste0(getwd(),"/cpdb_example"),
 #   create_plots = FALSE,
 #   method = 'statistical_analysis',
-#   iterations = 10,
+#   iterations = 1000,
 #   threshold = NULL,
 #   result_precision = NULL,
 #   counts_data = "gene_name",
@@ -73,7 +77,7 @@ seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_cl
 # start_time <- Sys.time()
 # diffcom_test_2 <- run_diffcom(
 #   seurat_object = seurat_test_2,
-#   LR_data = LRall[cpdb == TRUE, c("GENESYMB_L", "GENESYMB_R", "SYMB_LR")],
+#   LR_data = LR_test_2,
 #   seurat_cell_type_id = "cell_ontology_class",
 #   condition_id = "age_group",
 #   assay = "RNA",
@@ -92,7 +96,7 @@ seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_cl
 #saveRDS(object = diffcom_test_2, file = paste0(dir_data, "test/test_2_data_scDiffcom_for_cpdb.rds"))
 diffcom_test_2 <- readRDS(paste0(dir_data, "test/test_2_data_scDiffcom_for_cpdb.rds"))
 
-## Read CPDB results and preprocess ####
+## Read CPDB results and process them for the comparison ####
 
 #Note: the output of CPDB requires some processing to be compared
 #      to the output of scDiffCom. Here we use a file that has 
@@ -108,29 +112,91 @@ orthologs_test_2 <- read.table(
   header = TRUE,
   sep = "\t"
 )
-#only keep monodimer ligand-receptor interactions for this particular comparison
-cpdb_test_2 <- cpdb_test_2[is.na(cpdb_test_2$name_a_2) & is.na(cpdb_test_2$name_b_2),]
-cpdb_test_2 <- merge.data.table(cpdb_test_2, orthologs_test_2, by.x = "name_a_1", by.y = "human_symbol", all.x = TRUE)
-cpdb_test_2 <- merge.data.table(cpdb_test_2, orthologs_test_2, by.x = "name_b_1", by.y = "human_symbol", all.x = TRUE)
-cpdb_test_2$LR_GENES <- paste(cpdb_test_2$mouse_symbol.x, cpdb_test_2$mouse_symbol.y, sep = "_")
-#common LR pairs
-common_pairs <- intersect(unique(cpdb_test_2$LR_GENES), unique(diffcom_test_2$LR_GENES))
-#subset the results
-diffcom_test_2 <- diffcom_test_2[LR_GENES %in% common_pairs]
+setDT(cpdb_test_2)
+setDT(orthologs_test_2)
+cpdb_test_2[, c("mouse_a_1", "mouse_a_2", "mouse_b_1", "mouse_b_2") := list(
+              orthologs_test_2[.SD, on = "human_symbol==name_a_1", x.mouse_symbol],
+              orthologs_test_2[.SD, on = "human_symbol==name_a_2", x.mouse_symbol],
+              orthologs_test_2[.SD, on = "human_symbol==name_b_1", x.mouse_symbol],
+              orthologs_test_2[.SD, on = "human_symbol==name_b_2", x.mouse_symbol])]
+cpdb_test_2 <- cpdb_test_2[!(!is.na(name_a_2) & is.na(mouse_a_2)) | !(!is.na(name_b_2) & is.na(mouse_b_2))]
+cpdb_test_2[, c("LR_ID") := list(sapply(1:nrow(.SD), function(i) {
+  temp <- c(mouse_a_1[[i]], mouse_a_2[[i]], mouse_b_1[[i]], mouse_b_2[[i]])
+  temp <- temp[!is.na(temp)]
+  temp <- sort(temp)
+  temp <- paste0(temp, collapse = "_")
+}))]
+cpdb_test_2[, CCI := paste(cell_type_a, cell_type_b, LR_ID, sep = "_")]
+cpdb_test_2[, CCI2 := paste(cell_type_b, cell_type_a, LR_ID, sep = "_")]
+cpdb_test_2 <- cpdb_test_2[, c("CCI", "CCI2", "LR_ID", "cell_type_a", "cell_type_b",
+                               "mouse_a_1", "mouse_a_2", "mouse_b_1", "mouse_b_2",
+                               "score_old", "pvalue_old", "score_young", "pvalue_young",
+                               "mean_a_1_old", "mean_a_2_old", "mean_b_1_old", "mean_b_2_old",
+                               "mean_a_1_young", "mean_a_2_young", "mean_b_1_young", "mean_b_2_young")]
+
+
+## Process scDiffCom results for comparison ####
 diffcom_test_2$L_CELLTYPE <- gsub(" ", ".", diffcom_test_2$L_CELLTYPE)
 diffcom_test_2$R_CELLTYPE <- gsub(" ", ".", diffcom_test_2$R_CELLTYPE)
-cpdb_test_2 <- cpdb_test_2[cpdb_test_2$LR_GENES %in% common_pairs, ]
-cpdb_test_2 <- cpdb_test_2[, c("LR_GENES", "cell_type_a", "cell_type_b", "pvalue_old", "pvalue_young",
-                           "score_old", "score_young")]
-#create comparison dt
-setDT(cpdb_test_2)
-comparison_test_2 <- merge.data.table(
-  x = diffcom_test_2,
-  y = cpdb_test_2,
-  by.x = c("LR_GENES", "L_CELLTYPE", "R_CELLTYPE"),
-  by.y = c("LR_GENES", "cell_type_a", "cell_type_b"),
+diffcom_test_2[, CCI := paste(L_CELLTYPE, R_CELLTYPE, LR_SORTED, sep = "_")]
+diffcom_test_2_old <- diffcom_test_2[LR_DETECTED_old == TRUE,]
+diffcom_test_2_young <- diffcom_test_2[LR_DETECTED_young == TRUE,]
+diffcom_test_2_mix <- diffcom_test_2[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE,]
+
+## Consider the common CCI between the two packages ####
+common_CCI_old <- intersect(unique(cpdb_test_2$CCI), unique(diffcom_test_2_old$CCI))
+common_CCI_young <- intersect(unique(cpdb_test_2$CCI), unique(diffcom_test_2_young$CCI))
+common_CCI_mix <- intersect(unique(cpdb_test_2$CCI), unique(diffcom_test_2_mix$CCI))
+
+## Merge the results together
+
+test <- merge.data.table(
+  cpdb_test_2[ , c("CCI", "mouse_a_1", "mouse_a_2", "mean_a_1_old", "mean_a_2_old", "mean_b_1_old", "mean_b_2_old")],
+  diffcom_test_2[, c("CCI", "L1_EXPRESSION_old", "L2_EXPRESSION_old", "R1_EXPRESSION_old", "R2_EXPRESSION_old")],
+  by = "CCI",
   all.x = TRUE
 )
+
+
+cpdb_test_2_com <- cpdb_test_2[CCI %in% common_CCI]
+diffcom_test_2_com <- diffcom_test_2[CCI %in% common_CCI]
+
+cpdb_test_2_com[duplicated(cpdb_test_2_com$CCI)]$CCI
+
+comp_dt <- cpdb_test_2_com[diffcom_test_2_com, on = "CCI"]
+comp_dt2 <- comp_dt[cpdb_test_2, on = "CCI==CCI2"]
+
+testxk <- comp_dt2[, c("CCI", "CCI2", "i.score_old", "score_old", "LR_SCORE_old")]
+testxk[, diff1 := abs(LR_SCORE_old - score_old)]
+testxk[, diff2 := abs(LR_SCORE_old - i.score_old)]
+testxk[, mindif := pmin(diff1, diff2)]
+hist(log10(testxk$mindif), breaks = 100)
+
+testxk2 <- comp_dt2[, c("CCI", "CCI2", "i.pvalue_old", "pvalue_old", "PVAL_old")]
+testxk2[, diff1 := abs(PVAL_old - pvalue_old)]
+testxk2[, diff2 := abs(PVAL_old - i.pvalue_old)]
+testxk2[, mindif := pmin(diff1, diff2)]
+hist(log10(testxk2$mindif), breaks = 100)
+
+
+plot(comp_dt$LR_SCORE_old, comp_dt$score_old)
+plot(comp_dt$pvalue_old, comp_dt$PVAL_old)
+plot(comp_dt$pvalue_young, comp_dt$PVAL_young)
+
+test <- comp_dt[, c("CCI", "score_old", "LR_SCORE_old")]
+test[, diff:= abs(score_old - LR_SCORE_old)]
+
+test_w <- subset(seurat_test_2, subset = cell_ontology_class == "hepatocyte" & age_group == "old")
+test_w2 <- subset(seurat_test_2, subset = cell_ontology_class == "endothelial cell of hepatic sinusoid" & age_group == "old")
+(mean(expm1(test_w$RNA@data["Fn1",]))  + min(mean(expm1(test_w2$RNA@data["Itga3",])), mean(expm1(test_w2$RNA@data["Itgb1",]))))/2
+(mean(expm1(test_w2$RNA@data["Cd74",]))  + mean(expm1(test_w$RNA@data["Ccr3",])))/2
+
+test_y <- subset(seurat_test_2, subset = cell_ontology_class == "NK cell" & age_group == "old")
+test_y2 <- subset(seurat_test_2, subset = cell_ontology_class == "B cell" & age_group == "old")
+(mean(expm1(test_y$RNA@data["Ccl5",]))  + mean(expm1(test_y2$RNA@data["Gpr75",])))/2
+(mean(expm1(test_y$RNA@data["Ccl5",]))  + min(mean(expm1(test_w2$RNA@data["Itga3",])), mean(expm1(test_w2$RNA@data["Itgb1",]))))/2
+(mean(expm1(test_w2$RNA@data["Ccl5",]))  + mean(expm1(test_w$RNA@data["Ccr3",])))/2
+
 comparison_test_2 <- na.omit(comparison_test_2)
 comparison_test_2$sig_young_cpdb <- ifelse(comparison_test_2$pvalue_young <= 0.05, TRUE, FALSE)
 comparison_test_2$sig_young_diffcom <- ifelse(comparison_test_2$PVAL_young <= 0.05, TRUE, FALSE)
@@ -192,8 +258,8 @@ table(comparison_test_2$sig_young_cpdb, comparison_test_2$sig_young_diffcom)
 table(comparison_test_2$sig_old_cpdb, comparison_test_2$sig_old_diffcom)
 
 
-
-
+(mean(expm1(test_w2$RNA@data["B2m",])))
+(mean((test_w2$RNA@data["Cd74",])))
 
 ## Conclusion #### 
 

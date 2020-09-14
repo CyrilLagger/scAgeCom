@@ -2,9 +2,9 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - July 2020
+## cyril.lagger@liverpool.ac.uk - September 2020
 ##
-## Check that scDiffCom returns correct results.
+## Double-check that scDiffCom returns correct results.
 ##
 ####################################################
 ##
@@ -14,30 +14,29 @@ library(Seurat)
 library(data.table)
 library(scDiffCom)
 library(ggplot2)
+library(pbapply)
 
 ## Data path ####
 dir_data <- "../data_scAgeCom/"
 
 ## Load a Seurat objects ####
 
-#here the file corresponds to the Liver tissue from TMS FACS data.
+#here the test file corresponds to the Liver tissue from TMS FACS data.
 seurat_test_1 <- readRDS(paste0(dir_data, "data_seurat_example.rds"))
-seurat_test_1 <- NormalizeData(seurat_test, assay = "RNA")
+seurat_test_1 <- NormalizeData(seurat_test_1, assay = "RNA")
 seurat_test_1$age_group <- ifelse(seurat_test_1$age %in% c('1m', '3m'), 'young', 'old' )
 seurat_test_1$cell_ontology_class <- as.character(seurat_test_1$cell_ontology_class)
 
 ## Load the LR database from scDiffCom ####
-
-#we only take a subset of the pairs for testing
-LR_test_1 <- LRall[ scsr == TRUE | cpdb == TRUE, c("GENESYMB_L", "GENESYMB_R", "SYMB_LR")]
+LR_test_1 <- scDiffCom::LR6db$LR6db_curated
 
 ## Typical usage of scDiffCom (1000 iterations) ####
 
-#NOTES: --running scDiffcom takes a few minutes for 1000 iterations (e.g: 2.2 min on a laptop for the parameters below)
+#NOTES: --running scDiffcom takes a few minutes for 1000 iterations (e.g: around 4 min on a laptop for the parameters below)
 #       --the command does not need to be ran each time if the results have been saved already
 #       --uncomment the lines if you want to test it
 
-#?run_diffcom
+# ?run_diffcom
 # start_time <- Sys.time()
 # diffcom_test_1 <- run_diffcom(
 #   seurat_object = seurat_test_1,
@@ -77,56 +76,91 @@ LR_test_1 <- LRall[ scsr == TRUE | cpdb == TRUE, c("GENESYMB_L", "GENESYMB_R", "
 ## Save the results or load previously saved results ####
 
 #saveRDS(object = diffcom_test_1, file = paste0(dir_data, "test/test_1_data_scDiffcom_1000iter.rds"))
-diffcom_test_1 <- readRDS(paste0(dir_data, "test/test_1_data_scDiffcom_1000iter.rds"))
-
 #saveRDS(object = diffcom_test_1_distr, file = paste0(dir_data, "test/test_1_data_scDiffcom_distr_1000iter.rds"))
+
+diffcom_test_1 <- readRDS(paste0(dir_data, "test/test_1_data_scDiffcom_1000iter.rds"))
 diffcom_test_1_distr <- readRDS(paste0(dir_data, "test/test_1_data_scDiffcom_distr_1000iter.rds"))
 
+#consider only detected interactions and check that they correspond to the distributions
+diffcom_test_1_detected <- diffcom_test_1[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
+identical(diffcom_test_1_detected$LR_SCORE_young - diffcom_test_1_detected$LR_SCORE_old,
+          diffcom_test_1_distr$distr_diff[, 1001])
+identical(diffcom_test_1_detected$LR_SCORE_old,
+          diffcom_test_1_distr$distr_cond1[, 1001])
+identical(diffcom_test_1_detected$LR_SCORE_young,
+          diffcom_test_1_distr$distr_cond2[, 1001])
 
-## Select 6 CCI for comparison ####
+## Select groups of CCIs for further comparison ####
 
-cci_test_list <- list(
-  diffcom_test[LR_DETECTED_young & LR_DETECTED_old][28],
-  diffcom_test[!LR_DETECTED_young & LR_DETECTED_old][120],
-  diffcom_test[LR_DETECTED_young & !LR_DETECTED_old][345],
-  diffcom_test[LR_DETECTED_young & !LR_DETECTED_old][1234],
-  diffcom_test[!LR_DETECTED_young & !LR_DETECTED_old][90],
-  diffcom_test[LR_GENES == "Ltb_Ltbr"  & L_CELLTYPE ==  "B cell" & R_CELLTYPE == "Kupffer cell"]
+cci_test_choosen_list <- list(
+  diffcom_test_1[LR_DETECTED_young & LR_DETECTED_old][28],
+  diffcom_test_1[!LR_DETECTED_young & LR_DETECTED_old][16103],
+  diffcom_test_1[LR_DETECTED_young & !LR_DETECTED_old][345],
+  diffcom_test_1[LR_DETECTED_young & !LR_DETECTED_old][1234],
+  diffcom_test_1[!LR_DETECTED_young & !LR_DETECTED_old][90]
 )
+
+cci_test_detected <- diffcom_test_1_detected[sample(.N, 5)]
+
 
 ## Double-check that the LR scores are correct ####
 
-#create a function that compute the LR scores in a different way than scDiffCom
-#only works for "RNA" assay and "data" slot (but sufficent for our comparison)
+# We create a (slow) function that compute the LR scores in a different way than scDiffCom, such that
+# we can double check the results.
 compare_cci_score_test <- function(
   cci_test,
   condition,
   log_scale
 ) {
-  seurat_sub_l <- subset(seurat_test_1, features = cci_test[["L_GENE"]],
+  seurat_sub_l <- subset(seurat_test_1, features = na.omit(unlist(cci_test[, c("LIGAND_1", "LIGAND_2")])),
                          subset = (cell_ontology_class == cci_test[["L_CELLTYPE"]] &
                                      age_group == condition))
-  seurat_sub_r <- subset(seurat_test_1, features = cci_test[["R_GENE"]],
+  seurat_sub_r <- subset(seurat_test_1, features = na.omit(unlist(cci_test[, c("RECEPTOR_1", "RECEPTOR_2")])),
                          subset = (cell_ontology_class == cci_test[["R_CELLTYPE"]] &
                                      age_group == condition))
   if(log_scale) {
-    LR_avg_expr <- (mean((seurat_sub_l[["RNA"]]@data[1,])) + mean((seurat_sub_r[["RNA"]]@data[1,])))/2
+    LR_avg_expr <- (min(sapply(1:nrow(seurat_sub_l), function(i) {
+      mean((seurat_sub_l[["RNA"]]@data[i,]))
+    })) +
+      min(sapply(1:nrow(seurat_sub_r), function(i) {
+        mean((seurat_sub_r[["RNA"]]@data[i,]))
+      }))
+    )/2
   } else {
-    LR_avg_expr <- (mean(expm1(seurat_sub_l[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r[["RNA"]]@data[1,])))/2
+    LR_avg_expr <- (min(sapply(1:nrow(seurat_sub_l), function(i) {
+      mean(expm1(seurat_sub_l[["RNA"]]@data[i,]))
+    })) +
+      min(sapply(1:nrow(seurat_sub_r), function(i) {
+        mean(expm1(seurat_sub_r[["RNA"]]@data[i,]))
+      }))
+    )/2
   }
   return(LR_avg_expr - cci_test[[paste0("LR_SCORE_", condition)]])
 }
 
-#should return 0 over numerically close to zero
-lapply(cci_test_list, compare_cci_score_test, "young", TRUE)
+#should return zero or numerically close to zero
+lapply(cci_test_choosen_list, compare_cci_score_test, "young", TRUE)
 lapply(cci_test_list, compare_cci_score_test, "old", TRUE)
+lapply(1:nrow(cci_test_detected), function(i) {
+  compare_cci_score_test(cci_test_detected[i], "young", TRUE)
+})
+lapply(1:nrow(cci_test_detected), function(i) {
+  compare_cci_score_test(cci_test_detected[i], "old", TRUE)
+})
+
 
 ## Double-check that the LR differential p-values are correct ####
 
-#create a function that compute the LR differential p-value (and also returns the distribution) in a different way than scDiffCom
-compare_cci_pvalue_diff_test <- function(seurat_obj, cci_test, iterations, log_scale) {
+#We create a (very slow) function that compute the LR differential p-value (and also returns the distribution)
+#in a different way than scDiffCom.
+compare_cci_pvalue_diff_test <- function(
+  seurat_obj,
+  cci_test,
+  iterations,
+  log_scale
+) {
   cells_use <- colnames(seurat_obj)[seurat_obj$cell_ontology_class  %in% c(cci_test[["L_CELLTYPE"]], cci_test[["R_CELLTYPE"]])]
-  seurat_temp <- subset(seurat_obj, features = c(cci_test[["L_GENE"]], cci_test[["R_GENE"]]),
+  seurat_temp <- subset(seurat_obj, features = c(na.omit(unlist(cci_test[, c("LIGAND_1", "LIGAND_2")])), na.omit(unlist(cci_test[, c("RECEPTOR_1", "RECEPTOR_2")]))),
                         cells = cells_use)
   get_shuffled_LR <- function(permut) {
     if(permut) {
@@ -137,52 +171,75 @@ compare_cci_pvalue_diff_test <- function(seurat_obj, cci_test, iterations, log_s
     }
     cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["L_CELLTYPE"]] &
                                           seurat_temp$age_group == "young"]
-    seurat_sub_l_young <- subset(seurat_temp, features = cci_test[["L_GENE"]],
-                           cells = cells_use1)
+    seurat_sub_l_young <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("LIGAND_1", "LIGAND_2")])),
+                                 cells = cells_use1)
     cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["R_CELLTYPE"]] &
                                           seurat_temp$age_group == "young"]
-    seurat_sub_r_young <- subset(seurat_temp, features = cci_test[["R_GENE"]],
-                           cells = cells_use1)
+    seurat_sub_r_young <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("RECEPTOR_1", "RECEPTOR_2")])),
+                                 cells = cells_use1)
     cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["L_CELLTYPE"]] &
                                           seurat_temp$age_group == "old"]
-    seurat_sub_l_old <- subset(seurat_temp, features = cci_test[["L_GENE"]],
-                                 cells = cells_use1)
+    seurat_sub_l_old <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("LIGAND_1", "LIGAND_2")])),
+                               cells = cells_use1)
     cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["R_CELLTYPE"]] &
                                           seurat_temp$age_group == "old"]
-    seurat_sub_r_old <- subset(seurat_temp, features = cci_test[["R_GENE"]],
-                                 cells = cells_use1)
+    seurat_sub_r_old <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("RECEPTOR_1", "RECEPTOR_2")])),
+                               cells = cells_use1)
     if(log_scale) {
-      LR_diff <- (mean((seurat_sub_l_old[["RNA"]]@data[1,])) + mean((seurat_sub_r_old[["RNA"]]@data[1,])))/2 - 
-        (mean((seurat_sub_l_young[["RNA"]]@data[1,])) + mean((seurat_sub_r_young[["RNA"]]@data[1,])))/2
+      LR_diff <- (min(sapply(1:nrow(seurat_sub_l_old), function(i) {
+        mean((seurat_sub_l_old[["RNA"]]@data[i,]))
+      })) +
+        min(sapply(1:nrow(seurat_sub_r_old), function(i) {
+          mean((seurat_sub_r_old[["RNA"]]@data[i,]))
+        }))
+      )/2 -
+        (min(sapply(1:nrow(seurat_sub_l_young), function(i) {
+          mean((seurat_sub_l_young[["RNA"]]@data[i,]))
+        })) +
+          min(sapply(1:nrow(seurat_sub_r_young), function(i) {
+            mean((seurat_sub_r_young[["RNA"]]@data[i,]))
+          }))
+        )/2
     } else {
-      LR_diff <- (mean(expm1(seurat_sub_l_old[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r_old[["RNA"]]@data[1,])))/2 - 
-        (mean(expm1(seurat_sub_l_young[["RNA"]]@data[1,])) + mean(expm1(seurat_sub_r_young[["RNA"]]@data[1,])))/2
+      LR_diff <- (min(sapply(1:nrow(seurat_sub_l_old), function(i) {
+        mean(expm1(seurat_sub_l_old[["RNA"]]@data[i,]))
+      })) +
+        min(sapply(1:nrow(seurat_sub_r_old), function(i) {
+          mean(expm1(seurat_sub_r_old[["RNA"]]@data[i,]))
+        }))
+      )/2 -
+        (min(sapply(1:nrow(seurat_sub_l_young), function(i) {
+          mean(expm1(seurat_sub_l_young[["RNA"]]@data[i,]))
+        })) +
+          min(sapply(1:nrow(seurat_sub_r_young), function(i) {
+            mean(expm1(seurat_sub_r_young[["RNA"]]@data[i,]))
+          }))
+        )/2
     }
     return(LR_diff)
   }
-  all_LR <- replicate(iterations, get_shuffled_LR(TRUE))
+  all_LR <- pbreplicate(iterations, get_shuffled_LR(TRUE))
   all_LR <- c(all_LR, get_shuffled_LR(FALSE))
   pval <- sum(abs(all_LR[1:iterations]) >= abs(all_LR[(iterations + 1)])) / iterations
   return(list(pval = pval,
               distr = all_LR))
 }
 
-#takes a bit of time, do 1000 iterations to be comparable
-test_pval_diff <- lapply(cci_test_list, function(x) {
-  compare_cci_pvalue_diff_test(seurat_test_1, x, iterations = 1000, TRUE)
+test_pval_diff <- lapply(1:nrow(cci_test_detected), function(i) {
+  compare_cci_pvalue_diff_test(seurat_test_1, cci_test_detected[i], iterations = 100, TRUE)
 })
 
 #compare the p-values 
-mapply(function(x,y) {x$pval-y$PVAL_DIFF}, test_pval_diff, cci_test_list)
+mapply(function(x,y) {x$pval-cci_test_detected[y]$PVAL_DIFF}, test_pval_diff, 1:nrow(cci_test_detected))
 lapply(test_pval_diff, function(x) {x$pval})
-lapply(cci_test_list, function(x) {x$PVAL_DIFF})
+cci_test_detected$PVAL_DIFF
 
-#look at the distributions
+#compare the distributions
 distr_plots <- lapply(
   1:length(test_pval_diff),
   function(i) {
     ggplot(data.frame(x=test_pval_diff[[i]]$distr), aes(x=x)) + geom_histogram(bins=50) +
-      geom_vline(xintercept = cci_test_list[[i]]$LR_SCORE_old - cci_test_list[[i]]$LR_SCORE_young ) +
+      geom_vline(xintercept = cci_test_detected[i]$LR_SCORE_old - cci_test_detected[i]$LR_SCORE_young ) +
       xlab(expression(xi[old]-xi[young])) +
       ylab("Counts")+
       theme(text=element_text(size=20)) 
@@ -196,8 +253,8 @@ g_distr_plots <- cowplot::plot_grid(
 #ggsave(filename = paste0(dir_data, "test/test_1_plot_distr_permutations.png"), plot = g_distr_plots)
 
 #compare the distributions when existing
-distr_id <- lapply(cci_test_list, function(x) {
-  id <- which(diffcom_test_distr$distr_cond1[,1001] == x$LR_SCORE_old)
+distr_id <- lapply(1:nrow(cci_test_detected), function(x) {
+  id <- which(diffcom_test_1_distr$distr_cond1[,1001] == cci_test_detected[x]$LR_SCORE_old)
   if(length(id) != 1){
     return(NULL)
   } else
@@ -222,8 +279,8 @@ comp_distr <- function(distr1, distr2, case) {
     theme(text=element_text(size=20)) 
 }
 
-plot_comp_distr_diff <- lapply(1:6, function(i) {
-  comp_distr(-diffcom_test_distr$distr_diff[distr_id[[i]],], test_pval_diff[[i]]$distr, "diff")
+plot_comp_distr_diff <- lapply(1:nrow(cci_test_detected), function(i) {
+  comp_distr(-diffcom_test_1_distr$distr_diff[distr_id[[i]],], test_pval_diff[[i]]$distr, "diff")
 })
 g_plot_comp_distr_diff <- cowplot::plot_grid(plotlist = plot_comp_distr_diff, ncol = 2, align = "v")
 #ggsave(filename = paste0(dir_data, "test/test_1_plot_comp_distr_permutations.png"), plot = g_plot_comp_distr_diff, scale = 2)
