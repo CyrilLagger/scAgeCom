@@ -4,8 +4,8 @@
 ##
 ## cyril.lagger@liverpool.ac.uk - September 2020
 ##
-## Check that scDiffCom returns the same values as
-## CellPhoneDB when used in the same conditions.
+## Script that show how to run CELLPHONEDB from 
+## the scDiffCom package.
 ##
 ####################################################
 ##
@@ -18,21 +18,25 @@ library(data.table)
 library(ggplot2)
 
 ## Data path ####
-dir_data <- "../data_scAgeCom/"
+dir_data <- "../data_scAgeCom"
 
 ## Load a Seurat objects ####
 
 #here the file corresponds to the Liver tissue from TMS FACS data.
-seurat_test_2 <- readRDS(paste0(dir_data, "data_seurat_example.rds"))
+seurat_test_2 <- readRDS(paste0(dir_data, "/data_seurat_example.rds"))
 seurat_test_2 <- NormalizeData(seurat_test_2, assay = "RNA")
 seurat_test_2$age_group <- ifelse(seurat_test_2$age %in% c('1m', '3m'), 'young', 'old' )
 seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_class)
 
-seurat_test_2 <- seurat_test_2[1000, ]
-
 ## Run CellPhoneDB ####
+
+#Note: the function scDiffCom::run_cpdb_from_seurat is a R wrapper
+#      around the original CPDB python package. It only works on
+#      Linux and if CPDB is installed in your current python environment.
+
 #typical usage (for the parameters see the CPDB manual: https://github.com/Teichlab/cellphonedb)
-#the output is the typical CPDB output with various files
+#the output is the typical CPDB output with various files. We also create a single data.table that 
+#summarize the main results.
 run_cpdb_from_seurat(
   seurat_obj = seurat_test_2,
   assay = "RNA",
