@@ -18,15 +18,15 @@ library(data.table)
 library(ggplot2)
 
 ## Data path ####
-dir_data <- "../data_scAgeCom"
+dir_data_test <- "../data_scAgeCom/test/"
 
 ## Load a Seurat objects ####
 
 #here the file corresponds to the Liver tissue from TMS FACS data.
-seurat_test_2 <- readRDS(paste0(dir_data, "/data_seurat_example.rds"))
-seurat_test_2 <- NormalizeData(seurat_test_2, assay = "RNA")
-seurat_test_2$age_group <- ifelse(seurat_test_2$age %in% c('1m', '3m'), 'young', 'old' )
-seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_class)
+seurat_t2 <- readRDS(paste0(dir_data_test, "data_seurat_example_facs_liver.rds"))
+seurat_t2 <- NormalizeData(seurat_t2, assay = "RNA")
+seurat_t2$age_group <- ifelse(seurat_t2$age %in% c('1m', '3m'), 'young', 'old' )
+seurat_t2$cell_ontology_class <- as.character(seurat_t1$cell_ontology_class)
 
 ## Run CellPhoneDB ####
 
@@ -38,7 +38,7 @@ seurat_test_2$cell_ontology_class <- as.character(seurat_test_2$cell_ontology_cl
 #the output is the typical CPDB output with various files. We also create a single data.table that 
 #summarize the main results.
 run_cpdb_from_seurat(
-  seurat_obj = seurat_test_2,
+  seurat_obj = seurat_t2,
   assay = "RNA",
   slot = "data",
   log_scale = FALSE,
@@ -46,7 +46,7 @@ run_cpdb_from_seurat(
   input_species = "mouse",
   min_cells = 5,
   condition_id = "age_group",
-  input_dir = paste0(getwd(),"/cpdb_example"),
+  input_dir = paste0(dir_data_test,"cpdb_test_results"),
   create_plots = FALSE,
   method = 'statistical_analysis',
   iterations = 1000,
