@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - July 2020
+## cyril.lagger@liverpool.ac.uk - September 2020
 ##
 ## Check the behaviour of scDiffCom in functions of
 ## its parameters.
@@ -16,27 +16,25 @@ library(scDiffCom)
 library(data.table)
 library(ggplot2)
 library(e1071)
-library(VennDiagram)
+library(UpSetR)
 
 ## Data path ####
-dir_data <- "../data_scAgeCom/"
+dir_data_test <- "../data_scAgeCom/test/"
 
 ## Load a Seurat objects ####
 
 #here the file corresponds to the Liver tissue from TMS FACS data.
-seurat_test_3 <- readRDS(paste0(dir_data, "data_seurat_example.rds"))
-seurat_test_3$age_group <- ifelse(seurat_test_3$age %in% c('1m', '3m'), 'young', 'old' )
-seurat_test_3$cell_ontology_class <- as.character(seurat_test_3$cell_ontology_class)
+seurat_t3 <- readRDS(paste0(dir_data_test, "data_seurat_example_facs_liver.rds"))
+seurat_t3$age_group <- ifelse(seurat_t3$age %in% c('1m', '3m'), 'young', 'old' )
+seurat_t3$cell_ontology_class <- as.character(seurat_t3$cell_ontology_class)
 
-## Load the LR database from scDiffCom ####
-
-#we only take a subset of the pairs for testing
-LR_test_3 <- LRall[ scsr == TRUE | cpdb == TRUE, c("GENESYMB_L", "GENESYMB_R", "SYMB_LR")]
+## Load interactions ####
+LR_t3 <- scDiffCom::LR6db$LR6db_curated
 
 ## Normalization choice ####
-seurat_test_3 <- NormalizeData(seurat_test_3, assay = "RNA")
-seurat_test_3 <- SCTransform(
-  object = seurat_test_3,
+seurat_t3 <- NormalizeData(seurat_t3, assay = "RNA")
+seurat_t3 <- SCTransform(
+  object = seurat_t3,
   return.only.var.genes = FALSE
 )
 
@@ -45,7 +43,7 @@ seurat_test_3 <- SCTransform(
 #Note: We want to look at normalization and log-scale.
 #      We also want to check the usage of one-sided vs two-sided test for differential p-values.
 
-param_list <- list(
+param_t3 <- list(
   R_log_one = list(id = "R_log_one", assay = "RNA", log_scale = TRUE, one_sided = TRUE),
   R_log_two = list(id = "R_log_two",assay = "RNA", log_scale = TRUE, one_sided = FALSE),
   R_nlog_one = list(id = "R_nlog_one", assay = "RNA", log_scale = FALSE, one_sided = TRUE),
@@ -56,19 +54,26 @@ param_list <- list(
   S_nlog_two = list(id = "S_nlog_two", assay = "SCT", log_scale = FALSE, one_sided = FALSE)
 )
 
+param_t3_short <- list(
+  R_log = param_t3$R_log_two,
+  R_nlog = param_t3$R_nlog_two,
+  S_log = param_t3$S_log_two,
+  S_nlog = param_t3$S_nlog_two
+)
+
 ## Run scDiffCom on all parameters ####
 
 #create a data.table with all conditions
 #it will take some times, so we use 1000 iterations as a start
-# diffcom_bind_test_3 <- rbindlist(
+# diffcom_bind_t3 <- rbindlist(
 #   lapply(
-#     param_list,
+#     param_t3,
 #     function(
 #       param
 #     ) {
 #       run_diffcom(
-#         seurat_obj = seurat_test_3,
-#         LR_data = LR_test_3,
+#         seurat_obj = seurat_t3,
+#         LR_data = LR_t3,
 #         seurat_cell_type_id = "cell_ontology_class",
 #         condition_id = "age_group",
 #         assay = param[["assay"]],
@@ -86,59 +91,188 @@ param_list <- list(
 #   idcol = "param_group"
 # )
 
-## Save or load scDiffcom results ####
 
-#saveRDS(diffcom_bind_test_3, file = paste0(dir_data, "test/test_3_data_scDiffCom_allparameters_1000iter.rds"))
-diffcom_bind_test_3 <- readRDS(paste0(dir_data, "test/test_3_data_scDiffCom_allparameters_1000iter.rds"))
+## Preprocessing, filtering and saving results ####
+#not needed if already saved
 
-## Do some processing ####
+#only keep detected interactions in either young or old samples
+#diffcom_bind_t3 <- diffcom_bind_t3[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
+#diffcom_bind_t3[, TISSUE := "Liver"]
 
-#scTransform do some internal filtering and remove some genes
-#we only keep comparable CCIs
-diffcom_param <- diffcom_bind_test_3[LR_GENES %in% diffcom_bind_test_3[param_group == "S_log_one", LR_GENES]]
-table(diffcom_param$param_group)
+#apply filtering analysis to get the different regulation cases
+# source("src/src_1_filtering.R")
+# diffcom_bind_t3 <- rbindlist(
+#   l = lapply(
+#     unique(diffcom_bind_t3$param_group),
+#     function(param) {
+#       temp <- diffcom_bind_t3[param_group == param]
+#       temp <- analyze_CCI_per_tissue(
+#         data = temp,
+#         cutoff_quantile = 0.25,
+#         cutoff_logFC_abs = log(1.1),
+#         is_log = param_t3[[param]]$log_scale
+#       )
+#     }
+#   ),
+#   use.names = TRUE
+# )
 
-#as for the main downstream analysis we add some useful columns
-diffcom_param[, TISSUE := "Liver"]
-diffcom_param[, LR_LOGFC := ifelse(
-  param_group %in% c("R_log_one", "R_log_two", "S_log_one", "S_log_two"),
-  LR_SCORE_old - LR_SCORE_young,
-  log(LR_SCORE_old/LR_SCORE_young)
-)]
-diffcom_param[, LR_LOGFC_ABS := abs(LR_LOGFC)]
-diffcom_param[, LR_CELLTYPES := paste(L_CELLTYPE, R_CELLTYPE, sep = "_")]
+#save results
+#saveRDS(diffcom_bind_t3, file = paste0(dir_data_test, "t3_data_scDiffCom_allparameters_1000iter.rds"))
 
-## Compare detection rate in functions of normalization ####
+## Load previously saved results ####
 
-#Note: we look at detection of CCIs before filtering, so only based on 10% expression and min of 5 cells.
+#read files
+diffcom_bind_t3 <- readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_1000iter.rds"))
 
-#build the drate data.tables
-comp_drate_old <- dcast(
-  diffcom_param[, c("param_group", "LR_GENES", "L_CELLTYPE", "R_CELLTYPE", "LR_DETECTED_old")],
-  formula = LR_GENES + L_CELLTYPE + R_CELLTYPE ~ param_group,
-  value.var = "LR_DETECTED_old"
+## Compare classification for each parameter ####
+
+diffcom_bind_t3[ , CASE_TYPE_2 := ifelse(CASE_TYPE %in% c("FTTU", "TTTU"),
+                                         "UP",
+                                         ifelse(CASE_TYPE %in% c("TFTD", "TTTD"),
+                                                "DOWN",
+                                                ifelse(CASE_TYPE == "FFF",
+                                                       "FFF",
+                                                       "FLAT")))]
+diffcom_bind_t3[, CCI := paste(LR_CELLTYPE, LR_NAME, sep = "_")]
+
+#look how the CCIs are distributed
+ftable(diffcom_bind_t3$param_group, diffcom_bind_t3$CASE_TYPE)
+ftable(diffcom_bind_t3[grepl("two", param_group)]$param_group, diffcom_bind_t3[grepl("two", param_group)]$CASE_TYPE)
+ftable(diffcom_bind_t3[grepl("two", param_group)]$param_group, diffcom_bind_t3[grepl("two", param_group)]$CASE_TYPE_2)
+
+diffcom_bind_t3[, param_case := paste(param_group, CASE_TYPE_2, sep = "_")]
+param_case_list <- unique(diffcom_bind_t3$param_case)
+CCI_per_param_list <- sapply(param_case_list, function(i) {
+  diffcom_bind_t3[param_case == i]$CCI
+})
+CCI_per_param_list_2 <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+  diffcom_bind_t3[param_case == i]$CCI
+})
+UpSetR::upset(fromList(CCI_per_param_list), nsets = 32, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list_2), nsets = 16, order.by = "freq", nintersects = 35)
+
+#look and remove the CCI that are consistent over all parameter cases
+dcast_param_t3 <- dcast(
+  diffcom_bind_t3[, c("CCI", "param_group", "CASE_TYPE_2")],
+  formula = CCI ~ param_group,
+  value.var = "CASE_TYPE_2"
 )
-comp_drate_young <- dcast(
-  diffcom_param[, c("param_group", "LR_GENES", "L_CELLTYPE", "R_CELLTYPE", "LR_DETECTED_young")],
-  formula = LR_GENES + L_CELLTYPE + R_CELLTYPE ~ param_group,
-  value.var = "LR_DETECTED_young"
+dcast_param_t3[, is_eq := R_log_two == R_nlog_two & R_nlog_two == S_log_two & S_log_two == S_nlog_two]
+
+CCI_conserved <- dcast_param_t3[is_eq == TRUE]$CCI
+CCI_non_conserved <- dcast_param_t3[is_eq == FALSE | is.na(is_eq)]$CCI
+CCI_non_conserved_noNA <- dcast_param_t3[is_eq == FALSE]$CCI
+CCI_per_param_list_2_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+  diffcom_bind_t3[param_case == i & CCI %in% CCI_conserved]$CCI
+})
+CCI_per_param_list_2_non_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+  diffcom_bind_t3[param_case == i & CCI %in% CCI_non_conserved]$CCI
+})
+CCI_per_param_list_2_non_conserved_noNA <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+  diffcom_bind_t3[param_case == i & CCI %in% CCI_non_conserved_noNA]$CCI
+})
+CCI_per_param_list_3_conserved <- sapply(param_case_list[grepl("_log_two", param_case_list)], function(i) {
+  diffcom_bind_t3[param_case == i & CCI %in% CCI_conserved]$CCI
+})
+
+
+UpSetR::upset(fromList(CCI_per_param_list_2_conserved), nsets = 16, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved), nsets = 16, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved_noNA), nsets = 16, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list_3_conserved), nsets = 8, order.by = "freq")
+
+#Note: we can observe some differences in the classification depending on the processing methods.
+#      There is a priori no clear way to define a better approach based only on this data.
+
+## Compare ORA results for each parameter ####
+source("src/src_2_ora.R")
+
+ora_list_t3 <- sapply(
+  unique(diffcom_bind_t3$param_group),
+  function(param) {
+    res <- analyze_ORA(diffcom_bind_t3[param_group == param])
+  },
+  simplify = FALSE
 )
 
-#we observe that scTransform detects more CCIs. It seems like size-factor is conservative here.
-table(comp_drate_old$R_log_one, comp_drate_old$S_log_one)
-table(comp_drate_young$R_log_one, comp_drate_young$S_log_one)
+ora_up_LR_NAME <- rbindlist(
+  l = lapply(
+    ora_list_t3,
+    function(i) {
+      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_UP <= 0.05 & OR_UP >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_UP", "OR_UP")]
+    }
+  ),
+  use.names = TRUE,
+  idcol = "param"
+)
+ora_down_LR_NAME <- rbindlist(
+  l = lapply(
+    ora_list_t3,
+    function(i) {
+      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_DOWN <= 0.05 & OR_DOWN >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_DOWN", "OR_DOWN")]
+    }
+  ),
+  use.names = TRUE,
+  idcol = "param"
+)
+
+ora_up_LR_CELLTYPE <- rbindlist(
+  l = lapply(
+    ora_list_t3,
+    function(i) {
+      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_UP <= 0.05 & OR_UP >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_UP", "OR_UP")]
+    }
+  ),
+  use.names = TRUE,
+  idcol = "param"
+)
+ora_down_LR_CELLTYPE <- rbindlist(
+  l = lapply(
+    ora_list_t3,
+    function(i) {
+      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_DOWN <= 0.05 & OR_DOWN >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_DOWN", "OR_DOWN")]
+    }
+  ),
+  use.names = TRUE,
+  idcol = "param"
+)
+
+param_list <- unique(ora_up_LR_NAME$param)
+param_list <- param_list[grepl("two", param_list)]
+
+ora_up_LR_NAME_per_param <- sapply(param_list, function(i) {
+  ora_up_LR_NAME[param == i]$Value
+})
+ora_down_LR_NAME_per_param <- sapply(param_list, function(i) {
+  ora_down_LR_NAME[param == i]$Value
+})
+ora_up_LR_CELLTYPE_per_param <- sapply(param_list, function(i) {
+  ora_up_LR_CELLTYPE[param == i]$Value
+})
+ora_down_LR_CELLTYPE_per_param <- sapply(param_list, function(i) {
+  ora_down_LR_CELLTYPE[param == i]$Value
+})
+UpSetR::upset(fromList(ora_up_LR_NAME_per_param), nsets = 4, order.by = "freq")
+UpSetR::upset(fromList(ora_down_LR_NAME_per_param), nsets = 4, order.by = "freq")
+UpSetR::upset(fromList(ora_up_LR_CELLTYPE_per_param), nsets = 4, order.by = "freq")
+UpSetR::upset(fromList(ora_down_LR_CELLTYPE_per_param), nsets = 4, order.by = "freq")
 
 ## Compare LR scores ####
 
 #build score data.tables
 comp_LR_score_old <- dcast(
-  diffcom_param[, c("param_group", "LR_GENES", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_old")],
-  formula = LR_GENES + L_CELLTYPE + R_CELLTYPE ~ param_group,
+  diffcom_bind_t3[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_old")],
+  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
   value.var = "LR_SCORE_old"
 )
 comp_LR_score_young <- dcast(
-  diffcom_param[, c("param_group", "LR_GENES", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_young")],
-  formula = LR_GENES + L_CELLTYPE + R_CELLTYPE ~ param_group,
+  diffcom_bind_t3[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_young")],
+  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
   value.var = "LR_SCORE_young"
 )
 
@@ -172,14 +306,13 @@ g_comp_LR_score_old <- cowplot::plot_grid(
   ncol = 2,
   align = "v"
 )
+g_comp_LR_score_old
+ggsave(paste0(dir_data_test, "t3_plot_compParam_scores.png"), g_comp_LR_score_old, scale = 2)
 
-#take some times to save
-#ggsave(paste0(dir_data, "test/test_3_plot_compParam_scores.png"), g_comp_LR_score_old, scale = 2)
-
-#histogram for score distributions only for detected CCI
+#histogram for score distributions only for detected CCI 
 
 create_histo_score_detected_old <- function(group) {
-  ggplot(diffcom_param[param_group == group & LR_DETECTED_old == TRUE], aes(x = LR_SCORE_old)) +
+  ggplot(diffcom_bind_t3[param_group == group & LR_DETECTED_old == TRUE], aes(x = LR_SCORE_old)) +
     geom_histogram(bins = 50) +
     xlab(expression(xi[old])) +
     ylab("Counts") +
@@ -187,7 +320,7 @@ create_histo_score_detected_old <- function(group) {
     #scale_y_log10()
 }
 create_histo_score_detected_young <- function(group) {
-  ggplot(diffcom_param[param_group == group & LR_DETECTED_young == TRUE], aes(x = LR_SCORE_young)) +
+  ggplot(diffcom_bind_t3[param_group == group & LR_DETECTED_young == TRUE], aes(x = LR_SCORE_young)) +
     geom_histogram(bins = 50) +
     xlab(expression(xi[young])) +
     ylab("Counts") +
@@ -201,110 +334,31 @@ g_distr_score_old <- cowplot::plot_grid(
   align = "v",
   labels = c("SF-log", "SF-nlog", "SCT-log", "SCT-nlog")
 )
-#ggsave(paste0(dir_data, "test/test_3_plot_comp_distr_scores_old.png"), g_distr_score_old, scale = 2)
+g_distr_score_old 
+ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_old.png"), g_distr_score_old, scale = 2)
 g_distr_score_young <- cowplot::plot_grid(
   plotlist = lapply(list("R_log_one", "R_nlog_one", "S_log_one", "S_nlog_one"), create_histo_score_detected_young),
   ncol = 2,
   align = "v",
   labels = c("SF-log", "SF-nlog", "SCT-log", "SCT-nlog")
 )
-#ggsave(paste0(dir_data, "test/test_3_plot_comp_distr_scores_young.png"), g_distr_score_young, scale = 2)
-
-## Load filtering functions and filter CCI ####
-
-#load the filtering functions
-source("src/src_1_filtering.R")
-
-#functions to get the 20% high scores
-get_quantile_score_detected_old <- function(group, q) {
-  quantile(diffcom_param[param_group == group & LR_DETECTED_old == TRUE, LR_SCORE_old], q)
-}
-get_quantile_score_detected_young <- function(group, q) {
-  quantile(diffcom_param[param_group == group & LR_DETECTED_young == TRUE, LR_SCORE_young], q)
-}
-
-diffcom_param_filter <- rbindlist(
-  lapply(
-    param_list,
-    function(
-      param
-    ) {
-      dt = diffcom_param[param_group == param[["id"]]]
-      dt[, param_group := NULL]
-      thr_score <- get_quantile_score_detected_young(param[["id"]], 0.8)
-      filter_CCI(
-        dt = dt,
-        CUTOFF_SCORE_YOUNG = thr_score,
-        CUTOFF_SCORE_OLD = thr_score,
-        CUTOFF_LOGFC = log(1.1)
-      )
-      reassign_CCI(
-        dt = dt,
-        CUTOFF_SCORE_YOUNG = thr_score,
-        CUTOFF_SCORE_OLD = thr_score,
-        CUTOFF_LOGFC = log(1.1)
-      )
-      return(dt)
-    }
-  ),
-  idcol = "param_group"
-)
-
-diffcom_param_filter[, SIMPLE_TYPE := ifelse(
-  SIG_TYPE %in% c("FFF"),
-  "ND",
-  ifelse(
-    SIG_TYPE %in% c("TTF"),
-    "FLAT",
-    ifelse(
-      SIG_TYPE %in% c("FTT", "TTTU"),
-      "UP",
-      "DOWN"
-    )
-  )
-)]
-
-## Compare the CCI classification ####
-
-#build a comparison data.table
-comp_class <- dcast(
-  diffcom_param_filter[, c("param_group", "LR_GENES", "L_CELLTYPE", "R_CELLTYPE", "SIG_TYPE")],
-  formula = LR_GENES + L_CELLTYPE + R_CELLTYPE ~ param_group,
-  value.var = "SIG_TYPE"
-)
-comp_topclass <- dcast(
-  diffcom_param_filter[, c("param_group", "LR_GENES", "L_CELLTYPE", "R_CELLTYPE", "SIMPLE_TYPE")],
-  formula = LR_GENES + L_CELLTYPE + R_CELLTYPE ~ param_group,
-  value.var = "SIMPLE_TYPE"
-)
-
-#actual comparisons
-comp_class_summary <- comp_class[, .N, by = names(param_list)]
-comp_topclass_summary <- comp_topclass[, .N, by = names(param_list)]
-
-comp_class_normalization <- comp_class[, .N, by = c("R_log_two", "S_log_two")]
-comp_topclass_normalization <- comp_topclass[, .N, by = c("R_log_two", "S_log_two")]
-
-comp_class_log2 <- comp_class[, .N, by = c("R_log_two", "R_nlog_two")]
-comp_topclass_log2 <- comp_topclass[, .N, by = c("R_log_two", "R_nlog_two")]
-
-#Note: we can observe some differences in the classification depending on the processing methods.
-#      There is a priori no clear way to define a better approach based only on this data.
-#      There is also probably an effect from choosing the cutoffs in each case. 
+g_distr_score_young
+ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_young.png"), g_distr_score_young, scale = 2)
 
 ## Run scDiffCom to return distributions on all parameters ####
 
 #Note: returning all the distributions requires quite a lot of memory
 #      If we do 1000 iterations for the 8 parameter choices, we get 5.4 GB.
-#      We don't save the full results, as it takes only 16minutes to get it.
-diffcom_distr_bind_test_3 <- lapply(
-  param_list,
+#      We don't save the full results, as it takes only 16 minutes to get it. 
+#      But we will save other downstream results later on.
+diffcom_distr_bind_t3 <- lapply(
+  param_t3_short,
   function(
     param
   ) {
     run_diffcom(
-      seurat_obj = seurat_test_3,
-      LR_data = LR_test_3,
+      seurat_obj = seurat_t3,
+      LR_data = LR_t3,
       seurat_cell_type_id = "cell_ontology_class",
       condition_id = "age_group",
       assay = param[["assay"]],
@@ -319,15 +373,9 @@ diffcom_distr_bind_test_3 <- lapply(
     )
   }
 )
-diffcom_distr_bind_test_3 <- list(
-  R_log = diffcom_distr_bind_test_3$R_log_two,
-  R_nlog = diffcom_distr_bind_test_3$R_nlog_two,
-  S_log = diffcom_distr_bind_test_3$S_log_two,
-  S_nlog = diffcom_distr_bind_test_3$S_nlog_two
-)
 
 ## Compute distribution properties
-distr_properties <- lapply(diffcom_distr_bind_test_3, function(distr_param) {
+distr_properties <- lapply(diffcom_distr_bind_t3, function(distr_param) {
   lapply(distr_param, function(mat) {
     res <- apply(mat, MARGIN = 1, function(mat_row) {
       m <- mean(mat_row)
@@ -342,7 +390,7 @@ distr_properties <- lapply(diffcom_distr_bind_test_3, function(distr_param) {
 })
 
 #create a data.table with all properties
-distr_full_table <- rbindlist(
+distr_t3_full_table <- rbindlist(
   l = lapply(
     distr_properties,
     function(x) {
@@ -354,24 +402,21 @@ distr_full_table <- rbindlist(
   ),
   idcol = "param_group"
 )
-#saveRDS(distr_full_table, paste0(dir_data, "test/test_3_data_scDiffCom_distribution_table.rds"))
+saveRDS(distr_t3_full_table, paste0(dir_data_test, "t3_data_scDiffCom_distribution_table.rds"))
+
+distr_t3_full_table <- readRDS(paste0(dir_data_test, "t3_data_scDiffCom_distribution_table.rds"))
 
 ## Look at mean/sd ratio ####
 
 #Note 1: we expect it to be close to zero for distr_diff
-#Note 2: there is a problem somewhere probably because of the low cell-number cell-types
-param_list_short <- list(
-  R_log = param_list$R_log_two,
-  R_nlog = param_list$R_nlog_two,
-  S_log = param_list$S_log_two,
-  S_nlog = param_list$S_nlog_two
-)
+#Note 2: We need to correct for the cases when there are zero cell-types (it is not a problem in itsel as
+#        these cases are treated separately or filtered out in our main analysis.)
 
-distr_full_table[, mean_sd := mean/sd]
+distr_t3_full_table[, mean_sd := mean/sd]
 
 g_mean_sd <- cowplot::plot_grid(
-  plotlist = lapply(names(param_list_short), function(param) {
-    ggplot(distr_full_table[param_group == param & distribution_type == "distr_diff" & mean_sd > -0.1], aes(x = mean_sd)) +
+  plotlist = lapply(names(param_t3_short), function(param) {
+    ggplot(distr_t3_full_table[param_group == param & distribution_type == "distr_diff" & mean_sd > -0.1], aes(x = mean_sd)) +
       geom_histogram(bins = 100) +
       xlab(expression(mu/sigma)) +
       ylab("Counts") +
@@ -381,26 +426,15 @@ g_mean_sd <- cowplot::plot_grid(
   align = "v",
   labels = c("R_log", "R_nlog", "S_log", "S_nlog")
 )
-#ggsave(paste0(dir_data, "test/test_3_plot_comp_mean_sd.png"), g_mean_sd, scale = 2)
+g_mean_sd 
+ggsave(paste0(dir_data_test, "t3_plot_comp_mean_sd.png"), g_mean_sd, scale = 2)
 
-# g_mean_sd_cond1 <- cowplot::plot_grid(
-#   plotlist = lapply(names(param_list_short), function(param) {
-#     ggplot(distr_full_table[param_group == param & distribution_type == "distr_cond1"], aes(x = mean_sd)) +
-#       geom_histogram(bins = 100) +
-#       xlab(expression(mu/sigma)) +
-#       ylab("Counts") +
-#       theme(text=element_text(size=20))
-#   }),
-#   ncol = 2,
-#   align = "v",
-#   labels = c("R_log", "R_nlog", "S_log", "S_nlog")
-# )
 
-## Look at skewness ####
+## Look at the skewness ####
 
 g_skewness <- cowplot::plot_grid(
-  plotlist = lapply(names(param_list_short), function(param) {
-    ggplot(distr_full_table[param_group == param & distribution_type == "distr_diff"], aes(x = skewness)) +
+  plotlist = lapply(names(param_t3_short), function(param) {
+    ggplot(distr_t3_full_table[param_group == param & distribution_type == "distr_diff"], aes(x = skewness)) +
       geom_histogram(bins = 100) +
       xlab("skewness") +
       ylab("Counts") +
@@ -410,10 +444,25 @@ g_skewness <- cowplot::plot_grid(
   align = "v",
   labels = c("R_log", "R_nlog", "S_log", "S_nlog")
 )
-ggsave(paste0(dir_data, "test/test_3_plot_comp_skewness.png"), g_skewness, scale = 2)
+g_skewness
+ggsave(paste0(dir_data_test, "t3_plot_comp_skewness.png"), g_skewness, scale = 2)
 
-#Other ideas: qqplot, shapiro
-# see https://stackoverflow.com/questions/7781798/seeing-if-data-is-normally-distributed-in-r/7788452#7788452
+ggplot(distr_t3_full_table[distribution_type == "distr_diff" & param_group %in% c("S_log", "S_nlog")], aes(x = skewness, color = param_group)) +
+  geom_histogram(bins = 100, position = "identity", alpha = 0.4) +
+  xlab("skewness") +
+  ylab("Counts") +
+  theme(text=element_text(size=20))
+ggplot(distr_t3_full_table[distribution_type == "distr_diff" & param_group %in% c("S_log", "R_log")], aes(x = skewness, color = param_group)) +
+  geom_histogram(bins = 100, position = "identity", alpha = 0.4) +
+  xlab("skewness") +
+  ylab("Counts") +
+  theme(text=element_text(size=20))
+
+#note: we cleary see that the log-normalized cases are less skewed. Therefore we will work only with log-normalized data
+# in our main analysis. 
+# We also decide to work with size-factor normalization because there is no clear argument to choose between this one and scTransform
+# and in this way the data are normalized as in the original TMS paper. Moreover, it is not clear is scTransform
+# can be applied to non-UMI data (so to the FACS dataset)
 
 
 
