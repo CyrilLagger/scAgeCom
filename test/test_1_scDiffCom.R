@@ -36,7 +36,7 @@ LR_t1 <- scDiffCom::LR6db$LR6db_curated
 ## Typical usage of scDiffCom (1000 iterations) ####
 
 #NOTES: --running scDiffcom takes a few minutes for 1000 iterations (e.g: around 4 min on a laptop for the parameters below)
-#       --the command does not need to be ran each time if the results have been saved already
+#       --the command does not need to be run each time if the results have been saved already
 #       --uncomment the lines if you want to test it
 
 # ?run_diffcom
@@ -85,8 +85,9 @@ LR_t1 <- scDiffCom::LR6db$LR6db_curated
 
 #apply filtering analysis to get the different regulation cases
 #source("src/src_1_filtering.R")
-#hist(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), breaks = 100)
 #quantile(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), 0.25)
+#hist(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), breaks = 100)
+#abline(v = quantile(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), 0.25) )
 
 #diffcom_t1 <- analyze_CCI(
 #  data = diffcom_t1,
@@ -103,7 +104,7 @@ LR_t1 <- scDiffCom::LR6db$LR6db_curated
 diffcom_t1 <- readRDS(paste0(dir_data_test, "t1_data_scDiffcom_1000iter.rds"))
 diffcom_t1_distr <- readRDS(paste0(dir_data_test, "t1_data_scDiffcom_distr_1000iter.rds"))
 
-#check talbes are in the same order
+#check tables are in the same order
 identical(diffcom_t1$LR_SCORE_young - diffcom_t1$LR_SCORE_old,
           diffcom_t1_distr$distr_diff[, 1001])
 identical(diffcom_t1$LR_SCORE_old,
@@ -136,9 +137,9 @@ cci_random_distr_t1 <- lapply(diffcom_t1_distr, function(i) {
 #"special cases" CCI
 cci_choosen_t1 <- rbindlist(
   list(
-    diffcom_t1[CASE_TYPE == "FFF" & L_NCELLS_young < 5 & L_NCELLS_young > 0 & R_NCELLS_young >0][28],
+    diffcom_t1[CASE_TYPE == "FFF" & L_NCELLS_young < 5 & L_NCELLS_young > 0 & R_NCELLS_young >0][3],
     diffcom_t1[CASE_TYPE != "FFF" & L_NCELLS_young < 5 & L_NCELLS_young > 0 & R_NCELLS_young >0][1],
-    diffcom_t1[CASE_TYPE == "FTTU"][2],
+    diffcom_t1[CASE_TYPE == "FTTU"][100],
     diffcom_t1[CASE_TYPE == "TFTD"][2],
     diffcom_t1[CASE_TYPE == "TTTD"][2],
     diffcom_t1[CASE_TYPE == "TTTU"][2],
