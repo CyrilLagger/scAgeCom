@@ -1,137 +1,136 @@
+####################################################
+##
+## Project: scAgeCom
+##
+## cyril.lagger@liverpool.ac.uk - September 2020
+##
+## Investigate the 6 LR databases and do a final
+## choice regading the curated interations.
+##
+####################################################
+##
+
+## Libraries ####
+
+library(scDiffCom)
 library(UpSetR)
 library(ComplexUpset)
-library(scDiffCom)
 library(ggplot2)
 
-#load db  
-LRdb <- LR6db$LR6db_all
-db_sources <- LR6db$LR6db_source
-db_names <- names(db_sources)
 
-##### look at which source to remove or to keep ####
-#from sctensor: remove all if unique
-LR_rm_sctensor <- db_sources$SCTENSOR
-#from nichenet: remove ppi (keep kegg_*, pharmacology, ramilowski_known)
-LR_rm_nichenet <- db_sources$NICHENET[grepl("ppi", db_sources$NICHENET)]
-#from icellnet: keep all (comes only as PMID)
-#from cellchat: keep all (comes from PMID, KEGG and PMC)
-sum(!grepl("PMID|KEGG|PMC", db_sources$CELLCHAT))
-#from cellphonedb: keep all (comes as cpdb)
-#from scsr: keep all for now
-LR_scsr_source <- sort(unique(unlist(strsplit(db_sources$SCSR, ","))))
-LR_scsr_source <- unique(gsub('[[:digit:]]+', '', LR_scsr_source))
-LR_scsr_source_manual <- c("cellsignal.com", "fantom5", "HPMR", "HPRD", "IUPHAR", "literature", "PMID", "reactome", "uniprot")
-LR_scsr_source_manual2 <- c("cellsignal\\.com", "fantom5", "HPMR", "HPRD", "IUPHAR", "literature", "PMID", "reactome", "uniprot")
-sum(!grepl(paste0(LR_scsr_source_manual2, collapse = "|"), db_sources$SCSR))
-LR_rm_scsr <- c("uniprot")
+## Analysis data path ####
+dir_data_analysis <- "../data_scAgeCom/analysis/"
 
-#final list to remove
-LR_rm <- c(
-  LR_rm_sctensor,
-  LR_rm_nichenet,
-  LR_rm_scsr,
-  sapply(LR_rm_sctensor, function(i) {
-    sapply(LR_rm_nichenet, function(j) {
-      c(paste(i,j, sep = ","), paste(j, i, sep = ","))
-    })
-  }),
-  sapply(LR_rm_sctensor, function(i) {
-    sapply(LR_rm_scsr, function(j) {
-      c(paste(i,j, sep = ","), paste(j, i, sep = ","))
-    })
-  }),
-  sapply(LR_rm_scsr, function(i) {
-    sapply(LR_rm_nichenet, function(j) {
-      c(paste(i,j, sep = ","), paste(j, i, sep = ","))
-    })
-  }),
-  sapply(LR_rm_sctensor, function(i) {
-    sapply(LR_rm_nichenet, function(j) {
-      sapply(LR_rm_scsr, function(k) {
-        c(paste(i,j,k, sep = ","), paste(i,k,j, sep = ","), paste(j, i,k, sep = ","), paste(j, k, i, sep = ","),
-          paste(k, i, j, sep = ","), paste(k, j, i, sep = ","))
-      })
-    })
-  })
-)
-LRdb_filtered <- LRdb[!(SOURCE %in% LR_rm)]
-
-#rename source to look at the categories
-LRdb_filtered[, SOURCE_CAT := gsub(paste0(c(LR_rm_nichenet, LR_rm_sctensor, "uniprot"), collapse = "|"), "PPI", SOURCE)]
-LRdb_filtered[, SOURCE_CAT := gsub("pharmacology", "IUPHAR", SOURCE_CAT)]
-LRdb_filtered[, SOURCE_CAT := gsub("kegg", "KEGG", SOURCE_CAT)]
-LRdb_filtered[, SOURCE_noDig := gsub(" ", "", gsub('[[:digit:]]+', '', SOURCE))]
-temp_char <- LRdb_filtered[3315]$SOURCE_noDig
-LRdb_filtered[SOURCE_noDig %in% c("", "; ", " ;", ";", temp_char), SOURCE_CAT := paste0("PMID:", SOURCE_CAT)]
-LRdb_filtered[, SOURCE_CAT := gsub("fantom5", "ramilowski", SOURCE_CAT)]
+## Load the LR database ####
+LR6db_full <- scDiffCom::LR6db$LR6db_all
+LR6db_curated <- scDiffCom::LR6db$LR6db_curated
+LR6db_source <- scDiffCom::LR6db$LR6db_source
 
 category_sources <- c("PPI", "IUPHAR", "KEGG", "PMID", "CPDB", "ramilowski",
                       "cellsignal.com", "HPMR", "HPRD", "reactome")
-sum(!grepl(paste0(category_sources, collapse = "|"), LRdb_filtered$SOURCE_CAT))
 
+category_DBs <- names(LR6db_source)
 
-source_db_list <- sapply(category_sources, function(i) {
-  LRdb_filtered[grepl(i, SOURCE_CAT)]$LR_SORTED
-})
+## Clean up the SOURCE of each interaction ####
+LR_rm_sctensor <- c("SWISSPROT_STRING", "TREMBL_STRING")
+LR_rm_nichenet <- c("ppi_bidir_bidir", "ppi_bidir_bidir_go", "ppi_bidir_r",
+                    "ppi_bidir_r_go", "ppi_l_bidir", "ppi_l_bidir_go",
+                    "ppi_lr", "ppi_lr_go")
 
-UpSetR::upset(fromList(source_db_list), nsets = 9, order.by = "freq", nintersects = 35)
+LR6db_full[, SOURCE_CLEAN := gsub(paste0(c(LR_rm_nichenet, LR_rm_sctensor, "uniprot"), collapse = "|"), "PPI", SOURCE)]
+LR6db_full[, SOURCE_CLEAN := gsub("pharmacology", "IUPHAR", SOURCE_CLEAN)]
+LR6db_full[, SOURCE_CLEAN := gsub("kegg", "KEGG", SOURCE_CLEAN)]
+LR6db_full[, SOURCE_CLEAN := gsub("fantom5", "ramilowski", SOURCE_CLEAN)]
+LR6db_full[, SOURCE_no_digit := gsub(" ", "", gsub('[[:digit:]]+', '', SOURCE))]
+LR6db_full[SOURCE_no_digit %in% c("", "; ", " ;", ";") | nchar(SOURCE_no_digit) <= 2, SOURCE_CLEAN := paste0("PMID:", SOURCE_CLEAN)]
+sum(!grepl(paste0(category_sources, collapse = "|"), LR6db_full$SOURCE_CAT))
 
-db_list <- sapply(db_names, function(i) {
-  LRdb_filtered[grepl(i, DATABASE)]$LR_SORTED
-}, 
-USE.NAMES = TRUE,
-simplify = FALSE)
+LR6db_curated[, SOURCE_CLEAN := gsub(paste0(c(LR_rm_nichenet, LR_rm_sctensor, "uniprot"), collapse = "|"), "PPI", SOURCE)]
+LR6db_curated[, SOURCE_CLEAN := gsub("pharmacology", "IUPHAR", SOURCE_CLEAN)]
+LR6db_curated[, SOURCE_CLEAN := gsub("kegg", "KEGG", SOURCE_CLEAN)]
+LR6db_curated[, SOURCE_CLEAN := gsub("fantom5", "ramilowski", SOURCE_CLEAN)]
+LR6db_curated[, SOURCE_no_digit := gsub(" ", "", gsub('[[:digit:]]+', '', SOURCE))]
+LR6db_curated[SOURCE_no_digit %in% c("", "; ", " ;", ";") | nchar(SOURCE_no_digit) <= 2, SOURCE_CLEAN := paste0("PMID:", SOURCE_CLEAN)]
+sum(!grepl(paste0(category_sources, collapse = "|"), LR6db_curated$SOURCE_CAT))
 
-UpSetR::upset(fromList(db_list), nsets = 6, order.by = "freq", nintersects = 26, scale.intersections = "identity")
+## Produce Upsetplot of full and curated LR interactions based on their source and database of origin ####
 
-#### with ComplexUpset
-
-LR_temp <- LRdb_filtered
-LR_temp[, c(category_sources) := lapply(category_sources, function(i) {
-  grepl(i, SOURCE_CAT)
+#produce correct format for upset function
+LR_full_upset <- LR6db_full
+LR_full_upset[, c(category_sources) := lapply(category_sources, function(i) {
+  ifelse(grepl(i, SOURCE_CLEAN), 1, 0)
 })]
-LR_temp[, c(db_names) := lapply(db_names, function(i) {
-  grepl(i, DATABASE)
+LR_full_upset[, c(category_DBs) := lapply(category_DBs, function(i) {
+  ifelse(grepl(i, DATABASE), 1, 0)
 })]
-LR_temp[, complex := !is.na(LIGAND_2) | !is.na(RECEPTOR_2)]
+LR_full_upset[, complex := !is.na(LIGAND_2) | !is.na(RECEPTOR_2)]
 
+LR_curated_upset <- LR6db_curated
+LR_curated_upset[, c(category_sources) := lapply(category_sources, function(i) {
+  ifelse(grepl(i, SOURCE_CLEAN), 1, 0)
+})]
+LR_curated_upset[, c(category_DBs) := lapply(category_DBs, function(i) {
+  ifelse(grepl(i, DATABASE), 1, 0)
+})]
+LR_curated_upset[, complex := !is.na(LIGAND_2) | !is.na(RECEPTOR_2)]
 
-upset(
-  LR_temp,
-  category_sources,
-  min_size = 20
+#upset plot of all interactions
+plot_upset_full_dbs <- ComplexUpset::upset(
+  LR_full_upset,
+  category_DBs,
+  min_size = 50
 )
+ggsave(filename = paste0(dir_data_analysis, "analysis_2_plot_upset_full_dbs.png"),
+       plot = plot_upset_full_dbs, scale = 2)
 
-upset(
-  LR_temp,
+plot_upset_full_sources <- ComplexUpset::upset(
+  LR_full_upset,
   category_sources,
-  min_size = 20,
+  min_size = 50
+)
+ggsave(filename = paste0(dir_data_analysis, "analysis_2_plot_upset_full_sources.png"),
+       plot = plot_upset_full_sources, scale = 2)
+
+plot_upset_curated_dbs <- ComplexUpset::upset(
+  LR_curated_upset,
+  category_DBs,
   base_annotations=list(
     'Intersection size'=intersection_size(
       counts=TRUE,
-      aes=aes(fill=complex)
+      aes=aes(fill=complex),
+      text = list(position = position_stack(vjust = 0.0)),
+      bar_number_threshold = 100
     )
-  )
-)
-
-upset(
-  LR_temp,
-  db_names,
+  ),
   min_size = 20
 )
+ggsave(filename = paste0(dir_data_analysis, "analysis_2_plot_upset_curated_dbs.png"),
+       plot = plot_upset_curated_dbs, scale = 2)
 
-
-upset(
-  LR_temp,
-  db_names,
-  min_size = 20,
+plot_upset_curated_sources <- ComplexUpset::upset(
+  LR_curated_upset,
+  category_sources,
   base_annotations=list(
     'Intersection size'=intersection_size(
       counts=TRUE,
-      aes=aes(fill=complex)
+      aes=aes(fill=complex),
+      text = list(position = position_stack(vjust = 0.0)),
+      bar_number_threshold = 100
     )
-  )
+  ),
+  min_size = 30
 )
+ggsave(filename = paste0(dir_data_analysis, "analysis_2_plot_upset_curated_sources.png"),
+       plot = plot_upset_curated_sources, scale = 2)
+
+#UpSetR::upset(LR_full_upset[, ..category_DBs], nsets = 6, order.by = "freq", nintersects = 35)
+#UpSetR::upset(LR_full_upset[, ..category_sources], nsets = 10, order.by = "freq", nintersects = 35)
+#UpSetR::upset(LR_curated_upset[, ..category_DBs], nsets = 6, order.by = "freq", nintersects = 35)
+#UpSetR::upset(LR_curated_upset[, ..category_sources], nsets = 10, order.by = "freq", nintersects = 35)
+
+
+
+
 
 #look at orthology
 #OK:
@@ -225,3 +224,18 @@ LR_genes_go[ go_id == "GO:0050789"]
 
 test <- LRall
 test2 <- test[ cpdb == TRUE | scsr == TRUE]
+
+#####
+upset_list_full_sources <- sapply(category_sources, function(i) {
+  LR6db_full[grepl(i, SOURCE_CLEAN)]$LR_SORTED
+})
+upset_list_full_DBs <- sapply(category_DBs, function(i) {
+  LR6db_full[grepl(i, DATABASE)]$LR_SORTED
+})
+
+upset_list_curated_sources <- sapply(category_sources, function(i) {
+  LR6db_curated[grepl(i, SOURCE_CLEAN)]$LR_SORTED
+})
+upset_list_curated_DBs <- sapply(category_DBs, function(i) {
+  LR6db_curated[grepl(i, DATABASE)]$LR_SORTED
+})
