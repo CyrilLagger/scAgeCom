@@ -20,7 +20,7 @@ library(pbapply)
 ## Data path and parameters####
 dir_data_test <- "../data_scAgeCom/test/"
 
-n_iter <- 500 #number of permutations for the double-check
+n_iter <- 1000 #number of permutations for the double-check
 
 ## Load a Seurat objects ####
 
@@ -313,22 +313,22 @@ lapply(seq_along(pv_diff_choosen_t1), function(i) {
 })
 
 #compare the distributions
-plot_t1_random_pval_diff_comp <- cowplot::plot_grid(
+t1_plot_random_pval_diff_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_diff_random_t1), function(i) {
     comp_distr(cci_random_distr_t1$distr_diff[i,], pv_diff_random_t1[[i]]$distr, case = "diff")
   }),
   ncol = 2,
   align = "v"
 )
-ggsave(filename = paste0(dir_data_test, "plot_t1_random_distr_permutations_comp.png"), plot = plot_t1_random_pval_diff_comp, scale = 2)
-plot_t1_choosen_pval_diff_comp <- cowplot::plot_grid(
+ggsave(filename = paste0(dir_data_test, "t1_plot_random_distr_permutations_comp.png"), plot = t1_plot_random_pval_diff_comp, scale = 2)
+t1_plot_choosen_pval_diff_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_diff_choosen_t1), function(i) {
     comp_distr(cci_choosen_distr_t1$distr_diff[i,], pv_diff_choosen_t1[[i]]$distr, case = "diff")
   }),
   ncol = 2,
   align = "v"
 )
-ggsave(filename = paste0(dir_data_test, "plot_t1_choosen_distr_permutations_comp.png"), plot = plot_t1_choosen_pval_diff_comp, scale = 2)
+ggsave(filename = paste0(dir_data_test, "t1_plot_choosen_distr_permutations_comp.png"), plot = t1_plot_choosen_pval_diff_comp, scale = 2)
 
 ## Double-check that the LR specificity p-values are correct ####
 
@@ -393,35 +393,35 @@ lapply(seq_along(pv_spec_old_choosen_t1), function(i) {
 })
 
 #compare the distributions
-plot_t1_random_pval_spec_young_comp <- cowplot::plot_grid(
+t1_plot_random_pval_spec_young_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_spec_young_random_t1), function(i) {
     comp_distr(cci_random_distr_t1$distr_cond2[i,], pv_spec_young_random_t1[[i]]$distr, case = "young")
   }),
   ncol = 2,
   align = "v"
 )
-ggsave(filename = paste0(dir_data_test, "plot_t1_random_pval_spec_young_comp.png"), plot = plot_t1_random_pval_spec_young_comp, scale = 2)
-plot_t1_random_pval_spec_old_comp <- cowplot::plot_grid(
+ggsave(filename = paste0(dir_data_test, "t1_plot_random_pval_spec_young_comp.png"), plot = t1_plot_random_pval_spec_young_comp, scale = 2)
+t1_plot_random_pval_spec_old_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_spec_old_random_t1), function(i) {
     comp_distr(cci_random_distr_t1$distr_cond1[i,], pv_spec_old_random_t1[[i]]$distr, case = "old")
   }),
   ncol = 2,
   align = "v"
 )
-ggsave(filename = paste0(dir_data_test, "plot_t1_random_pval_spec_old_comp.png"), plot = plot_t1_random_pval_spec_old_comp, scale = 2)
-plot_t1_choosen_pval_spec_young_comp <- cowplot::plot_grid(
+ggsave(filename = paste0(dir_data_test, "t1_plot_random_pval_spec_old_comp.png"), plot = t1_plot_random_pval_spec_old_comp, scale = 2)
+t1_plot_choosen_pval_spec_young_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_spec_young_choosen_t1), function(i) {
     comp_distr(cci_choosen_distr_t1$distr_cond2[i,], pv_spec_young_choosen_t1[[i]]$distr, case = "young")
   }),
   ncol = 2,
   align = "v"
 )
-ggsave(filename = paste0(dir_data_test, "plot_t1_choosen_pval_spec_young_comp.png"), plot = plot_t1_choosen_pval_spec_young_comp, scale = 2)
-plot_t1_choosen_pval_spec_old_comp <- cowplot::plot_grid(
+ggsave(filename = paste0(dir_data_test, "t1_plot_choosen_pval_spec_young_comp.png"), plot = t1_plot_choosen_pval_spec_young_comp, scale = 2)
+t1_plot_choosen_pval_spec_old_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_spec_old_choosen_t1), function(i) {
     comp_distr(cci_choosen_distr_t1$distr_cond1[i,], pv_spec_old_choosen_t1[[i]]$distr, case = "old")
   }),
   ncol = 2,
   align = "v"
 )
-ggsave(filename = paste0(dir_data_test, "plot_t1_choosen_pval_spec_young_comp.png"), plot = plot_t1_choosen_pval_spec_young_comp, scale = 2)
+ggsave(filename = paste0(dir_data_test, "t1_plot_choosen_pval_spec_young_comp.png"), plot = t1_plot_choosen_pval_spec_young_comp, scale = 2)
