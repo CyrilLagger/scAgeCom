@@ -26,7 +26,7 @@ dir_data_test <- "../data_scAgeCom/test/"
 seurat_t2 <- readRDS(paste0(dir_data_test, "data_seurat_example_facs_liver.rds"))
 seurat_t2 <- NormalizeData(seurat_t2, assay = "RNA")
 seurat_t2$age_group <- ifelse(seurat_t2$age %in% c('1m', '3m'), 'young', 'old' )
-seurat_t2$cell_ontology_class <- as.character(seurat_t1$cell_ontology_class)
+seurat_t2$cell_ontology_class <- as.character(seurat_t2$cell_ontology_class)
 
 ## Load interactions from CELLPHONEDB ####
 LR_t2 <- scDiffCom::LR6db$LR6db_curated
