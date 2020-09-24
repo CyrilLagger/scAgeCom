@@ -89,10 +89,10 @@ identical(seurat_objects$tms_droplet$n_genes, unique_genes$tms_droplet)
 # add age groups
 anyNA(seurat_objects$tms_facs$age)
 unique(seurat_objects$tms_facs$age)
-seurat_objects$tms_facs$age_group <- ifelse(seurat_objects$tms_facs$age %in% c('1m', '3m'), 'young', 'old')
+seurat_objects$tms_facs$age_group <- ifelse(seurat_objects$tms_facs$age %in% c('1m', '3m'), 'YOUNG', 'OLD')
 anyNA(seurat_objects$tms_droplet$age)
 unique(seurat_objects$tms_droplet$age)
-seurat_objects$tms_droplet$age_group <- ifelse(seurat_objects$tms_droplet$age %in% c('1m', '3m'), 'young', 'old')
+seurat_objects$tms_droplet$age_group <- ifelse(seurat_objects$tms_droplet$age %in% c('1m', '3m'), 'YOUNG', 'OLD')
 seurat_objects$calico_kidney$age_group <- seurat_objects$calico_kidney$age
 seurat_objects$calico_lung$age_group <- seurat_objects$calico_lung$age
 seurat_objects$calico_spleen$age_group <- seurat_objects$calico_spleen$age
