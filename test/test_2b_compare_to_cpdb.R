@@ -52,10 +52,31 @@ LR_t2 <- LR_t2[grepl("CELLPHONEDB", DATABASE)]
 #   return_distr = FALSE
 # )
 
-#saveRDS(object = diffcom_t2, file = paste0(dir_data_test, "t2_data_scDiffcom_for_cpdb.rds"))
-diffcom_t2 <- readRDS(paste0(dir_data_test, "t2_data_scDiffcom_for_cpdb.rds"))
+## Preprocessing, filtering and saving results ####
+#not needed if already saved
 
-## Read CPDB results and process them for the comparison ####
+#only keep detected interactions in either young or old samples
+#diffcom_t2 <- diffcom_t2[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
+#diffcom_t2[, TISSUE := "Liver"]
+
+#apply filtering analysis to get the different regulation cases
+#source("src/src_1_filtering.R")
+#quantile(c(diffcom_t2$LR_SCORE_old, diffcom_t2$LR_SCORE_young), 0.25)
+#hist(c(diffcom_t2$LR_SCORE_old, diffcom_t2$LR_SCORE_young), breaks = 100)
+#abline(v = quantile(c(diffcom_t2$LR_SCORE_old, diffcom_t2$LR_SCORE_young), 0.25) )
+
+#diffcom_t2 <- analyze_CCI(
+#  data = diffcom_t2,
+#  cutoff_score = quantile(c(diffcom_t2$LR_SCORE_old, diffcom_t2$LR_SCORE_young), 0.25)
+#)
+
+#save results
+#saveRDS(object = diffcom_t2, file = paste0(dir_data_test, "t2_data_scDiffcom_for_cpdb.rds"))
+
+
+## Read scDiffCom and CPDB results and process them for the comparison ####
+
+diffcom_t2 <- readRDS(paste0(dir_data_test, "t2_data_scDiffcom_for_cpdb.rds"))
 cpdb_t2 <- read.table(
   paste0(dir_data_test, "cpdb_test_results/cpdb_full_table_withCond.txt"),
   header = TRUE,
