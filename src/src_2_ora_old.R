@@ -1,109 +1,73 @@
 
+
+# Overrepresentation analysis --------------------------------------------------
+
+#' Title
+#'
+#' @param data 
+#' @param cols 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 analyze_ORA <- function(
-  data
+  data, 
+  cols = get_default_colnames()
 ) {
-  dt_ora = ora(data)
-  dt_ora_up = ora(data[DIFFERENTIAL_DIRECTION == "UP"])
-  dt_ora_down = ora(data[DIFFERENTIAL_DIRECTION == "DOWN"])
+  
+  COL_DIFFERENTIAL_DIRECTION = cols$DIFFERENTIAL_DIRECTION
+  
+  dt_ora = ora(data, cols)
+  dt_ora_up = ora(data[get(COL_DIFFERENTIAL_DIRECTION) == "UP"], cols)
+  dt_ora_down = ora(data[get(COL_DIFFERENTIAL_DIRECTION) == "DOWN"], cols)
+  
   dt_complete = merge(dt_ora, dt_ora_up,
                       by = c("Tissue", "Category", "Value"), 
                       all = TRUE, 
                       suffixes = c("", "_UP"))
+  
   dt_complete = merge(dt_complete, dt_ora_down,
                       by = c("Tissue", "Category", "Value"),
                       all = TRUE,
                       suffixes = c("", "_DOWN"))
+  
   return(dt_complete)
 }
 
-ora <- function(data) {
+
+#' Title
+#'
+#' @param data 
+#' @param cols 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+ora <- function(data, cols) {
+  
+  # tissues = c(unique(data[[cols$TISSUES]]))
   categories = c(
-    "TISSUE",
-    "L_CELLTYPE", "R_CELLTYPE", "LR_CELLTYPE",
-    "LR_NAME"
+    cols$TISSUES, cols$LIGAND_CELLTYPE, cols$RECEPTOR_CELLTYPE, 
+    cols$LIGAND_RECEPTOR_CELLTYPES, cols$L_GENE, cols$R_GENE, cols$LR_GENES
   )
-  dt_counts = fast_counts(data, categories)
+  
+  dt_counts = fast_counts(data, cols, categories)
   dt_ora = perform_ora_from_counts(dt_counts)
+  
   return(dt_ora)
 }
 
-fast_counts <- function(data, categories) {
-  COL_TISSUE <- "TISSUE"
-  dt_categories = count_on_all_columns(data, categories)
-  dt_tissues = count_significant_on_tissues(data)
-  dt_counts = merge(dt_categories, dt_tissues, by=COL_TISSUE, all=TRUE)
-    dt_counts = dt_counts[, .(
-    Tissue = get(COL_TISSUE),
-    Category = Category,
-    Value = Value,
-    Counts_value_significant = Counts_value_significant,
-    Counts_value_notsignificant = Counts_value_notsignificant,
-    Counts_notvalue_significant = Counts_significant - Counts_value_significant,
-    Counts_notvalue_notsignificant = Counts_notsignificant - Counts_value_notsignificant
-  )
-  ]
-  return(dt_counts)
-}
 
-count_on_all_columns <- function(data, categories) {
-  dt_categories = list()
-  for (category in categories) {
-    dt_cat = count_on_one_column(data, category)
-    dt_categories[[category]] = dt_cat
-  }
-  dt_counts = rbindlist(dt_categories, use.names = TRUE)
-  return(dt_counts)
-}
-
-count_on_one_column <- function(data, column) {
-  COL_TISSUE <- "TISSUE"
-  dt_val_sig = data[DIFFERENTIAL_EXPRESSED == TRUE,
-                    .(Category=column, Counts_value_significant=.N),
-                    by=.(get(COL_TISSUE), Value=get(column))]
-  dt_val_notsig = data[DIFFERENTIAL_EXPRESSED == FALSE,
-                       .(Category=column, Counts_value_notsignificant=.N),
-                       by=.(get(COL_TISSUE), Value=get(column))]
-  dt_list = list(dt_val_sig, dt_val_notsig)
-  lapply(dt_list, function(dt) {
-    setnames(dt, new = COL_TISSUE, old = "get")
-  })
-  dt_cat_final = merge(dt_list[[1]], dt_list[[2]], 
-                       by=c(COL_TISSUE, "Value", "Category"),
-                       all=TRUE)
-  setnafill(dt_cat_final, 
-            "const",
-            fill=0,
-            cols=4:5)
-  # Add entries for all organs
-  dt_all = dt_cat_final[, lapply(.SD, sum), by=.(Value, Category), .SDcols = !c(COL_TISSUE)]
-  dt_all[, (COL_TISSUE) := "All"]
-  dt_cat_final = rbindlist(list(dt_cat_final, dt_all), use.names=TRUE)
-  return(dt_cat_final)
-}
-
-count_significant_on_tissues <- function(data) {
-  COL_TISSUE <- "TISSUE"
-  # To be merged at last on tissue level + to create "All" entry
-  dt_sig = data[DIFFERENTIAL_EXPRESSED == TRUE,
-                .(Counts_significant = .N),
-                by = .(get(COL_TISSUE))]
-  dt_notsig = data[DIFFERENTIAL_EXPRESSED == FALSE,
-                   .(Counts_notsignificant = .N),
-                   by = .(get(COL_TISSUE))]
-  dt_list = list(dt_sig, dt_notsig)
-  lapply(dt_list, function(dt) {
-    setnames(dt, new = COL_TISSUE, old = "get")  })
-  
-  dt_tissues_counts = merge(dt_list[[1]], dt_list[[2]], 
-                            by=c(COL_TISSUE),
-                            all=TRUE)
-  setnafill(dt_tissues_counts, "const", fill=0, cols=2:3)
-  dt_all = dt_tissues_counts[, lapply(.SD, sum), .SDcols = !c(COL_TISSUE)]
-  dt_all[, (COL_TISSUE) := "All"]
-  dt_tissues_counts = rbindlist(list(dt_tissues_counts, dt_all), use.names=TRUE)
-  return(dt_tissues_counts)
-}
-
+#' Title
+#'
+#' @param data 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 perform_ora_from_counts <- function(data) {
   
   # https://stackoverflow.com/questions/11680579/assign-multiple-columns-using-in-data-table-by-group
@@ -132,6 +96,168 @@ perform_ora_from_counts <- function(data) {
   return(data)
 }
 
+#' Title
+#'
+#' @param data 
+#' @param cols 
+#' @param categories 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+fast_counts <- function(data, cols, categories) {
+  
+  COL_TISSUE = cols$TISSUES
+  
+  dt_categories = count_on_all_columns(data, cols, categories)
+  dt_tissues = count_significant_on_tissues(data, cols)
+  
+  dt_counts = merge(dt_categories, dt_tissues, by=COL_TISSUE, all=TRUE)
+  
+  dt_counts = dt_counts[, .(
+    Tissue = get(COL_TISSUE),
+    Category = Category,
+    Value = Value,
+    
+    Counts_value_significant = Counts_value_significant,
+    Counts_value_notsignificant = Counts_value_notsignificant,
+    Counts_notvalue_significant = Counts_significant - Counts_value_significant,
+    Counts_notvalue_notsignificant = Counts_notsignificant - Counts_value_notsignificant
+  )
+  ]
+  
+  return(dt_counts)
+}
+
+
+#' Title
+#'
+#' @param data 
+#' @param cols 
+#' @param categories 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+count_on_all_columns <- function(data, cols, categories) {
+  
+  dt_categories = list()
+  
+  for (category in categories) {
+    dt_cat = count_on_one_column(data, cols, category)
+    dt_categories[[category]] = dt_cat
+  }
+  
+  dt_counts = rbindlist(dt_categories, use.names = TRUE)
+  return(dt_counts)
+}
+
+
+#' Title
+#'
+#' @param data 
+#' @param cols 
+#' @param column 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+count_on_one_column <- function(data, cols, column) {
+  
+  COL_TISSUE = cols$TISSUES
+  COL_DIFFERENTIAL_EXPRESSED = cols$DIFFERENTIAL_EXPRESSED
+  COL_DIFFERENTIAL_DIRECTION = cols$DIFFERENTIAL_DIRECTION
+  
+  dt_val_sig = data[get(COL_DIFFERENTIAL_EXPRESSED) == TRUE,
+                    .(Category=column, Counts_value_significant=.N),
+                    by=.(get(COL_TISSUE), Value=get(column))]
+  
+  dt_val_notsig = data[get(COL_DIFFERENTIAL_EXPRESSED) == FALSE,
+                       .(Category=column, Counts_value_notsignificant=.N),
+                       by=.(get(COL_TISSUE), Value=get(column))]
+  
+  dt_list = list(dt_val_sig, dt_val_notsig)
+  
+  lapply(dt_list, function(dt) {
+    setnames(dt, new = COL_TISSUE, old = "get")
+  })
+  
+  
+  dt_cat_final = merge(dt_list[[1]], dt_list[[2]], 
+                       by=c(COL_TISSUE, "Value", "Category"),
+                       all=TRUE)
+  
+  setnafill(dt_cat_final, 
+            "const",
+            fill=0,
+            cols=4:5)
+  
+  # Add entries for all organs
+  dt_all = dt_cat_final[, lapply(.SD, sum), by=.(Value, Category), .SDcols = !c(COL_TISSUE)]
+  dt_all[, (COL_TISSUE) := "All"]
+  dt_cat_final = rbindlist(list(dt_cat_final, dt_all), use.names=TRUE)
+  
+  return(dt_cat_final)
+  
+}
+
+#' Title
+#'
+#' @param data 
+#' @param cols 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+count_significant_on_tissues <- function(data, cols) {
+  
+  COL_TISSUE = cols$TISSUES
+  COL_DIFFERENTIAL_EXPRESSED = cols$DIFFERENTIAL_EXPRESSED
+  COL_DIFFERENTIAL_DIRECTION = cols$DIFFERENTIAL_DIRECTION
+  
+  # To be merged at last on tissue level + to create "All" entry
+  dt_sig = data[get(COL_DIFFERENTIAL_EXPRESSED) == TRUE,
+                .(Counts_significant = .N),
+                by = .(get(COL_TISSUE))]
+  dt_notsig = data[get(COL_DIFFERENTIAL_EXPRESSED) == FALSE,
+                   .(Counts_notsignificant = .N),
+                   by = .(get(COL_TISSUE))]
+  
+  dt_list = list(dt_sig, dt_notsig)
+  
+  lapply(dt_list, function(dt) {
+    setnames(dt, new = COL_TISSUE, old = "get")
+  })
+  
+  dt_tissues_counts = merge(dt_list[[1]], dt_list[[2]], 
+                            by=c(COL_TISSUE),
+                            all=TRUE)
+  
+  setnafill(dt_tissues_counts, "const", fill=0, cols=2:3)
+  
+  dt_all = dt_tissues_counts[, lapply(.SD, sum), .SDcols = !c(COL_TISSUE)]
+  dt_all[, (COL_TISSUE) := "All"]
+  dt_tissues_counts = rbindlist(list(dt_tissues_counts, dt_all), use.names=TRUE)
+  
+  return(dt_tissues_counts)
+}
+
+
+#' Title
+#'
+#' @param Counts_value_significant 
+#' @param Counts_value_notsignificant 
+#' @param Counts_notvalue_significant 
+#' @param Counts_notvalue_notsignificant 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 odds_ratio <- function(Counts_value_significant,
                        Counts_value_notsignificant,
                        Counts_notvalue_significant,
@@ -149,6 +275,17 @@ odds_ratio <- function(Counts_value_significant,
 }
 
 
+#' Title
+#'
+#' @param Counts_value_significant 
+#' @param Counts_value_notsignificant 
+#' @param Counts_notvalue_significant 
+#' @param Counts_notvalue_notsignificant 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 fisher_2sided <- function(Counts_value_significant,
                           Counts_value_notsignificant,
                           Counts_notvalue_significant,
@@ -164,6 +301,17 @@ fisher_2sided <- function(Counts_value_significant,
   return(res)
 }
 
+#' Title
+#'
+#' @param Counts_value_significant 
+#' @param Counts_value_notsignificant 
+#' @param Counts_notvalue_significant 
+#' @param Counts_notvalue_notsignificant 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 vfisher_2sided <- function(Counts_value_significant,
                            Counts_value_notsignificant,
                            Counts_notvalue_significant,
@@ -179,6 +327,17 @@ vfisher_2sided <- function(Counts_value_significant,
   return(l)
 }
 
+#' Title
+#'
+#' @param Counts_value_significant 
+#' @param Counts_value_notsignificant 
+#' @param Counts_notvalue_significant 
+#' @param Counts_notvalue_notsignificant 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 kulc <- function(Counts_value_significant,
                  Counts_value_notsignificant,
                  Counts_notvalue_significant,
@@ -192,6 +351,17 @@ kulc <- function(Counts_value_significant,
 }
 
 
+#' Title
+#'
+#' @param Counts_value_significant 
+#' @param Counts_value_notsignificant 
+#' @param Counts_notvalue_significant 
+#' @param Counts_notvalue_notsignificant 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 imbalance_ratio <- function(Counts_value_significant,
                             Counts_value_notsignificant,
                             Counts_notvalue_significant,
