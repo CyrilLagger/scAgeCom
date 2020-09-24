@@ -3,9 +3,9 @@ library(ComplexUpset)
 library(scDiffCom)
 library(ggplot2)
 
-#load db
-LRdb <- LR6db_wSource$LR6db
-db_sources <- LR6db_wSource$db_source
+#load db  
+LRdb <- LR6db$LR6db_all
+db_sources <- LR6db$LR6db_source
 db_names <- names(db_sources)
 
 ##### look at which source to remove or to keep ####
@@ -153,8 +153,9 @@ fwrite(LRdb_filtered, file = "../../../../../test.csv")
 library(clusterProfiler)
 library(org.Mm.eg.db)
 
-LR_genes <- unique(unlist(LRdb_filtered[, c("LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3")]))
+LR_genes <- unique(unlist(LR6db$LR6db_curated[, c("LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3")]))
 LR_genes <- LR_genes[!is.na(LR_genes)]
+
 
 LR_ggo_bc_l3 <- groupGO(
   gene = LR_genes,
@@ -207,6 +208,12 @@ setDT(LR_genes_go)
 LR_genes_go_comb <- LR_genes_go[, list(text = paste(name_1006, collapse=",")), by = mgi_symbol]
 
 LR_genes_go_comb2 <- LR_genes_go[, list(text = paste(mgi_symbol, collapse=",")), by = name_1006]
+
+library(GO.db)
+Term("GO:0016021")
+t <- c(GOBPOFFSPRING[["GO:0042110"]], "GO:0042110")
+Term("GO:0042110")
+Term(t[2])
 
 library(data.table)
 setDT(LR_genes_go)
