@@ -14,7 +14,9 @@
 bind_tissues <- function(
   path,
   list_of_tissues,
-  pre_filtering = TRUE
+  conds,
+  pre_filtering = TRUE,
+  min_cells = NULL
 ) {
   data.table::rbindlist(
     l = lapply(
@@ -23,29 +25,18 @@ bind_tissues <- function(
         tiss
       ) 
       {
-        dt <- readRDS(paste0(path, "/diffcom_", tiss, ".rds"))
+        dt <- readRDS(paste0(path, "/scdiffcom_", tiss, ".rds"))
         dt[, TISSUE := tiss]
         if(pre_filtering) {
-          dt <- dt[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
+          dt <- dt[get(paste0("LR_DETECTED_", conds[[1]])) == TRUE | get(paste0("LR_DETECTED_", conds[[2]])) == TRUE]
+        }
+        if(!is.null(min_cells)) {
+          dt <- dt[get(paste0("L_NCELLS_", conds[[1]])) >= min_cells & 
+                     get(paste0("R_NCELLS_", conds[[1]])) >= min_cells &
+                     get(paste0("L_NCELLS_", conds[[2]])) >= min_cells &
+                     get(paste0("R_NCELLS_", conds[[2]])) >= min_cells]
         }
         return(dt)
-        # if(is_log) {
-        #   dt[, LR_LOGFC := LR_SCORE_old - LR_SCORE_young]
-        # } else {
-        #   dt[, LR_LOGFC := log(LR_SCORE_old/LR_SCORE_young)]
-        # }
-        # dt[, LR_LOGFC_ABS := abs(LR_LOGFC)]
-        # dt[, LR_CELLTYPES := paste(L_CELLTYPE, R_CELLTYPE, sep = "_")]
-        #dt[, c("L_EXPRESSION_young",
-        #       "L_EXPRESSION_old",
-        #       "R_EXPRESSION_young",
-        #       "R_EXPRESSION_old",
-        #       "L_DETECTED_young",
-        #       "L_DETECTED_old",
-        #       "R_DETECTED_young",
-        #       "R_DETECTED_old",
-        #       "PVAL_old", 
-        #       "PVAL_young") := NULL]
       }),
     use.names = TRUE,
     fill = TRUE
@@ -54,40 +45,47 @@ bind_tissues <- function(
 
 analyze_CCI_per_tissue <- function(
   data, 
+  conds,
   cutoff_quantile,
-  cutoff_specificity_young = 0.05,
-  cutoff_specificity_old = 0.05,
+  cutoff_logFC_abs,
+  cutoff_specificity = 0.05,
   cutoff_pval = 0.05,
-  cutoff_logFC_abs = log(1.1),
   reassignment = NULL,
-  is_log = TRUE
+  is_log = TRUE,
+  recompute_BH = FALSE
 ) {
   message("Analyzing CCI...")
   data <- copy(data)
-  data <- preprocess_results(data, is_log)
+  data <- preprocess_results(data, conds, is_log)
   tissues <- unique(data$TISSUE)
   res <- rbindlist(
     l = lapply(
       tissues,
       function(tiss) {
         temp <- data[TISSUE == tiss]
-        cutoff_score <- quantile(c(temp$LR_SCORE_old, temp$LR_SCORE_young), cutoff_quantile)
+        if(recompute_BH) {
+          temp[, BH_PVAL_DIFF := p.adjust(PVAL_DIFF, method = "BH")]
+          temp[, paste0("BH_PVAL_", conds[[1]]) := p.adjust(get(paste0("PVAL_", conds[[1]])), method = "BH")]
+          temp[, paste0("BH_PVAL_", conds[[2]]) := p.adjust(get(paste0("PVAL_", conds[[2]])), method = "BH")]
+        }
+        cutoff_score <- quantile(c(temp[[paste0("LR_SCORE_", conds[[1]])]], temp[[paste0("LR_SCORE_", conds[[2]])]]), cutoff_quantile)
         temp <- analyze_detected(
-          temp, 
+          temp,
+          conds,
           cutoff_score,
-          cutoff_specificity_young,
-          cutoff_specificity_old
+          cutoff_specificity
         )
         temp <- analyze_significant(
           temp,
+          conds,
           cutoff_pval,
           cutoff_logFC_abs
         )
         temp <- add_case_type(
           temp,
+          conds,
           cutoff_score,
-          cutoff_specificity_young,
-          cutoff_specificity_old
+          cutoff_specificity
         )
         return(temp)
       }
@@ -134,6 +132,7 @@ analyze_CCI <- function(
 
 preprocess_results <- function(
   data,
+  conds,
   is_log = TRUE
 ) {
   message("Preprocessing results...")
@@ -141,9 +140,9 @@ preprocess_results <- function(
     stop("data should be data.table")
   }
   if(is_log) {
-    data[, LOGFC := LR_SCORE_old - LR_SCORE_young]
+    data[, LOGFC := get(paste0("LR_SCORE_", conds[[2]])) - get(paste0("LR_SCORE_", conds[[1]]))]
   } else {
-    data[, LOGFC := log(LR_SCORE_old / LR_SCORE_young)]
+    data[, LOGFC := log(get(paste0("LR_SCORE_", conds[[2]])) / get(paste0("LR_SCORE_", conds[[1]])))]
   }
   data[, LOGFC_ABS := abs(LOGFC)]
   data[, LR_CELLTYPE := paste(L_CELLTYPE, R_CELLTYPE, sep = "_")]
@@ -161,35 +160,36 @@ preprocess_results <- function(
 
 analyze_detected <- function(
   data,
+  conds,
   cutoff_score,
-  cutoff_specificity_young,
-  cutoff_specificity_old
+  cutoff_specificity
 ) {
   message("Analyzing detected...")
   # Can have separate column for specificity to analyze later, since it
   #  can reject interesting interactions that we may want to detect.
-  data[, LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG := 
-         (LR_DETECTED_young == TRUE) 
-       & (LR_SCORE_young >=  cutoff_score)
-       & (BH_PVAL_young <= cutoff_specificity_young)
+  data[, paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]]) := 
+         (get(paste0("LR_DETECTED_", conds[[1]])) == TRUE) 
+       & (get(paste0("LR_SCORE_", conds[[1]])) >=  cutoff_score)
+       & (get(paste0("BH_PVAL_", conds[[1]])) <= cutoff_specificity)
        ]
-  data[, LR_DETECTED_AND_SIGNIFICANT_IN_OLD := 
-         (LR_DETECTED_old == TRUE) 
-       & (LR_SCORE_old >=  cutoff_score)
-       & (BH_PVAL_old <= cutoff_specificity_old)
+  data[, paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]]) := 
+         (get(paste0("LR_DETECTED_", conds[[2]])) == TRUE) 
+       & (get(paste0("LR_SCORE_", conds[[2]])) >=  cutoff_score)
+       & (get(paste0("BH_PVAL_", conds[[2]])) <= cutoff_specificity)
        ]
   return(data)
 }
 
 analyze_significant <- function(
-  data, 
+  data,
+  conds,
   cutoff_pval,
   cutoff_logFC_abs
 ) {
   message("Analyzing significant...")
   data[, DIFFERENTIAL_EXPRESSED := 
-         (LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG
-          | LR_DETECTED_AND_SIGNIFICANT_IN_OLD)
+         (get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]]))
+          | get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])))
        & (BH_PVAL_DIFF <= cutoff_pval)
        & (LOGFC_ABS >= cutoff_logFC_abs)
        ]
@@ -199,14 +199,14 @@ analyze_significant <- function(
 
 add_case_type <- function(
   data,
+  conds,
   cutoff_score,
-  cutoff_specificity_young,
-  cutoff_specificity_old
+  cutoff_specificity
 ) {
   message("Analyzing type of interactions...")
   data[, CASE_TYPE := ifelse(
-    LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG &
-      LR_DETECTED_AND_SIGNIFICANT_IN_OLD &
+    get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
+      get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
       DIFFERENTIAL_EXPRESSED,
     ifelse(
       DIFFERENTIAL_DIRECTION == "UP",
@@ -214,8 +214,8 @@ add_case_type <- function(
       "TTTD"
     ),
     ifelse(
-      LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG &
-        LR_DETECTED_AND_SIGNIFICANT_IN_OLD &
+      get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
+        get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
         !DIFFERENTIAL_EXPRESSED,
       ifelse(
         DIFFERENTIAL_DIRECTION == "UP",
@@ -223,16 +223,16 @@ add_case_type <- function(
         "TTFD"
       ),
       ifelse(
-        LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG &
-          !LR_DETECTED_AND_SIGNIFICANT_IN_OLD &
+        get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
+          !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
           DIFFERENTIAL_EXPRESSED,
         ifelse(
           DIFFERENTIAL_DIRECTION == "DOWN",
           "TFTD",
           ifelse(
-            sum(c(BH_PVAL_old > cutoff_specificity_old,
-                  !LR_DETECTED_old,
-                  LR_SCORE_old < cutoff_score
+            sum(c(get(paste0("BH_PVAL_", conds[[2]])) > cutoff_specificity,
+                  !get(paste0("LR_DETECTED_", conds[[2]])),
+                  get(paste0("LR_SCORE_", conds[[2]])) < cutoff_score
             )
             ) == 1,
             "TTTU",
@@ -240,13 +240,13 @@ add_case_type <- function(
           )
         ),
         ifelse(
-          LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG & 
-            !LR_DETECTED_AND_SIGNIFICANT_IN_OLD &  
+          get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) & 
+            !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &  
             !DIFFERENTIAL_EXPRESSED,
           ifelse(
-            sum(c(BH_PVAL_old > cutoff_specificity_old,
-                  !LR_DETECTED_old,
-                  LR_SCORE_old < cutoff_score
+            sum(c(get(paste0("BH_PVAL_", conds[[2]])) > cutoff_specificity,
+                  !get(paste0("LR_DETECTED_", conds[[2]])),
+                  get(paste0("LR_SCORE_", conds[[2]])) < cutoff_score
             )
             ) == 1,
             ifelse(
@@ -257,16 +257,16 @@ add_case_type <- function(
             "FFF"
           ),
           ifelse(
-            !LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG &
-              LR_DETECTED_AND_SIGNIFICANT_IN_OLD & 
+            !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
+              get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) & 
               DIFFERENTIAL_EXPRESSED,
             ifelse(
               DIFFERENTIAL_DIRECTION == "UP",
               "FTTU",
               ifelse(
-                sum(c(BH_PVAL_young > cutoff_specificity_young,
-                      !LR_DETECTED_young,
-                      LR_SCORE_young < cutoff_score
+                sum(c(get(paste0("BH_PVAL_", conds[[1]])) > cutoff_specificity,
+                      !get(paste0("LR_DETECTED_", conds[[1]])),
+                      get(paste0("LR_SCORE_", conds[[1]])) < cutoff_score
                 )
                 ) == 1,
                 "TTTD",
@@ -274,13 +274,13 @@ add_case_type <- function(
               )
             ),
             ifelse(
-              !LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG &
-                LR_DETECTED_AND_SIGNIFICANT_IN_OLD &
+              !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
+                get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
                 !DIFFERENTIAL_EXPRESSED,
               ifelse(
-                sum(c(BH_PVAL_young > cutoff_specificity_young,
-                      !LR_DETECTED_young,
-                      LR_SCORE_young < cutoff_score
+                sum(c(get(paste0("BH_PVAL_", conds[[1]])) > cutoff_specificity,
+                      !get(paste0("LR_DETECTED_", conds[[1]])),
+                      get(paste0("LR_SCORE_", conds[[1]])) < cutoff_score
                 )
                 ) == 1,
                 ifelse(
@@ -321,14 +321,14 @@ get_default_colnames <- function() {
     
     "LIGAND_CELLTYPE" = "L_CELLTYPE",
     "RECEPTOR_CELLTYPE" = "R_CELLTYPE",
-    "LR_SCORE_YOUNG" = "LR_SCORE_young",
-    "LR_SCORE_OLD" = "LR_SCORE_old",
+    "LR_SCORE_YOUNG" = "LR_SCORE_YOUNG",
+    "LR_SCORE_OLD" = "LR_SCORE_OLD",
     "BH_PVAL" = "BH_PVAL_DIFF",
     "RAW_PVAL" = "PVAL_DIFF",
-    "LR_DETECTED_YOUNG" = "LR_DETECTED_young",
-    "LR_DETECTED_OLD" = "LR_DETECTED_old",
-    "BH_PVAL_SPECIFICITY_YOUNG" = "BH_PVAL_young",
-    "BH_PVAL_SPECIFICITY_OLD" = "BH_PVAL_old",
+    "LR_DETECTED_YOUNG" = "LR_DETECTED_YOUNG",
+    "LR_DETECTED_OLD" = "LR_DETECTED_OLD",
+    "BH_PVAL_SPECIFICITY_YOUNG" = "BH_PVAL_YOUNG",
+    "BH_PVAL_SPECIFICITY_OLD" = "BH_PVAL_OLD",
     
     
     "LIGAND_RECEPTOR_CELLTYPES" = "LR_CELLTYPES",
@@ -336,18 +336,18 @@ get_default_colnames <- function() {
     "LOGFC_ABS" = "LR_LOGFC_ABS",
     
     
-    #"LIGAND_EXPRESSION_YOUNG" = "L_EXPRESSION_young",
-    #"LIGAND_EXPRESSION_OLD" = "L_EXPRESSION_old",
-    #"LIGAND_DETECTED_YOUNG" = "L_DETECTED_young",
-    #"LIGAND_DETECTED_OLD" = "L_DETECTED_old",
-    #"RECEPTOR_EXPRESSION_YOUNG" = "R_EXPRESSION_young",
-    #"RECEPTOR_EXPRESSION_OLD" = "R_EXPRESSION_old",
-    #"RECEPTOR_DETECTED_YOUNG" = "R_DETECTED_young",
-    #"RECEPTOR_DETECTED_OLD" = "R_DETECTED_old",
+    #"LIGAND_EXPRESSION_YOUNG" = "L_EXPRESSION_YOUNG",
+    #"LIGAND_EXPRESSION_OLD" = "L_EXPRESSION_OLD",
+    #"LIGAND_DETECTED_YOUNG" = "L_DETECTED_YOUNG",
+    #"LIGAND_DETECTED_OLD" = "L_DETECTED_OLD",
+    #"RECEPTOR_EXPRESSION_YOUNG" = "R_EXPRESSION_YOUNG",
+    #"RECEPTOR_EXPRESSION_OLD" = "R_EXPRESSION_OLD",
+    #"RECEPTOR_DETECTED_YOUNG" = "R_DETECTED_YOUNG",
+    #"RECEPTOR_DETECTED_OLD" = "R_DETECTED_OLD",
     
     # New
-    "LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG" = "LR_DETECTED_AND_SIGN_young",
-    "LR_DETECTED_AND_SIGNIFICANT_IN_OLD" = "LR_DETECTED_AND_SIGN_old",
+    "LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG" = "LR_DETECTED_AND_SIGN_YOUNG",
+    "LR_DETECTED_AND_SIGNIFICANT_IN_OLD" = "LR_DETECTED_AND_SIGN_OLD",
     "DIFFERENTIAL_EXPRESSED" = "DIFF_EXPRESSION",
     "DIFFERENTIAL_DIRECTION" = "DIRECTION",
     "CASE_TYPE" = "CASE_TYPE"
