@@ -81,19 +81,30 @@ LR_curated_upset[, complex := !is.na(LIGAND_2) | !is.na(RECEPTOR_2)]
 plot_upset_full_dbs <- ComplexUpset::upset(
   LR_full_upset,
   category_DBs,
-  min_size = 50
+  min_size = 50,
+  base_annotations=list(
+    'Intersection size'=intersection_size(
+      bar_number_threshold = 100
+    )
+  )
 )
 plot_upset_full_dbs
 ggsave(filename = paste0(dir_data_analysis, "a2_plot_upset_full_dbs.png"),
-       plot = plot_upset_full_dbs, scale = 2)
+       plot = plot_upset_full_dbs, scale = 1.5)
 
 plot_upset_full_sources <- ComplexUpset::upset(
   LR_full_upset,
   category_sources,
-  min_size = 50
+  min_size = 50,
+  base_annotations=list(
+    'Intersection size'=intersection_size(
+      bar_number_threshold = 100
+    )
+  )
 )
+plot_upset_full_sources
 ggsave(filename = paste0(dir_data_analysis, "a2_plot_upset_full_sources.png"),
-       plot = plot_upset_full_sources, scale = 2)
+       plot = plot_upset_full_sources, scale = 1.5)
 
 plot_upset_curated_dbs <- ComplexUpset::upset(
   LR_curated_upset,
@@ -108,8 +119,9 @@ plot_upset_curated_dbs <- ComplexUpset::upset(
   ),
   min_size = 20
 )
+plot_upset_curated_dbs
 ggsave(filename = paste0(dir_data_analysis, "a2_plot_upset_curated_dbs.png"),
-       plot = plot_upset_curated_dbs, scale = 2)
+       plot = plot_upset_curated_dbs, scale = 1.5)
 
 plot_upset_curated_sources <- ComplexUpset::upset(
   LR_curated_upset,
@@ -124,8 +136,9 @@ plot_upset_curated_sources <- ComplexUpset::upset(
   ),
   min_size = 30
 )
+plot_upset_curated_sources
 ggsave(filename = paste0(dir_data_analysis, "a2_plot_upset_curated_sources.png"),
-       plot = plot_upset_curated_sources, scale = 2)
+       plot = plot_upset_curated_sources, scale = 1.5)
 
 #UpSetR::upset(LR_full_upset[, ..category_DBs], nsets = 6, order.by = "freq", nintersects = 35)
 #UpSetR::upset(LR_full_upset[, ..category_sources], nsets = 10, order.by = "freq", nintersects = 35)

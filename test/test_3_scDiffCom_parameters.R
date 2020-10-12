@@ -44,21 +44,10 @@ seurat_t3 <- SCTransform(
 #      We also want to check the usage of one-sided vs two-sided test for differential p-values.
 
 param_t3 <- list(
-  R_log_one = list(id = "R_log_one", assay = "RNA", log_scale = TRUE, one_sided = TRUE),
-  R_log_two = list(id = "R_log_two",assay = "RNA", log_scale = TRUE, one_sided = FALSE),
-  R_nlog_one = list(id = "R_nlog_one", assay = "RNA", log_scale = FALSE, one_sided = TRUE),
-  R_nlog_two = list(id = "R_nlog_two", assay = "RNA", log_scale = FALSE, one_sided = FALSE),
-  S_log_one = list(id = "S_log_one", assay = "SCT", log_scale = TRUE, one_sided = TRUE),
-  S_log_two = list(id = "S_log_two", assay = "SCT", log_scale = TRUE, one_sided = FALSE),
-  S_nlog_one = list(id = "S_nlog_one", assay = "SCT", log_scale = FALSE, one_sided = TRUE),
-  S_nlog_two = list(id = "S_nlog_two", assay = "SCT", log_scale = FALSE, one_sided = FALSE)
-)
-
-param_t3_short <- list(
-  R_log = param_t3$R_log_two,
-  R_nlog = param_t3$R_nlog_two,
-  S_log = param_t3$S_log_two,
-  S_nlog = param_t3$S_nlog_two
+  R_log = list(id = "R_log_two",assay = "RNA", log_scale = TRUE),
+  R_nlog = list(id = "R_nlog_two", assay = "RNA", log_scale = FALSE),
+  S_log_two = list(id = "S_log_two", assay = "SCT", log_scale = TRUE),
+  S_nlog_two = list(id = "S_nlog_two", assay = "SCT", log_scale = FALSE)
 )
 
 ## Run scDiffCom on all parameters ####
@@ -67,7 +56,7 @@ param_t3_short <- list(
 #it will take some times, so we use 1000 iterations as a start
 # diffcom_bind_t3 <- rbindlist(
 #   lapply(
-#     param_t3,
+#     param_t3_short,
 #     function(
 #       param
 #     ) {
@@ -100,8 +89,8 @@ param_t3_short <- list(
 #diffcom_bind_t3[, TISSUE := "Liver"]
 
 #apply filtering analysis to get the different regulation cases
-# source("src/src_1_filtering.R")
-# diffcom_bind_t3 <- rbindlist(
+#source("src/src_1_filtering.R")
+#diffcom_bind_t3 <- rbindlist(
 #   l = lapply(
 #     unique(diffcom_bind_t3$param_group),
 #     function(param) {
@@ -110,12 +99,12 @@ param_t3_short <- list(
 #         data = temp,
 #         cutoff_quantile = 0.25,
 #         cutoff_logFC_abs = log(1.1),
-#         is_log = param_t3[[param]]$log_scale
+#         is_log = param_t3_short[[param]]$log_scale
 #       )
 #     }
 #   ),
 #   use.names = TRUE
-# )
+#)
 
 #save results
 #saveRDS(diffcom_bind_t3, file = paste0(dir_data_test, "t3_data_scDiffCom_allparameters_1000iter.rds"))
@@ -138,19 +127,14 @@ diffcom_bind_t3[, CCI := paste(LR_CELLTYPE, LR_NAME, sep = "_")]
 
 #look how the CCIs are distributed
 ftable(diffcom_bind_t3$param_group, diffcom_bind_t3$CASE_TYPE)
-ftable(diffcom_bind_t3[grepl("two", param_group)]$param_group, diffcom_bind_t3[grepl("two", param_group)]$CASE_TYPE)
-ftable(diffcom_bind_t3[grepl("two", param_group)]$param_group, diffcom_bind_t3[grepl("two", param_group)]$CASE_TYPE_2)
+ftable(diffcom_bind_t3$param_group, diffcom_bind_t3$CASE_TYPE_2)
 
 diffcom_bind_t3[, param_case := paste(param_group, CASE_TYPE_2, sep = "_")]
 param_case_list <- unique(diffcom_bind_t3$param_case)
 CCI_per_param_list <- sapply(param_case_list, function(i) {
   diffcom_bind_t3[param_case == i]$CCI
 })
-CCI_per_param_list_2 <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
-  diffcom_bind_t3[param_case == i]$CCI
-})
-UpSetR::upset(fromList(CCI_per_param_list), nsets = 32, order.by = "freq", nintersects = 35)
-UpSetR::upset(fromList(CCI_per_param_list_2), nsets = 16, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list), nsets = 16, order.by = "freq", nintersects = 35)
 
 #look and remove the CCI that are consistent over all parameter cases
 dcast_param_t3 <- dcast(
@@ -158,7 +142,7 @@ dcast_param_t3 <- dcast(
   formula = CCI ~ param_group,
   value.var = "CASE_TYPE_2"
 )
-dcast_param_t3[, is_eq := R_log_two == R_nlog_two & R_nlog_two == S_log_two & S_log_two == S_nlog_two]
+dcast_param_t3[, is_eq := R_log == R_nlog & R_nlog == S_log & S_log == S_nlog]
 
 CCI_conserved <- dcast_param_t3[is_eq == TRUE]$CCI
 CCI_non_conserved <- dcast_param_t3[is_eq == FALSE | is.na(is_eq)]$CCI
@@ -166,13 +150,13 @@ CCI_non_conserved_noNA <- dcast_param_t3[is_eq == FALSE]$CCI
 CCI_per_param_list_2_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
   diffcom_bind_t3[param_case == i & CCI %in% CCI_conserved]$CCI
 })
-CCI_per_param_list_2_non_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+CCI_per_param_list_2_non_conserved <- sapply(param_case_list, function(i) {
   diffcom_bind_t3[param_case == i & CCI %in% CCI_non_conserved]$CCI
 })
-CCI_per_param_list_2_non_conserved_noNA <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+CCI_per_param_list_2_non_conserved_noNA <- sapply(param_case_list, function(i) {
   diffcom_bind_t3[param_case == i & CCI %in% CCI_non_conserved_noNA]$CCI
 })
-CCI_per_param_list_3_conserved <- sapply(param_case_list[grepl("_log_two", param_case_list)], function(i) {
+CCI_per_param_list_2_conserved <- sapply(param_case_list, function(i) {
   diffcom_bind_t3[param_case == i & CCI %in% CCI_conserved]$CCI
 })
 
@@ -180,7 +164,7 @@ CCI_per_param_list_3_conserved <- sapply(param_case_list[grepl("_log_two", param
 UpSetR::upset(fromList(CCI_per_param_list_2_conserved), nsets = 16, order.by = "freq", nintersects = 35)
 UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved), nsets = 16, order.by = "freq", nintersects = 35)
 UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved_noNA), nsets = 16, order.by = "freq", nintersects = 35)
-UpSetR::upset(fromList(CCI_per_param_list_3_conserved), nsets = 8, order.by = "freq")
+
 
 #Note: we can observe some differences in the classification depending on the processing methods.
 #      There is a priori no clear way to define a better approach based only on this data.
@@ -200,8 +184,8 @@ ora_up_LR_NAME <- rbindlist(
   l = lapply(
     ora_list_t3,
     function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_UP <= 0.05 & OR_UP >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_UP", "OR_UP")]
+      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_adjusted_UP <= 0.05 & OR_UP >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_UP", "OR_UP")]
     }
   ),
   use.names = TRUE,
@@ -211,8 +195,8 @@ ora_down_LR_NAME <- rbindlist(
   l = lapply(
     ora_list_t3,
     function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_DOWN <= 0.05 & OR_DOWN >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_DOWN", "OR_DOWN")]
+      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_DOWN", "OR_DOWN")]
     }
   ),
   use.names = TRUE,
@@ -223,8 +207,8 @@ ora_up_LR_CELLTYPE <- rbindlist(
   l = lapply(
     ora_list_t3,
     function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_UP <= 0.05 & OR_UP >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_UP", "OR_UP")]
+      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_adjusted_UP <= 0.05 & OR_UP >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_UP", "OR_UP")]
     }
   ),
   use.names = TRUE,
@@ -234,8 +218,8 @@ ora_down_LR_CELLTYPE <- rbindlist(
   l = lapply(
     ora_list_t3,
     function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_DOWN <= 0.05 & OR_DOWN >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_DOWN", "OR_DOWN")]
+      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1]
+      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_DOWN", "OR_DOWN")]
     }
   ),
   use.names = TRUE,
@@ -243,7 +227,6 @@ ora_down_LR_CELLTYPE <- rbindlist(
 )
 
 param_list <- unique(ora_up_LR_NAME$param)
-param_list <- param_list[grepl("two", param_list)]
 
 ora_up_LR_NAME_per_param <- sapply(param_list, function(i) {
   ora_up_LR_NAME[param == i]$Value

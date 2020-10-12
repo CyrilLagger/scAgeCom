@@ -24,47 +24,63 @@ dir_data_analysis <- "../data_scAgeCom/analysis/"
 ## Read metadata from the seurat files ####
 
 seurat_md <- readRDS(paste0(dir_data_analysis, "analysis_1_data_seurat_md.rds"))
+seurat_md <- lapply(
+  seurat_md,
+  setDT
+)
 
 ## Add and modify metadata ####
+
+# deal with calico data
+seurat_md$calico_kidney[, tissue :=  "Kidney"]
+seurat_md$calico_lung[, tissue := "Lung"]
+seurat_md$calico_spleen[, tissue := "Spleen"]
+
+seurat_md$calico_kidney[, cell_ontology_id :=  NA]
+seurat_md$calico_lung[, cell_ontology_id := NA]
+seurat_md$calico_spleen[, cell_ontology_id := NA]
+
+seurat_md$calico <- rbindlist(
+  l = list(seurat_md$calico_kidney, seurat_md$calico_lung, seurat_md$calico_spleen)
+)
+seurat_md$calico_kidney <- NULL
+seurat_md$calico_lung <- NULL
+seurat_md$calico_spleen <- NULL
+
+seurat_md$calico[, sex := "male"]
 
 # add age groups
 anyNA(seurat_md$tms_facs$age)
 unique(seurat_md$tms_facs$age)
-seurat_md$tms_facs$age_group <- ifelse(seurat_md$tms_facs$age %in% c('1m', '3m'), 'YOUNG', 'OLD')
+seurat_md$tms_facs[, age_group := ifelse(age %in% c('1m', '3m'), 'YOUNG', 'OLD')]
 anyNA(seurat_md$tms_droplet$age)
 unique(seurat_md$tms_droplet$age)
-seurat_md$tms_droplet$age_group <- ifelse(seurat_md$tms_droplet$age %in% c('1m', '3m'), 'YOUNG', 'OLD')
-seurat_md$calico_kidney$age_group <- ifelse(seurat_md$calico_kidney$age == "young", 'YOUNG', 'OLD')
-seurat_md$calico_lung$age_group <- ifelse(seurat_md$calico_lung$age == "young", 'YOUNG', 'OLD')
-seurat_md$calico_spleen$age_group <- ifelse(seurat_md$calico_spleen$age == "young", 'YOUNG', 'OLD')
+seurat_md$tms_droplet[, age_group := ifelse(age %in% c('1m', '3m'), 'YOUNG', 'OLD')]
+seurat_md$calico[, age_group := ifelse(age == "young", 'YOUNG', 'OLD')]
 
 # add tissue-cell types
 seurat_md[1:2] <- lapply(seurat_md[1:2], function(x) {
   x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class, sep = "_")
   return(x)
 })
-seurat_md$calico_kidney$tissue <- "Kidney"
-seurat_md$calico_lung$tissue <- "Lung"
-seurat_md$calico_spleen$tissue <- "Spleen"
-seurat_md[3:5] <- lapply(seurat_md[3:5], function(x) {
-  x$tissue_cell_type <- paste(x$tissue, x$cell_type, sep = "_")
-  return(x)
-})
+seurat_md$calico[, tissue_cell_type := paste(tissue, cell_type, sep = "_")]
+seurat_md$calico_subtype <- copy(seurat_md$calico)
+seurat_md$calico_subtype[, tissue_cell_type := paste(tissue, subtype, sep = "_")]
 
 # change some categories to character
+
 seurat_md <- lapply(seurat_md, function(x) {
   x$tissue <- as.character(x$tissue)
   x$age_group <- as.character(x$age_group)
   x$tissue_cell_type <- as.character(x$tissue_cell_type)
+  x$sex <- as.character(x$sex)
   return(x)
 })
-seurat_md$tms_facs$sex <- as.character(seurat_md$tms_facs$sex)
-seurat_md$tms_droplet$sex <- as.character(seurat_md$tms_droplet$sex)
 
 ## Create tables of age vs sex for each cell type ####
 
 tables_age_vs_sex <- lapply(
-  seurat_md[1:2],
+  seurat_md,
   function(md) {
     sapply(
       unique(md$tissue_cell_type),
@@ -78,7 +94,7 @@ tables_age_vs_sex <- lapply(
 )
 
 odds_age_vs_sex <- lapply(
-  seurat_md[1:2],
+  seurat_md,
   function(md) {
     sapply(
       unique(md$tissue_cell_type),
@@ -96,10 +112,74 @@ odds_age_vs_sex <- lapply(
   }
 )
 
-tables_age_vs_sex$tms_facs$`Diaphragm_skeletal muscle satellite cell` + 1
-odds_age_vs_sex$tms_facs[["Diaphragm_skeletal muscle satellite cell.odds ratio"]]
+## merge ontology id together to have one2one relationship with tissue cell type
 
-hist(log10(odds_age_vs_sex$tms_facs), breaks = 20)
+seurat_md <- lapply(
+  seurat_md,
+  function(md) {
+    md[, tissue_cell_type_ontology_id := paste0(unique(cell_ontology_id), collapse = ","), by = "tissue_cell_type"]
+  }
+)
+
+## Create counts table for presentation and to save as csv ####
+
+cell_types_full_table  <- rbindlist(
+  l = lapply(
+    1:4,
+    function(i) {
+      temp <- seurat_md[[i]][, c("tissue", "tissue_cell_type", "tissue_cell_type_ontology_id", "age_group", "sex")]
+      temp[, dataset := names(seurat_md)[[i]]]
+      temp <- temp[, .N, by = c("dataset", "tissue", "tissue_cell_type", "tissue_cell_type_ontology_id", "age_group", "sex")]
+      return(temp)
+    }
+  ),
+  use.names = TRUE
+)
+cell_types_full_table [, tct_ontology_id := paste0(unique(tissue_cell_type_ontology_id), collapse = ","), by = "tissue_cell_type"]
+cell_types_full_table <- dcast.data.table(
+  cell_types_full_table,
+  formula = tissue + tissue_cell_type + tct_ontology_id ~ dataset + age_group + sex ,
+  value.var = "N"
+)
+
+fwrite(cell_types_full_table, paste0(dir_data_analysis, "a1_cell_types_full_table.csv"))
+
+
+cell_types_tissue_table <- lapply(
+  seurat_md,
+  function(i) {
+    temp <- i[, c("tissue", "age", "sex")]
+    temp <- temp[, .N, by = c("tissue", "age", "sex")]
+    temp <- dcast.data.table(
+      temp,
+      formula = tissue ~  age + sex,
+      value.var = "N"
+    )
+    temp[is.na(temp)] <- 0
+    setorder(temp, tissue)
+    return(temp)
+  }
+)
+
+
+plot_facs_counts_tissue_age_sex <- tableGrob(cell_types_tissue_table[[1]], rows = NULL)
+grid.newpage()
+grid.draw(plot_facs_counts_tissue_age_sex)
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_facs_counts_tissue_age_sex.png"),
+       plot = plot_facs_counts_tissue_age_sex, scale = 1.5)
+
+plot_droplet_counts_tissue_age_sex <- tableGrob(cell_types_tissue_table[[2]], rows = NULL)
+grid.newpage()
+grid.draw(plot_droplet_counts_tissue_age_sex)
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_droplet_counts_tissue_age_sex.png"),
+       plot = plot_droplet_counts_tissue_age_sex, scale = 1.5)
+
+plot_calico_counts_tissue_age_sex <- tableGrob(cell_types_tissue_table[[3]], rows = NULL)
+grid.newpage()
+grid.draw(plot_calico_counts_tissue_age_sex)
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_calico_counts_tissue_age_sex.png"),
+       plot = plot_calico_counts_tissue_age_sex, scale = 1.5)
+
 
 ## Filter tissues and cell-types with less than a given amount of cells ####
 
@@ -143,23 +223,23 @@ tissues_more_10cells <- lapply(
   group_2 = "age_group"
 )
 
-tissues_female_more_10cells <- lapply(
+tissues_female_more_5cells <- lapply(
   seurat_md[1:2],
   function(md) {
-    filter_by_cells(md[md$sex == "female",], 10, "tissue", "age_group")
+    filter_by_cells(md[md$sex == "female",], 5, "tissue", "age_group")
   }
 )
-tissues_male_more_10cells <- lapply(
+tissues_male_more_5cells <- lapply(
   seurat_md[1:2],
   function(md) {
-    filter_by_cells(md[md$sex == "male",], 10, "tissue", "age_group")
+    filter_by_cells(md[md$sex == "male",], 5, "tissue", "age_group")
   }
 )
 
-tissues_sex_more_10cells <- lapply(
+tissues_sex_more_5cells <- lapply(
   seurat_md[1:2],
   filter_by_cells,
-  min_cells = 10,
+  min_cells = 5,
   group_1 = "tissue",
   group_2 = "sex"
 )
@@ -190,22 +270,22 @@ tct_more_10cells_all <- lapply(
   all_or_any = "all"
 )
 
-tct_female_more_10cells <- lapply(
+tct_female_more_5cells <- lapply(
   seurat_md[1:2],
   function(md) {
-    filter_by_cells(md[md$sex == "female",], 10, "tissue_cell_type", "age_group")
+    filter_by_cells(md[md$sex == "female",], 5, "tissue_cell_type", "age_group")
   }
 )
-tct_male_more_10cells <- lapply(
+tct_male_more_5cells <- lapply(
   seurat_md[1:2],
   function(md) {
-    filter_by_cells(md[md$sex == "male",], 10, "tissue_cell_type", "age_group")
+    filter_by_cells(md[md$sex == "male",], 5, "tissue_cell_type", "age_group")
   }
 )
-tct_sex_more_10cells <- lapply(
+tct_sex_more_5cells <- lapply(
   seurat_md[1:2],
   filter_by_cells,
-  min_cells = 10,
+  min_cells = 5,
   group_1 = "tissue_cell_type",
   group_2 = "sex"
 )
@@ -244,28 +324,28 @@ create_summary_df <- function(
 }
 
 
-plot_seurat_md_number_tct_mixed <- create_summary_df(tissues_more_10cells, tct_more_10cells, FALSE)
+plot_seurat_md_number_tct_mixed <- create_summary_df(tissues_more_10cells, tct_more_5cells, FALSE)
 grid.newpage()
 grid.draw(plot_seurat_md_number_tct_mixed)
-ggsave(filename = paste0(dir_data_analysis, "analysis_1_plot_seurat_md_number_tct_mixed.png"),
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_seurat_md_number_tct_mixed.png"),
        plot = plot_seurat_md_number_tct_mixed, scale = 1.5)
 
-plot_seurat_md_number_tct_female <- create_summary_df(tissues_female_more_10cells, tct_female_more_10cells, TRUE)
+plot_seurat_md_number_tct_female <- create_summary_df(tissues_female_more_5cells, tct_female_more_5cells, TRUE)
 grid.newpage()
 grid.draw(plot_seurat_md_number_tct_female)
-ggsave(filename = paste0(dir_data_analysis, "analysis_1_plot_seurat_md_number_tct_female.png"),
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_seurat_md_number_tct_female.png"),
        plot = plot_seurat_md_number_tct_female, scale = 1.5)
 
-plot_seurat_md_number_tct_male <- create_summary_df(tissues_male_more_10cells, tct_male_more_10cells, TRUE)
+plot_seurat_md_number_tct_male <- create_summary_df(tissues_male_more_5cells, tct_male_more_5cells, TRUE)
 grid.newpage()
 grid.draw(plot_seurat_md_number_tct_male)
-ggsave(filename = paste0(dir_data_analysis, "analysis_1_plot_seurat_md_number_tct_male.png"),
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_seurat_md_number_tct_male.png"),
        plot = plot_seurat_md_number_tct_male, scale = 1.5)
 
-plot_seurat_md_number_tct_sex <- create_summary_df(tissues_sex_more_10cells, tct_sex_more_10cells, TRUE)
+plot_seurat_md_number_tct_sex <- create_summary_df(tissues_sex_more_5cells, tct_sex_more_5cells, TRUE)
 grid.newpage()
 grid.draw(plot_seurat_md_number_tct_sex)
-ggsave(filename = paste0(dir_data_analysis, "analysis_1_plot_seurat_md_number_tct_sex.png"),
+ggsave(filename = paste0(dir_data_analysis, "a1_plot_seurat_md_number_tct_sex.png"),
        plot = plot_seurat_md_number_tct_sex, scale = 1.5)
 
 
@@ -295,8 +375,8 @@ plot_cells_per_tissue <- cowplot::plot_grid(
   #hjust = -0.5, vjust = -0.5
 )
 plot_cells_per_tissue
-ggsave(paste0(dir_data_analysis, "analysis_1_plot_cells_per_tissue.png"),
-       plot = plot_cells_per_tissue, scale = 2.5)
+#ggsave(paste0(dir_data_analysis, "analysis_1_plot_cells_per_tissue.png"),
+#       plot = plot_cells_per_tissue, scale = 2.5)
 
 # number of cell-types per tissues
 celltype_distr <- lapply(seurat_md, function(md) {
@@ -327,10 +407,7 @@ ggsave(paste0(dir_data_analysis, "analysis_1_plot_celltypes_per_tissue.png"),
 
 ## Comparison of common tissues ####
 
-seurat_md_2 <- seurat_md[1:2]
-seurat_md_2$calico <- rbindlist(
-  l = list(seurat_md$calico_kidney, seurat_md$calico_lung, seurat_md$calico_spleen)
-)
+
 
 seurat_common_md <- lapply(seurat_md_2, function(x) {
   x <- x[x$tissue %in% c("Kidney", "Lung", "Spleen"),]
@@ -400,23 +477,3 @@ grid.draw(g_spleen)
 ggsave(paste0(dir_data_analysis, "analysis_1_plot_spleen_celltypes.png"),
        plot = g_spleen, scale = 1.5)
 
-## Create a table of all tissues and cell-types accross with numbers accross the three datasets ####
-
-cell_types_full_table <- dcast.data.table(
-  rbindlist(
-    l = lapply(
-      1:3,
-      function(i) {
-        temp <- seurat_md_2[[i]][, c("tissue", "tissue_cell_type", "age_group")]
-        temp[, dataset := names(seurat_md_2)[[i]]]
-        temp <- temp[, .N, by = c("dataset", "tissue", "tissue_cell_type", "age_group")]
-        return(temp)
-      }
-    ),
-    use.names = TRUE
-  ),
-  formula = tissue + tissue_cell_type ~ dataset + age_group ,
-  value.var = "N"
-)
-
-fwrite(cell_types_full_table, paste0(dir_data_analysis, "analysis_1_cell_types_full_table.csv"))

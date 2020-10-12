@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## cyril.lagger@liverpool.ac.uk - October 2020
 ##
 ## Apply scDiffCom to all three datasets.
 ##
@@ -15,6 +15,9 @@ library(Seurat)
 library(scDiffCom)
 library(foreach)
 library(doParallel)
+library(pbapply)
+
+pboptions(type = "txt")
 
 ## Set up fixed parameters that should not change ####
 
@@ -136,21 +139,27 @@ for(analysis in analysis_list) {
     Seurat::DefaultAssay(seurat_tiss) <- "RNA"
     message("Size-factor normalization:")
     seurat_tiss <- Seurat::NormalizeData(seurat_tiss, assay = "RNA")
-    dt_res <- scDiffCom::run_diffcom(
+    dt_res <- scDiffCom::run_scdiffcom(
       seurat_obj = seurat_tiss,
-      LR_data = LR6db_curated,
-      seurat_cell_type_id = cell_type_id,
-      condition_id = condition_id,
+      LR_object = LR6db_curated,
+      celltype_col_id = cell_type_id,
+      condition_col_id = condition_id,
+      cond1_name = "YOUNG",
+      cond2_name = "OLD",
       assay = "RNA",
       slot = "data",
       log_scale = is_log,
       min_cells = min_cells,
-      threshold = 0.1,
+      pct_threshold = 0.1,
       permutation_analysis = TRUE,
-      one_sided = FALSE,
       iterations = n_iter,
+      cutoff_quantile_score = 0.25,
+      cutoff_pval_specificity = 0.05,
+      cutoff_pval_de = 0.05,
+      cutoff_logfc = log(1.1),
       return_distr = FALSE,
-      seed = 42
+      seed = 42,
+      verbose = TRUE
     )
     message(paste0("Saving results for the ", tiss, "."))
     saveRDS(dt_res, file = paste0(output_dir, "/scdiffcom_", tiss, ".rds"))

@@ -5,9 +5,8 @@ account: scagecom-liverpool
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2596458
-bundleId: 3435358
+bundleId: 3686688
 url: https://scagecom-liverpool.shinyapps.io/shinyApp/
-when: 1595706920.78068
+when: 1601460073.61657
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: data/analysis_4_data_diffcom_filter_new.rds|data/analysis_4_data_ora.rds
