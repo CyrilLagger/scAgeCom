@@ -1,36 +1,32 @@
+
+
+## Load libraries ####
+
 library(shiny)
 library(data.table)
 library(DT)
 library(ggplot2)
 library(shinyWidgets)
 
-# To Do: the file is becoming longer and longer... I will reorganize it in different subfiles. 
+## Global options ####
 
 #to display NA in DT
 options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
 
-#Load data
+## Load data ####
 
 #LR database
-LRdb <- readRDS("data/LRdb_data.rds")
-setnames(
-  LRdb,
-  old = c("GENESYMB_L", "GENESYMB_R", "SYMB_LR",
-          "CONF_L", "TYPE_L", "CONF_R", "TYPE_R"),
-  new = c("Ligand", "Receptor", "LR",
-          "Ortho. conf. L", "Ortho. type L", "Ortho. conf. R", "Ortho. type R")
-)
-cols_to_show_LRdb <- c("Ligand", "Receptor", "LR", "source_scsr", "source_cpdb", "source_nichenet", "source_sctensor",
-                       "Ortho. conf. L", "Ortho. type L", "Ortho. conf. R", "Ortho. type R")
+LR6db <- readRDS("data/LR6db_curated.rds")
+cols_to_show_LR6db <- c("LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
+                        "DATABASE", "SOURCE", "ANNOTATION", "FAMILY", "SUBFAMILY")
 
-#scDiffCom data
-#diffcom_data <- readRDS("data/analysis_4_data_diffcom_filter_new.rds")
-diffcom_data <- readRDS("data/analysis_4_data_diffcom_filter_less_stringent.rds")
-diffcom_data <- lapply(diffcom_data, function(data) {
-  data[, L_TCT := paste(TISSUE, L_CELLTYPE, sep = "_")]
-  data[, R_TCT := paste(TISSUE, R_CELLTYPE, sep = "_")]
-  data[, LOG2FC := LR_LOGFC*log2(exp(1))]
-  data[, Direction := ifelse(
+#scDiffCom results
+scdiffcom_data <- readRDS("data/a4_data_diffcom_all_filtered.rds")
+lapply(scdiffcom_data, function(data) {
+  data$results[, L_TCT := paste(TISSUE, L_CELLTYPE, sep = "_")]
+  data$results[, R_TCT := paste(TISSUE, R_CELLTYPE, sep = "_")]
+  data$results[, LOG2FC := LOGFC*log2(exp(1))]
+  data$results[, Direction := ifelse(
     CASE_TYPE == "TFTD", "Down (disappears)",
     ifelse(
       CASE_TYPE == "TTTD", "Down",
@@ -44,19 +40,22 @@ diffcom_data <- lapply(diffcom_data, function(data) {
     )
   )]
   setnames(
-    data,
-    old = c("L_GENE", "R_GENE", "L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF"),
-    new = c("Ligand", "Receptor", "Emitter cell type", "Receiver cell type", "Adj. P-value")
+    data$results,
+    old = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF"),
+    new = c("Emitter cell type", "Receiver cell type", "Adj. P-value")
   )
   return(data)
 })
-cols_to_show_diffcom <- c("TISSUE", "Ligand", "Receptor", "Emitter cell type", "Receiver cell type",
+#cols_to_show_scdiffcom <- c("TISSUE", "LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3", "Emitter cell type", "Receiver cell type",
+#                            "LOG2FC", "Adj. P-value", "Direction")
+
+cols_to_show_scdiffcom <- c("TISSUE", "LR_NAME", "Emitter cell type", "Receiver cell type",
                           "LOG2FC", "Adj. P-value", "Direction")
-cols_numeric_diffcom <- c("LOG2FC", "Adj. P-value")
+cols_numeric_scdiffcom <- c("LOG2FC", "Adj. P-value")
+#names(scdiffcom_data) <- lapply(scdiffcom_data, function(i) {i$id})
 
 #ORA data
-#ora_data <- readRDS("data/analysis_4_data_ora.rds")
-ora_data <- readRDS("data/analysis_4_data_ora_less_stringent.rds")
+ora_data <- readRDS("data/a4_data_ora.rds")
 ora_data <- lapply(ora_data, function(data) {
   setnames(
     data,
@@ -71,30 +70,18 @@ cols_to_show_ora <- c("Tissue", "Category", "Value", "Odds Ratio",
 cols_numeric_ora<- c("Odds Ratio", "Adj. P-value", "Odds Ratio Up", "Adj. P-value Up",
                      "Odds Ratio Down", "Adj. P-value Down")
 
-#List of tissue for each dataset
-TISSUE_DATASET <- list(
-  calico = c("Kidney", "Lung", "Spleen"),
-  calico_sub = c("Kidney", "Lung", "Spleen"),
-  tms_facs = c("Aorta", "BAT", "Bladder", "Brain_Myeloid",
-               "Brain_Non-Myeloid", "Diaphragm", "GAT",
-               "Heart", "Kidney", "Large_Intestine",
-               "Limb_Muscle", "Liver", "Lung", "Mammary_Gland",
-               "Marrow", "MAT", "Pancreas", "SCAT", "Skin",
-               "Spleen", "Thymus", "Tongue", "Trachea"),
-  tms_droplet = c("Bladder", "Heart_and_Aorta", "Kidney",
-                  "Limb_Muscle", "Liver", "Lung",
-                  "Mammary_Gland", "Marrow", "Spleen",
-                  "Thymus", "Tongue")
-)
+## Utility functions ####
 
-#utility functions
 show_DT <- function(data, cols_to_show, cols_numeric) {
-  DT::datatable(data[, ..cols_to_show],
+  res <- DT::datatable(data[, ..cols_to_show],
                 options = list(
                   pageLength = 10
                 )
-  ) %>%
-    DT::formatSignif(columns = cols_numeric, digits = 3 )
+  ) 
+  if(!is.null(cols_numeric)) {
+    res <- DT::formatSignif(res, columns = cols_numeric, digits = 3 )
+  }
+  return(res)
 }
 
 show_volcano <- function(data) {
@@ -120,11 +107,7 @@ ui <- fluidPage(
           selectInput(
             inputId = "dataset_selection",
             label = "Dataset",
-            choices = list(
-              "Tabula Muris Senis FACS" = "tms_facs",
-              "Tabula Muris senis Droplet" = "tms_droplet",
-              "Calico 2019" = "calico"
-            )
+            choices = names(scdiffcom_data)
           ),
           uiOutput("tissue_selection"),
           uiOutput("ligand_cell_selection"),
@@ -142,8 +125,8 @@ ui <- fluidPage(
         mainPanel(
           tabsetPanel(
             type = "tabs",
-            tabPanel("Table", DT::dataTableOutput("diffcom_table")),
-            tabPanel("Volcano Plot", plotOutput("diffcom_volcano"))
+            tabPanel("Table", DT::dataTableOutput("scdiffcom_table")),
+            tabPanel("Volcano Plot", plotOutput("scdiffcom_volcano"))
           )
         )
       )),
@@ -154,11 +137,7 @@ ui <- fluidPage(
           selectInput(
             inputId = "ora_dataset_selection",
             label = "Dataset",
-            choices = list(
-              "Tabula Muris Senis FACS" = "tms_facs",
-              "Tabula Muris senis Droplet" = "tms_droplet",
-              "Calico 2019" = "calico"
-            )
+            choices = names(scdiffcom_data)
           ),
           uiOutput("ora_tissue_selection"),
           uiOutput("ora_category_selection"),
@@ -195,17 +174,17 @@ ui <- fluidPage(
       sidebarLayout(
         sidebarPanel(
           pickerInput(
-            inputId = "LRdb_select",
+            inputId = "LR6db_select",
             "Database",
-            choices = c("scsr", "cpdb", "nichenet", "sctensor"),
-            selected = c("scsr", "cpdb", "nichenet", "sctensor"),
+            choices = c("SCSR", "CELLPHONEDB", "CELLCHAT", "NICHENET", "ICELLNET", "SCTENSOR"),
+            selected = c("SCSR", "CELLPHONEDB", "CELLCHAT", "NICHENET", "ICELLNET", "SCTENSOR"),
             options = list(`actions-box` = TRUE),
             multiple = T
           ),
           width = 2
         ),
         mainPanel(
-          DT::dataTableOutput("LRdb_table")
+          DT::dataTableOutput("LR6db_table")
         )
       )
     )
@@ -217,8 +196,8 @@ server <- function(input, output) {
     pickerInput(
       inputId = "tissue_select",
       "Tissue",
-      choices = TISSUE_DATASET[[input$dataset_selection]],
-      selected = TISSUE_DATASET[[input$dataset_selection]],
+      choices = scdiffcom_data[[input$dataset_selection]]$tissues,
+      selected = scdiffcom_data[[input$dataset_selection]]$tissues,
       options = list(`actions-box` = TRUE),
       multiple = T
     )
@@ -227,8 +206,8 @@ server <- function(input, output) {
     pickerInput(
       inputId = "L_cell_select",
       "Emitter cell Type",
-      choices = unique(diffcom_data[[input$dataset_selection]][TISSUE %in% input$tissue_select, L_TCT]),
-      selected = unique(diffcom_data[[input$dataset_selection]][TISSUE %in% input$tissue_select, L_TCT]),
+      choices = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, L_TCT]),
+      selected = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, L_TCT]),
       options = list(`actions-box` = TRUE),
       multiple = T
     )
@@ -237,8 +216,8 @@ server <- function(input, output) {
     pickerInput(
       inputId = "R_cell_select",
       "Receiver cell Type",
-      choices = unique(diffcom_data[[input$dataset_selection]][TISSUE %in% input$tissue_select, R_TCT]),
-      selected = unique(diffcom_data[[input$dataset_selection]][TISSUE %in% input$tissue_select, R_TCT]),
+      choices = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, R_TCT]),
+      selected = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, R_TCT]),
       options = list(`actions-box` = TRUE),
       multiple = T
     )
@@ -248,16 +227,16 @@ server <- function(input, output) {
       inputId = "slider_log2fc",
       label = "LOG2FC filter",
       min = 0, 
-      max = max(ceiling(abs(diffcom_data[[input$dataset_selection]]$LOG2FC))),
+      max = max(ceiling(abs(scdiffcom_data[[input$dataset_selection]]$results$LOG2FC))),
       value = 0,
       step = 0.01
     )
   })
-  output$diffcom_table <- DT::renderDataTable({
+  output$scdiffcom_table <- DT::renderDataTable({
     req(input$tissue_select, input$L_cell_select, input$R_cell_select)
     show_DT(
       setorder(
-        diffcom_data[[input$dataset_selection]][TISSUE %in% input$tissue_select &
+        scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select &
                                                   L_TCT %in% input$L_cell_select &
                                                   R_TCT %in% input$R_cell_select &
                                                   `Adj. P-value` <= input$slider_pvalue &
@@ -265,11 +244,11 @@ server <- function(input, output) {
         -LOG2FC,
         `Adj. P-value`
       ),
-            cols_to_show_diffcom, cols_numeric_diffcom)
+            cols_to_show_scdiffcom, cols_numeric_scdiffcom)
   })
-  output$diffcom_volcano <- renderPlot({
+  output$scdiffcom_volcano <- renderPlot({
     req(input$tissue_select, input$L_cell_select, input$R_cell_select)
-    show_volcano(diffcom_data[[input$dataset_selection]][TISSUE %in% input$tissue_select &
+    show_volcano(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select &
                                                            L_TCT %in% input$L_cell_select &
                                                            R_TCT %in% input$R_cell_select &
                                                            `Adj. P-value` <= input$slider_pvalue &
@@ -331,26 +310,42 @@ server <- function(input, output) {
       cols_numeric = cols_numeric
       )
   })
-  output$LRdb_table <- DT::renderDataTable({
-    req(input$LRdb_select)
-    if(!("scsr" %in% input$LRdb_select)) {
-      LRdb <- LRdb[scsr == FALSE]
-    }
-    if(!("cpdb" %in% input$LRdb_select)) {
-      LRdb <- LRdb[cpdb == FALSE]
-    }
-    if(!("nichenet" %in% input$LRdb_select)) {
-      LRdb <- LRdb[nichenet == FALSE]
-    }
-    if(!("sctensor" %in% input$LRdb_select)) {
-      LRdb <- LRdb[sctensor == FALSE]
-    }
+  output$LR6db_table <- DT::renderDataTable({
+   req(input$LR6db_select)
+    LR6db <- LR6db[apply(sapply(input$LR6db_select, function(i) {
+      grepl(i, LR6db$DATABASE)
+    }),
+    MARGIN = 1,
+    any
+    )]
+    
+    
+    # 
+    # if(!("SCSR" %in% input$LR6db_select)) {
+    #   LR6db <- LR6db[!grepl("SCSR", DATABASE)]
+    # }
+    # if(!("CELLPHONEDB" %in% input$LR6db_select)) {
+    #   LR6db <- LR6db[!grepl("CELLPHONEDB", DATABASE)]
+    # }
+    # if(!("NICHENET" %in% input$LR6db_select)) {
+    #   LR6db <- LR6db[!grepl("NICHENET", DATABASE)]
+    # }
+    # if(!("ICELLNET" %in% input$LR6db_select)) {
+    #   LR6db <- LR6db[!grepl("ICELLNET", DATABASE)]
+    # }
+    # if(!("CELLCHAT" %in% input$LR6db_select)) {
+    #   LR6db <- LR6db[!grepl("CELLCHAT", DATABASE)]
+    # }
+    # if(!("SCTENSOR" %in% input$LR6db_select)) {
+    #   LR6db <- LR6db[!grepl("SCTENSOR", DATABASE)]
+    # }
     show_DT(
       setorder(
-        LRdb,
-        LR
+        LR6db,
+        LIGAND_1, LIGAND_2, RECEPTOR_1, RECEPTOR_2, RECEPTOR_3
       ),
-      cols_to_show_LRdb, NULL)
+      #LR6db,
+      cols_to_show_LR6db, NULL)
   })
 }
 

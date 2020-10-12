@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## cyril.lagger@liverpool.ac.uk - October 2020
 ##
 ## Double-check that scDiffCom returns correct
 ## results and distributions.
@@ -27,7 +27,7 @@ n_iter <- 1000 #number of permutations for the double-check
 #here the test file corresponds to the Liver from TMS FACS data.
 seurat_t1 <- readRDS(paste0(dir_data_test, "data_seurat_example_facs_liver.rds"))
 seurat_t1 <- NormalizeData(seurat_t1, assay = "RNA")
-seurat_t1$age_group <- ifelse(seurat_t1$age %in% c('1m', '3m'), 'young', 'old' )
+seurat_t1$age_group <- ifelse(seurat_t1$age %in% c('1m', '3m'), 'YOUNG', 'OLD' )
 seurat_t1$cell_ontology_class <- as.character(seurat_t1$cell_ontology_class)
 
 ## Load the LR database from scDiffCom ####
@@ -39,117 +39,66 @@ LR_t1 <- scDiffCom::LR6db$LR6db_curated
 #       --the command does not need to be run each time if the results have been saved already
 #       --uncomment the lines if you want to test it
 
-# ?run_diffcom
-# start_time <- Sys.time()
-# diffcom_t1 <- run_diffcom(
+?run_scdiffcom
+# scdiffcom_t1 <- run_scdiffcom(
 #   seurat_object = seurat_t1,
-#   LR_data = LR_t1,
-#   seurat_cell_type_id = "cell_ontology_class",
-#   condition_id = "age_group",
+#   LR_object = LR_t1,
+#   celltype_col_id = "cell_ontology_class",
+#   condition_col_id = "age_group",
+#   cond1_name = "YOUNG",
+#   cond2_name = "OLD",
 #   assay = "RNA",
 #   slot = "data",
 #   log_scale = TRUE,
 #   min_cells = 5,
-#   threshold = 0.1,
+#   pct_threshold = 0.1,
 #   permutation_analysis = TRUE,
-#   one_sided = FALSE,
-#   iterations = 1000,
-#   return_distr = FALSE
-# )
-# end_time <- Sys.time()
-# end_time - start_time
-
-#run_diffcom but returning the distributions of the permutation test (only the detected ones)
-# diffcom_t1_distr <- run_diffcom(
-#   seurat_object = seurat_t1,
-#   LR_data = LR_t1,
-#   seurat_cell_type_id = "cell_ontology_class",
-#   condition_id = "age_group",
-#   assay = "RNA",
-#   slot = "data",
-#   log_scale = TRUE,
-#   min_cells = 5,
-#   threshold = 0.1,
-#   permutation_analysis = TRUE,
-#   one_sided = FALSE,
-#   iterations = 1000,
-#   return_distr = TRUE
+#   iterations = n_iter,
+#   cutoff_quantile_score = 0.25,
+#   cutoff_pval_specificity = 0.05,
+#   cutoff_pval_de = 0.05,
+#   cutoff_logfc = log(1.1),
+#   return_distr = TRUE,
+#   seed = 42,
+#   verbose = TRUE
 # )
 
-## Preprocessing, filtering and saving results ####
-#not needed if already saved
+## Save or load results ####
 
-#only keep detected interactions in either young or old samples
-#diffcom_t1 <- diffcom_t1[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
-#diffcom_t1[, TISSUE := "Liver"]
-
-#apply filtering analysis to get the different regulation cases
-#source("src/src_1_filtering.R")
-#quantile(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), 0.25)
-#hist(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), breaks = 100)
-#abline(v = quantile(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), 0.25) )
-
-#diffcom_t1 <- analyze_CCI(
-#  data = diffcom_t1,
-#  cutoff_score = quantile(c(diffcom_t1$LR_SCORE_old, diffcom_t1$LR_SCORE_young), 0.25)
-#)
-
-#save results
-#saveRDS(object = diffcom_t1, file = paste0(dir_data_test, "t1_data_scDiffcom_1000iter.rds"))
-#saveRDS(object = diffcom_t1_distr, file = paste0(dir_data_test, "t1_data_scDiffcom_distr_1000iter.rds"))
-
-## Load previously saved results ####
-
-#read files
-diffcom_t1 <- readRDS(paste0(dir_data_test, "t1_data_scDiffcom_1000iter.rds"))
-diffcom_t1_distr <- readRDS(paste0(dir_data_test, "t1_data_scDiffcom_distr_1000iter.rds"))
-
-#check tables are in the same order
-identical(diffcom_t1$LR_SCORE_young - diffcom_t1$LR_SCORE_old,
-          diffcom_t1_distr$distr_diff[, 1001])
-identical(diffcom_t1$LR_SCORE_old,
-          diffcom_t1_distr$distr_cond1[, 1001])
-identical(diffcom_t1$LR_SCORE_young,
-          diffcom_t1_distr$distr_cond2[, 1001])
-
-diffcom_t1$rn <- as.numeric(rownames(diffcom_t1))
+#either save
+#saveRDS(object = scdiffcom_t1, file = paste0(dir_data_test, "t1_data_scdiffcom.rds"))
+#or read
+scdiffcom_t1 <- readRDS(paste0(dir_data_test, "t1_data_scDiffcom.rds"))
 
 ## Select (random) CCIs for further comparison ####
 
-table(diffcom_t1$CASE_TYPE)
+table(scdiffcom_t1$scdiffcom_dt_filtered$REGULATION)
 
 #5 random CCIs
-cci_random_t1 <- rbindlist(
+cci_random_filtered_t1 <- rbindlist(
   list(
-  diffcom_t1[
-  L_NCELLS_old >=5 & R_NCELLS_old >= 5 & L_NCELLS_young >=5 & R_NCELLS_young >=5
-  ][sample(.N, 2)],
-  diffcom_t1[grepl("_", LR_NAME) & CASE_TYPE != "FFF" &
-    L_NCELLS_old >=5 & R_NCELLS_old >= 5 & L_NCELLS_young >=5 & R_NCELLS_young >=5
-    ][sample(.N, 2)]
+  scdiffcom_t1$scdiffcom_dt_filtered[sample(.N, 2)],
+  scdiffcom_t1$scdiffcom_dt_filtered[grepl("_", LR_NAME)][sample(.N, 2)]
   )
 )
 
-cci_random_distr_t1 <- lapply(diffcom_t1_distr, function(i) {
-  i[cci_random_t1$rn,]
+cci_random_filtered_distr_t1 <- lapply(scdiffcom_t1$scdiffcom_distributions, function(i) {
+  i[paste(cci_random_filtered_t1$LR_SORTED, cci_random_filtered_t1$LR_CELLTYPE, sep = "_"),]
 })
   
 #"special cases" CCI
-cci_choosen_t1 <- rbindlist(
+cci_choosen_filtered_t1 <- rbindlist(
   list(
-    diffcom_t1[CASE_TYPE == "FFF" & L_NCELLS_young < 5 & L_NCELLS_young > 0 & R_NCELLS_young >0][3],
-    diffcom_t1[CASE_TYPE != "FFF" & L_NCELLS_young < 5 & L_NCELLS_young > 0 & R_NCELLS_young >0][1],
-    diffcom_t1[CASE_TYPE == "FTTU"][100],
-    diffcom_t1[CASE_TYPE == "TFTD"][2],
-    diffcom_t1[CASE_TYPE == "TTTD"][2],
-    diffcom_t1[CASE_TYPE == "TTTU"][2],
-    diffcom_t1[CASE_TYPE == "TTFD"][2],
-    diffcom_t1[CASE_TYPE == "TTFU"][2]
+    scdiffcom_t1$scdiffcom_dt_filtered[REGULATION == "UP_APPEARS"][3],
+    scdiffcom_t1$scdiffcom_dt_filtered[REGULATION == "UP"][10],
+    scdiffcom_t1$scdiffcom_dt_filtered[REGULATION == "FLAT"][7],
+    scdiffcom_t1$scdiffcom_dt_filtered[REGULATION == "DOWN_DISAPPEARS"][24],
+    scdiffcom_t1$scdiffcom_dt_filtered[REGULATION == "DOWN"][87]
   )
 )
 
-cci_choosen_distr_t1 <- lapply(diffcom_t1_distr, function(i) {
-  i[cci_choosen_t1$rn,]
+cci_choosen_filtered_distr_t1 <- lapply(scdiffcom_t1$scdiffcom_distributions, function(i) {
+  i[paste(cci_choosen_filtered_t1$LR_SORTED, cci_choosen_filtered_t1$LR_CELLTYPE, sep = "_"),]
 })
 
 ## Double-check that the LR scores are correct ####
@@ -193,10 +142,10 @@ compare_cci_score_test <- function(
 }
 
 #should return zero or numerically close to zero
-compare_cci_score_test(cci_random_t1, "young", TRUE)
-compare_cci_score_test(cci_random_t1, "old", TRUE)
-compare_cci_score_test(cci_choosen_t1, "young", TRUE)
-compare_cci_score_test(cci_choosen_t1, "old", TRUE)
+compare_cci_score_test(cci_random_filtered_t1, "YOUNG", TRUE)
+compare_cci_score_test(cci_random_filtered_t1, "OLD", TRUE)
+compare_cci_score_test(cci_choosen_filtered_t1, "YOUNG", TRUE)
+compare_cci_score_test(cci_choosen_filtered_t1, "OLD", TRUE)
 
 ## Double-check that the LR differential p-values are correct ####
 
@@ -221,19 +170,19 @@ compare_cci_pvalue_diff_test <- function(
           sample(seurat_temp$age_group[seurat_temp$cell_ontology_class == cci_test[["R_CELLTYPE"]] ])
       }
       cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["L_CELLTYPE"]] &
-                                            seurat_temp$age_group == "young"]
+                                            seurat_temp$age_group == "YOUNG"]
       seurat_sub_l_young <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("LIGAND_1", "LIGAND_2")])),
                                    cells = cells_use1)
       cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["R_CELLTYPE"]] &
-                                            seurat_temp$age_group == "young"]
+                                            seurat_temp$age_group == "YOUNG"]
       seurat_sub_r_young <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("RECEPTOR_1", "RECEPTOR_2")])),
                                    cells = cells_use1)
       cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["L_CELLTYPE"]] &
-                                            seurat_temp$age_group == "old"]
+                                            seurat_temp$age_group == "OLD"]
       seurat_sub_l_old <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("LIGAND_1", "LIGAND_2")])),
                                  cells = cells_use1)
       cells_use1 <- colnames(seurat_temp)[seurat_temp$cell_ontology_class %in% cci_test[["R_CELLTYPE"]] &
-                                            seurat_temp$age_group == "old"]
+                                            seurat_temp$age_group == "OLD"]
       seurat_sub_r_old <- subset(seurat_temp, features = na.omit(unlist(cci_test[, c("RECEPTOR_1", "RECEPTOR_2")])),
                                  cells = cells_use1)
       if(log_scale) {
@@ -282,7 +231,8 @@ compare_cci_pvalue_diff_test <- function(
 comp_distr <- function(
   distr1,
   distr2,
-  case
+  case,
+  name
 ) {
   if(case == "young") {
     expr <- expression(xi[young])
@@ -298,37 +248,49 @@ comp_distr <- function(
     geom_vline(xintercept = distr1[length(distr1)] ) +
     xlab(expr) +
     ylab("Counts") +
-    theme(text=element_text(size=20)) 
+    theme(text=element_text(size=20)) +
+    ggtitle(name) +
+    theme(plot.title = element_text(size = 5))
 }
 
 #compute the p-values and distributions
-pv_diff_random_t1 <- compare_cci_pvalue_diff_test(seurat_t1, cci_random_t1, iterations = n_iter, log_scale = TRUE)
-pv_diff_choosen_t1 <- compare_cci_pvalue_diff_test(seurat_t1, cci_choosen_t1, iterations = n_iter, log_scale = TRUE)
+#pv_diff_random_t1 <- compare_cci_pvalue_diff_test(seurat_t1, cci_random_filtered_t1, iterations = n_iter, log_scale = TRUE)
+#pv_diff_choosen_t1 <- compare_cci_pvalue_diff_test(seurat_t1, cci_choosen_filtered_t1, iterations = n_iter, log_scale = TRUE)
+
+#save them
+saveRDS(cci_random_filtered_t1, file = paste0(dir_data_test, "t1_data_cci_random_filtered.rds"))
+saveRDS(object = pv_diff_random_t1, file = paste0(dir_data_test, "t1_data_pv_diff_random.rds"))
+saveRDS(cci_choosen_filtered_t1, file = paste(dir_data_test, "t1_data_cci_choosen_filtered.rds"))
+saveRDS(object = pv_diff_choosen_t1, file = paste0(dir_data_test, "t1_data_pv_diff_choosen.rds"))
 
 #compare the p-values 
 lapply(seq_along(pv_diff_random_t1), function(i) {
-  c(cci_random_t1[i,]$PVAL_DIFF, pv_diff_random_t1[[i]]$pval)
+  c(cci_random_filtered_t1[i,]$PVAL_DIFF, pv_diff_random_t1[[i]]$pval)
 })
 lapply(seq_along(pv_diff_choosen_t1), function(i) {
-  c(cci_choosen_t1[i,]$PVAL_DIFF, pv_diff_choosen_t1[[i]]$pval)
+  c(cci_choosen_filtered_t1[i,]$PVAL_DIFF, pv_diff_choosen_t1[[i]]$pval)
 })
 
 #compare the distributions
 t1_plot_random_pval_diff_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_diff_random_t1), function(i) {
-    comp_distr(cci_random_distr_t1$distr_diff[i,], pv_diff_random_t1[[i]]$distr, case = "diff")
+    comp_distr(cci_random_filtered_distr_t1$distr_diff[i,], pv_diff_random_t1[[i]]$distr, case = "diff",
+               name = paste(cci_random_filtered_t1$LR_CELLTYPE, cci_random_filtered_t1$LR_NAME, sep = "_")[[i]])
   }),
   ncol = 2,
   align = "v"
 )
+t1_plot_random_pval_diff_comp
 ggsave(filename = paste0(dir_data_test, "t1_plot_random_distr_permutations_comp.png"), plot = t1_plot_random_pval_diff_comp, scale = 2)
 t1_plot_choosen_pval_diff_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_diff_choosen_t1), function(i) {
-    comp_distr(cci_choosen_distr_t1$distr_diff[i,], pv_diff_choosen_t1[[i]]$distr, case = "diff")
+    comp_distr(cci_choosen_filtered_distr_t1$distr_diff[i,], pv_diff_choosen_t1[[i]]$distr, case = "diff",
+               name = paste(cci_choosen_filtered_t1$LR_CELLTYPE, cci_choosen_filtered_t1$LR_NAME, sep = "_")[[i]])
   }),
   ncol = 2,
   align = "v"
 )
+t1_plot_choosen_pval_diff_comp
 ggsave(filename = paste0(dir_data_test, "t1_plot_choosen_distr_permutations_comp.png"), plot = t1_plot_choosen_pval_diff_comp, scale = 2)
 
 ## Double-check that the LR specificity p-values are correct ####
@@ -374,29 +336,31 @@ compare_cci_pvalue_specific_test <- function(
 }
 
 #compute the p-values and distributions
-pv_spec_young_random_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_random_t1, iterations = n_iter, condition = "young", log_scale = TRUE)
-pv_spec_old_random_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_random_t1, iterations = n_iter, condition = "old", log_scale = TRUE)
-pv_spec_young_choosen_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_choosen_t1, iterations = n_iter, condition = "young", log_scale = TRUE)
-pv_spec_old_choosen_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_choosen_t1, iterations = n_iter, condition = "old", log_scale = TRUE)
+pv_spec_young_random_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_random_filtered_t1, iterations = n_iter, condition = "YOUNG", log_scale = TRUE)
+pv_spec_old_random_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_random_filtered_t1, iterations = n_iter, condition = "OLD", log_scale = TRUE)
+pv_spec_young_choosen_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_choosen_filtered_t1, iterations = n_iter, condition = "YOUNG", log_scale = TRUE)
+pv_spec_old_choosen_t1 <- compare_cci_pvalue_specific_test(seurat_t1, cci_choosen_filtered_t1, iterations = n_iter, condition = "OLD", log_scale = TRUE)
+
+#save them!!!
 
 #compare the p-values 
 lapply(seq_along(pv_spec_young_random_t1), function(i) {
-  c(cci_random_t1[i,]$PVAL_young, pv_spec_young_random_t1[[i]]$pval)
+  c(cci_random_filtered_t1[i,]$PVAL_YOUNG, pv_spec_young_random_t1[[i]]$pval)
 })
 lapply(seq_along(pv_spec_old_random_t1), function(i) {
-  c(cci_random_t1[i,]$PVAL_old, pv_spec_old_random_t1[[i]]$pval)
+  c(cci_random_t1[i,]$PVAL_OLD, pv_spec_old_random_t1[[i]]$pval)
 })
 lapply(seq_along(pv_spec_young_choosen_t1), function(i) {
-  c(cci_choosen_t1[i,]$PVAL_young, pv_spec_young_choosen_t1[[i]]$pval)
+  c(cci_choosen_t1[i,]$PVAL_YOUNG, pv_spec_young_choosen_t1[[i]]$pval)
 })
 lapply(seq_along(pv_spec_old_choosen_t1), function(i) {
-  c(cci_choosen_t1[i,]$PVAL_old, pv_spec_old_choosen_t1[[i]]$pval)
+  c(cci_choosen_t1[i,]$PVAL_OLD, pv_spec_old_choosen_t1[[i]]$pval)
 })
 
 #compare the distributions
 t1_plot_random_pval_spec_young_comp <- cowplot::plot_grid(
   plotlist = lapply(seq_along(pv_spec_young_random_t1), function(i) {
-    comp_distr(cci_random_distr_t1$distr_cond2[i,], pv_spec_young_random_t1[[i]]$distr, case = "young")
+    comp_distr(cci_random_filtered_distr_t1$distr_YOUNG[i,], pv_spec_young_random_t1[[i]]$distr, case = "young")
   }),
   ncol = 2,
   align = "v"
