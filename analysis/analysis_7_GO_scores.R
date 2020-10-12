@@ -20,7 +20,7 @@ library(ggplot2)
 
 ## 2. Load the results with all cell-cell interactions (CCI) ####
 
-CCI_all <- readRDS("../data_scAgeCom/analysis/analysis_4_data_diffcom_filter.rds") 
+CCI_all <- readRDS("../data_scAgeCom/analysis/a4_data_diffcom_all_filtered.rds") 
 #note change the path to where the rds files is stored on your computer
 
 
