@@ -333,9 +333,3 @@ get_celltypes_enrichment <- function(dt, cols) {
   
   return(dt_ctypes)
 }
-
-
-
-
-
-
