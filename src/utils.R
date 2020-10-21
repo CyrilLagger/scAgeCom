@@ -67,6 +67,3 @@ save_list_dfs <- function(l, dir) {
   }
   
 }
-
-
-test_analyze_CCI_per_tissue = function(data, original_fun, test_fun)
