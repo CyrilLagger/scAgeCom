@@ -31,10 +31,16 @@ bind_tissues <- function(
           dt <- dt[get(paste0("LR_DETECTED_", conds[[1]])) == TRUE | get(paste0("LR_DETECTED_", conds[[2]])) == TRUE]
         }
         if(!is.null(min_cells)) {
-          dt <- dt[get(paste0("L_NCELLS_", conds[[1]])) >= min_cells & 
-                     get(paste0("R_NCELLS_", conds[[1]])) >= min_cells &
-                     get(paste0("L_NCELLS_", conds[[2]])) >= min_cells &
-                     get(paste0("R_NCELLS_", conds[[2]])) >= min_cells]
+          # Colnames
+          L_NCELLS_COND1 = paste0("L_NCELLS_", conds[[1]])
+          R_NCELLS_COND1 = paste0("R_NCELLS_", conds[[1]])
+          L_NCELLS_COND2 = paste0("L_NCELLS_", conds[[2]])
+          R_NCELLS_COND2 = paste0("R_NCELLS_", conds[[2]])
+          
+          dt <- dt[get(L_NCELLS_COND1) >= min_cells & 
+                     get(R_NCELLS_COND1) >= min_cells &
+                     get(L_NCELLS_COND2) >= min_cells &
+                     get(R_NCELLS_COND2) >= min_cells]
         }
         return(dt)
       }),
@@ -44,7 +50,7 @@ bind_tissues <- function(
 }
 
 analyze_CCI_per_tissue <- function(
-  data, 
+  data,
   conds,
   cutoff_quantile,
   cutoff_logFC_abs,
@@ -58,17 +64,26 @@ analyze_CCI_per_tissue <- function(
   data <- copy(data)
   data <- preprocess_results(data, conds, is_log)
   tissues <- unique(data$TISSUE)
+  
+  # Colnames
+  BH_PVAL_COND1 = paste0("BH_PVAL_", conds[[1]])
+  BH_PVAL_COND2 = paste0("BH_PVAL_", conds[[2]])
+  PVAL_COND1 = paste0("PVAL_", conds[[1]])
+  PVAL_COND2 = paste0("PVAL_", conds[[2]])
+  LR_SCORE_COND1 = paste0("LR_SCORE_", conds[[1]])
+  LR_SCORE_COND2 = paste0("LR_SCORE_", conds[[2]])
+  
   res <- rbindlist(
     l = lapply(
       tissues,
       function(tiss) {
         temp <- data[TISSUE == tiss]
         if(recompute_BH) {
-          temp[, BH_PVAL_DIFF := p.adjust(PVAL_DIFF, method = "BH")]
-          temp[, paste0("BH_PVAL_", conds[[1]]) := p.adjust(get(paste0("PVAL_", conds[[1]])), method = "BH")]
-          temp[, paste0("BH_PVAL_", conds[[2]]) := p.adjust(get(paste0("PVAL_", conds[[2]])), method = "BH")]
+          temp[, (BH_PVAL_DIFF) := p.adjust(PVAL_DIFF, method = "BH")]
+          temp[, (BH_PVAL_COND1) := p.adjust(get(PVAL_COND1), method = "BH")]
+          temp[, (BH_PVAL_COND2) := p.adjust(get(PVAL_COND2), method = "BH")]
         }
-        cutoff_score <- quantile(c(temp[[paste0("LR_SCORE_", conds[[1]])]], temp[[paste0("LR_SCORE_", conds[[2]])]]), cutoff_quantile)
+        cutoff_score <- quantile(c(temp[[LR_SCORE_COND1]], temp[[LR_SCORE_COND2]]), cutoff_quantile)
         temp <- analyze_detected(
           temp,
           conds,
@@ -98,9 +113,9 @@ analyze_CCI_per_tissue <- function(
 
 analyze_CCI <- function(
   data, 
+  conds,
   cutoff_score,
-  cutoff_specificity_young = 0.05,
-  cutoff_specificity_old = 0.05,
+  cutoff_specificity = 0.05,
   cutoff_pval = 0.05,
   cutoff_logFC_abs = log(1.1),
   reassignment = NULL,
@@ -108,23 +123,24 @@ analyze_CCI <- function(
 ) {
   message("Analyzing CCI...")
   data <- copy(data)
-  data <- preprocess_results(data, is_log)
+  data <- preprocess_results(data, conds, is_log)
   data <- analyze_detected(
     data, 
+    conds,
     cutoff_score,
-    cutoff_specificity_young,
-    cutoff_specificity_old
+    cutoff_specificity
   )
   data <- analyze_significant(
     data,
+    conds,
     cutoff_pval,
     cutoff_logFC_abs
   )
   data <- add_case_type(
     data,
+    conds,
     cutoff_score,
-    cutoff_specificity_young,
-    cutoff_specificity_old
+    cutoff_specificity
   )
   return(data)
 }
@@ -136,13 +152,18 @@ preprocess_results <- function(
   is_log = TRUE
 ) {
   message("Preprocessing results...")
+  
+  # Colnames
+  LR_SCORE_COND1 = paste0("LR_SCORE_", conds[[1]])
+  LR_SCORE_COND2 = paste0("LR_SCORE_", conds[[2]])
+  
   if (!all(class(data) == c("data.table", "data.frame"))) {
     stop("data should be data.table")
   }
   if(is_log) {
-    data[, LOGFC := get(paste0("LR_SCORE_", conds[[2]])) - get(paste0("LR_SCORE_", conds[[1]]))]
+    data[, LOGFC := get(LR_SCORE_COND2) - get(LR_SCORE_COND1)]
   } else {
-    data[, LOGFC := log(get(paste0("LR_SCORE_", conds[[2]])) / get(paste0("LR_SCORE_", conds[[1]])))]
+    data[, LOGFC := log(get(LR_SCORE_COND2) / get(LR_SCORE_COND1))]
   }
   data[, LOGFC_ABS := abs(LOGFC)]
   data[, LR_CELLTYPE := paste(L_CELLTYPE, R_CELLTYPE, sep = "_")]
@@ -165,17 +186,26 @@ analyze_detected <- function(
   cutoff_specificity
 ) {
   message("Analyzing detected...")
-  # Can have separate column for specificity to analyze later, since it
-  #  can reject interesting interactions that we may want to detect.
-  data[, paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]]) := 
-         (get(paste0("LR_DETECTED_", conds[[1]])) == TRUE) 
-       & (get(paste0("LR_SCORE_", conds[[1]])) >=  cutoff_score)
-       & (get(paste0("BH_PVAL_", conds[[1]])) <= cutoff_specificity)
+  
+  # Colnames
+  LR_DETECT_AND_SIGN_COND1 = paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])
+  LR_DETECT_AND_SIGN_COND2 = paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])
+  LR_DETECT_COND1 = paste0("LR_DETECTED_", conds[[1]])
+  LR_DETECT_COND2 = paste0("LR_DETECTED_", conds[[2]])
+  BH_PVAL_COND1 = paste0("BH_PVAL_", conds[[1]])
+  BH_PVAL_COND2 = paste0("BH_PVAL_", conds[[2]])
+  LR_SCORE_COND1 = paste0("LR_SCORE_", conds[[1]])
+  LR_SCORE_COND2 = paste0("LR_SCORE_", conds[[2]])
+  
+  data[, (LR_DETECT_AND_SIGN_COND1) := 
+         (get(LR_DETECT_COND1) == TRUE) 
+       & (get(LR_SCORE_COND1) >=  cutoff_score)
+       & (get(BH_PVAL_COND1) <= cutoff_specificity)
        ]
-  data[, paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]]) := 
-         (get(paste0("LR_DETECTED_", conds[[2]])) == TRUE) 
-       & (get(paste0("LR_SCORE_", conds[[2]])) >=  cutoff_score)
-       & (get(paste0("BH_PVAL_", conds[[2]])) <= cutoff_specificity)
+  data[, (LR_DETECT_AND_SIGN_COND2) := 
+         (get(LR_DETECT_COND2) == TRUE) 
+       & (get(LR_SCORE_COND2) >=  cutoff_score)
+       & (get(BH_PVAL_COND2) <= cutoff_specificity)
        ]
   return(data)
 }
@@ -187,9 +217,14 @@ analyze_significant <- function(
   cutoff_logFC_abs
 ) {
   message("Analyzing significant...")
+  
+  # Columns
+  LR_DETECT_AND_SIGN_COND1 = paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])
+  LR_DETECT_AND_SIGN_COND2 = paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])
+  
   data[, DIFFERENTIAL_EXPRESSED := 
-         (get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]]))
-          | get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])))
+         (get(LR_DETECT_AND_SIGN_COND1)
+          | get(LR_DETECT_AND_SIGN_COND2))
        & (BH_PVAL_DIFF <= cutoff_pval)
        & (LOGFC_ABS >= cutoff_logFC_abs)
        ]
@@ -204,9 +239,20 @@ add_case_type <- function(
   cutoff_specificity
 ) {
   message("Analyzing type of interactions...")
+  
+  # Colnames
+  LR_DETECT_AND_SIGN_COND1 = paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])
+  LR_DETECT_AND_SIGN_COND2 = paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])
+  BH_PVAL_COND1 = paste0("BH_PVAL_", conds[[1]])
+  BH_PVAL_COND2 = paste0("BH_PVAL_", conds[[2]])
+  LR_DETECT_COND1 = paste0("LR_DETECTED_", conds[[1]])
+  LR_DETECT_COND2 = paste0("LR_DETECTED_", conds[[2]])
+  LR_SCORE_COND1 = paste0("LR_SCORE_", conds[[1]])
+  LR_SCORE_COND2 = paste0("LR_SCORE_", conds[[2]])
+  
   data[, CASE_TYPE := ifelse(
-    get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
-      get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
+    get(LR_DETECT_AND_SIGN_COND1) &
+      get(LR_DETECT_AND_SIGN_COND2) &
       DIFFERENTIAL_EXPRESSED,
     ifelse(
       DIFFERENTIAL_DIRECTION == "UP",
@@ -214,8 +260,8 @@ add_case_type <- function(
       "TTTD"
     ),
     ifelse(
-      get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
-        get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
+      get(LR_DETECT_AND_SIGN_COND1) &
+        get(LR_DETECT_AND_SIGN_COND2) &
         !DIFFERENTIAL_EXPRESSED,
       ifelse(
         DIFFERENTIAL_DIRECTION == "UP",
@@ -223,16 +269,16 @@ add_case_type <- function(
         "TTFD"
       ),
       ifelse(
-        get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
-          !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
+        get(LR_DETECT_AND_SIGN_COND1) &
+          !get(LR_DETECT_AND_SIGN_COND2) &
           DIFFERENTIAL_EXPRESSED,
         ifelse(
           DIFFERENTIAL_DIRECTION == "DOWN",
           "TFTD",
           ifelse(
-            sum(c(get(paste0("BH_PVAL_", conds[[2]])) > cutoff_specificity,
-                  !get(paste0("LR_DETECTED_", conds[[2]])),
-                  get(paste0("LR_SCORE_", conds[[2]])) < cutoff_score
+            sum(c(get(BH_PVAL_COND2) > cutoff_specificity,
+                  !get(LR_DETECT_COND2),
+                  get(LR_SCORE_COND2) < cutoff_score
             )
             ) == 1,
             "TTTU",
@@ -240,13 +286,13 @@ add_case_type <- function(
           )
         ),
         ifelse(
-          get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) & 
-            !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &  
+          get(LR_DETECT_AND_SIGN_COND1) & 
+            !get(LR_DETECT_AND_SIGN_COND2) &  
             !DIFFERENTIAL_EXPRESSED,
           ifelse(
-            sum(c(get(paste0("BH_PVAL_", conds[[2]])) > cutoff_specificity,
-                  !get(paste0("LR_DETECTED_", conds[[2]])),
-                  get(paste0("LR_SCORE_", conds[[2]])) < cutoff_score
+            sum(c(get(BH_PVAL_COND2) > cutoff_specificity,
+                  !get(LR_DETECT_COND2),
+                  get(LR_SCORE_COND2) < cutoff_score
             )
             ) == 1,
             ifelse(
@@ -257,16 +303,16 @@ add_case_type <- function(
             "FFF"
           ),
           ifelse(
-            !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
-              get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) & 
+            !get(LR_DETECT_AND_SIGN_COND1) &
+              get(LR_DETECT_AND_SIGN_COND2) & 
               DIFFERENTIAL_EXPRESSED,
             ifelse(
               DIFFERENTIAL_DIRECTION == "UP",
               "FTTU",
               ifelse(
-                sum(c(get(paste0("BH_PVAL_", conds[[1]])) > cutoff_specificity,
-                      !get(paste0("LR_DETECTED_", conds[[1]])),
-                      get(paste0("LR_SCORE_", conds[[1]])) < cutoff_score
+                sum(c(get(BH_PVAL_COND1) > cutoff_specificity,
+                      !get(LR_DETECT_COND1),
+                      get(LR_SCORE_COND1) < cutoff_score
                 )
                 ) == 1,
                 "TTTD",
@@ -274,13 +320,13 @@ add_case_type <- function(
               )
             ),
             ifelse(
-              !get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[1]])) &
-                get(paste0("LR_DETECTED_AND_SIGNIFICANT_IN_", conds[[2]])) &
+              !get(LR_DETECT_AND_SIGN_COND1) &
+                get(LR_DETECT_AND_SIGN_COND2) &
                 !DIFFERENTIAL_EXPRESSED,
               ifelse(
-                sum(c(get(paste0("BH_PVAL_", conds[[1]])) > cutoff_specificity,
-                      !get(paste0("LR_DETECTED_", conds[[1]])),
-                      get(paste0("LR_SCORE_", conds[[1]])) < cutoff_score
+                sum(c(get(BH_PVAL_COND1) > cutoff_specificity,
+                      !get(LR_DETECT_COND1),
+                      get(LR_SCORE_COND1) < cutoff_score
                 )
                 ) == 1,
                 ifelse(
