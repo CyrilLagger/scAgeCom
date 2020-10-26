@@ -1,219 +1,6 @@
+# Heatmap plots ------------------------------------------------------------------------
 
-analyze_ORA <- function(
-  data
-) {
-  dt_ora = ora(data)
-  dt_ora_up = ora(data[DIFFERENTIAL_DIRECTION == "UP"])
-  dt_ora_down = ora(data[DIFFERENTIAL_DIRECTION == "DOWN"])
-  dt_complete = merge(dt_ora, dt_ora_up,
-                      by = c("Tissue", "Category", "Value"), 
-                      all = TRUE, 
-                      suffixes = c("", "_UP"))
-  dt_complete = merge(dt_complete, dt_ora_down,
-                      by = c("Tissue", "Category", "Value"),
-                      all = TRUE,
-                      suffixes = c("", "_DOWN"))
-  return(dt_complete)
-}
-
-ora <- function(data) {
-  categories = c(
-    "TISSUE",
-    "L_CELLTYPE", "R_CELLTYPE", "LR_CELLTYPE",
-    "LR_NAME"
-  )
-  dt_counts = fast_counts(data, categories)
-  dt_ora = perform_ora_from_counts(dt_counts)
-  return(dt_ora)
-}
-
-fast_counts <- function(data, categories) {
-  COL_TISSUE <- "TISSUE"
-  dt_categories = count_on_all_columns(data, categories)
-  dt_tissues = count_significant_on_tissues(data)
-  dt_counts = merge(dt_categories, dt_tissues, by=COL_TISSUE, all=TRUE)
-    dt_counts = dt_counts[, .(
-    Tissue = get(COL_TISSUE),
-    Category = Category,
-    Value = Value,
-    Counts_value_significant = Counts_value_significant,
-    Counts_value_notsignificant = Counts_value_notsignificant,
-    Counts_notvalue_significant = Counts_significant - Counts_value_significant,
-    Counts_notvalue_notsignificant = Counts_notsignificant - Counts_value_notsignificant
-  )
-  ]
-  return(dt_counts)
-}
-
-count_on_all_columns <- function(data, categories) {
-  dt_categories = list()
-  for (category in categories) {
-    dt_cat = count_on_one_column(data, category)
-    dt_categories[[category]] = dt_cat
-  }
-  dt_counts = rbindlist(dt_categories, use.names = TRUE)
-  return(dt_counts)
-}
-
-count_on_one_column <- function(data, column) {
-  COL_TISSUE <- "TISSUE"
-  dt_val_sig = data[DIFFERENTIAL_EXPRESSED == TRUE,
-                    .(Category=column, Counts_value_significant=.N),
-                    by=.(get(COL_TISSUE), Value=get(column))]
-  dt_val_notsig = data[DIFFERENTIAL_EXPRESSED == FALSE,
-                       .(Category=column, Counts_value_notsignificant=.N),
-                       by=.(get(COL_TISSUE), Value=get(column))]
-  dt_list = list(dt_val_sig, dt_val_notsig)
-  lapply(dt_list, function(dt) {
-    setnames(dt, new = COL_TISSUE, old = "get")
-  })
-  dt_cat_final = merge(dt_list[[1]], dt_list[[2]], 
-                       by=c(COL_TISSUE, "Value", "Category"),
-                       all=TRUE)
-  setnafill(dt_cat_final, 
-            "const",
-            fill=0,
-            cols=4:5)
-  # Add entries for all organs
-  dt_all = dt_cat_final[, lapply(.SD, sum), by=.(Value, Category), .SDcols = !c(COL_TISSUE)]
-  dt_all[, (COL_TISSUE) := "All"]
-  dt_cat_final = rbindlist(list(dt_cat_final, dt_all), use.names=TRUE)
-  return(dt_cat_final)
-}
-
-count_significant_on_tissues <- function(data) {
-  COL_TISSUE <- "TISSUE"
-  # To be merged at last on tissue level + to create "All" entry
-  dt_sig = data[DIFFERENTIAL_EXPRESSED == TRUE,
-                .(Counts_significant = .N),
-                by = .(get(COL_TISSUE))]
-  dt_notsig = data[DIFFERENTIAL_EXPRESSED == FALSE,
-                   .(Counts_notsignificant = .N),
-                   by = .(get(COL_TISSUE))]
-  dt_list = list(dt_sig, dt_notsig)
-  lapply(dt_list, function(dt) {
-    setnames(dt, new = COL_TISSUE, old = "get")  })
-  
-  dt_tissues_counts = merge(dt_list[[1]], dt_list[[2]], 
-                            by=c(COL_TISSUE),
-                            all=TRUE)
-  setnafill(dt_tissues_counts, "const", fill=0, cols=2:3)
-  dt_all = dt_tissues_counts[, lapply(.SD, sum), .SDcols = !c(COL_TISSUE)]
-  dt_all[, (COL_TISSUE) := "All"]
-  dt_tissues_counts = rbindlist(list(dt_tissues_counts, dt_all), use.names=TRUE)
-  return(dt_tissues_counts)
-}
-
-perform_ora_from_counts <- function(data) {
-  
-  # https://stackoverflow.com/questions/11680579/assign-multiple-columns-using-in-data-table-by-group
-  
-  data[, c("OR", "pval") := 
-         vfisher_2sided(Counts_value_significant,
-                        Counts_value_notsignificant,
-                        Counts_notvalue_significant, 
-                        Counts_notvalue_notsignificant)
-       ]
-  
-  data[, c("Kulc_distance", "Imbalance_ratio") := list(
-    kulc(Counts_value_significant, 
-         Counts_value_notsignificant, 
-         Counts_notvalue_significant, 
-         Counts_notvalue_notsignificant),
-    imbalance_ratio(Counts_value_significant, 
-                    Counts_value_notsignificant, 
-                    Counts_notvalue_significant,
-                    Counts_notvalue_notsignificant)
-  )]
-  
-  # Add adjusted pval
-  data[, "pval_adjusted" := .(p.adjust(pval, method="BH"))]
-  
-  return(data)
-}
-
-odds_ratio <- function(Counts_value_significant,
-                       Counts_value_notsignificant,
-                       Counts_notvalue_significant,
-                       Counts_notvalue_notsignificant) {
-  
-  # There are functions that have better methods for estimating
-  #  odds ratio rather than the simple formula below.
-  # uses only basic arithmetic operations which are already vectorized
-  # or = ((Counts_value_significant * Counts_notvalue_notsignificant)
-  #       / (Counts_value_notsignificant * Counts_notvalue_significant))
-  
-  or = 
-    
-    return(or)
-}
-
-
-fisher_2sided <- function(Counts_value_significant,
-                          Counts_value_notsignificant,
-                          Counts_notvalue_significant,
-                          Counts_notvalue_notsignificant) {
-  
-  m = matrix(nrow = 2, ncol = 2, byrow=TRUE,
-             data = c(Counts_value_significant, Counts_value_notsignificant,
-                      Counts_notvalue_significant, Counts_notvalue_notsignificant)
-  )
-  
-  test = fisher.test(m, alternative="two.sided")
-  res = c(test$estimate, test$p.value)
-  return(res)
-}
-
-vfisher_2sided <- function(Counts_value_significant,
-                           Counts_value_notsignificant,
-                           Counts_notvalue_significant,
-                           Counts_notvalue_notsignificant) {
-  
-  v = mapply(fisher_2sided, 
-             Counts_value_significant,
-             Counts_value_notsignificant,
-             Counts_notvalue_significant,
-             Counts_notvalue_notsignificant)
-  
-  l = list(OR = v[1, ], pval = v[2, ])
-  return(l)
-}
-
-kulc <- function(Counts_value_significant,
-                 Counts_value_notsignificant,
-                 Counts_notvalue_significant,
-                 Counts_notvalue_notsignificant) {
-  
-  # vectorized by using only arithmetic operations
-  P_AB = Counts_value_significant / (Counts_value_significant + Counts_notvalue_significant)
-  P_BA = Counts_value_significant / (Counts_value_significant + Counts_value_notsignificant)
-  avg = (P_AB + P_BA) / 2
-  return(avg)
-}
-
-
-imbalance_ratio <- function(Counts_value_significant,
-                            Counts_value_notsignificant,
-                            Counts_notvalue_significant,
-                            Counts_notvalue_notsignificant) {
-  # Vectorized
-  numerator = abs(Counts_value_notsignificant - Counts_notvalue_significant)
-  denominator = (Counts_value_significant 
-                 + Counts_value_notsignificant
-                 + Counts_notvalue_significant)
-  return(numerator / denominator)
-  
-}
-
-
-
-# Plots ------------------------------------------------------------------------
-
-# plot_heatmaps <- function(data, cols) {
-#   stop("Not implemented")
-# }
-
-build_heatmaps <- function(dt, cols, dir_path) {
+build_heatmaps <- function(dt, dir_path) {
   
   # add "/" if not last char of dir_path
   if (!substr(dir_path, length(dir_path), length(dir_path)) == "/") {
@@ -239,7 +26,7 @@ build_heatmaps <- function(dt, cols, dir_path) {
                               directed = TRUE,
                               vertices = NULL)
     
-    matrix_all = as_adjacency_matrix(G, attr = "OR", sparse = FALSE)
+    matrix_all = as_adjacency_matrix(G, attr = "OR_DIFF", sparse = FALSE)
     matrix_all = clip_matrix(matrix_all, 1, OR_min, OR_max)
     
     matrix_up = as_adjacency_matrix(G, attr = "OR_UP", sparse = FALSE)
@@ -311,40 +98,21 @@ generate_heatmap <- function(matrix, title, filename) {
 }
 
 
-# get_celltypes_enrichment <- function(dt, cols) {
-#   
-#   COL_LIGAND_RECEPTOR_CELLTYPES = cols$LIGAND_RECEPTOR_CELLTYPES
-#   
-#   dt_ctypes = dt[Category == COL_LIGAND_RECEPTOR_CELLTYPES
-#                  & pval < 0.05]
-#   dt_ctypes = dt_ctypes[, c("Ligand_cell", "Receptor_cell") := list(
-#     sub("(.*) : ", "", Value),
-#     sub(" : (.*)", "", Value)
-#   )
-#   ]
-#   
-#   cols_to_select = c(
-#     "Tissue", "Ligand_cell", "Receptor_cell", "OR", "OR_UP", "OR_DOWN"
-#   )
-#   
-#   dt_ctypes = dt_ctypes[, ..cols_to_select]
-#   
-#   return(dt_ctypes)
-# }
-
-get_celltypes_enrichment <- function(dt, cols, use_adjpval=NULL) {
+get_celltypes_enrichment <- function(dt, use_adjpval=NULL) {
   
-  stop("Check compatibility")
+  message('get_celltype_enrichment: upgrade warning: OR -> OR_DIFF')
   
-  COL_LIGAND_RECEPTOR_CELLTYPES = cols$LIGAND_RECEPTOR_CELLTYPES
-  COL_pval = 'pval'
+  COL_LIGAND_RECEPTOR_CELLTYPES = "LR_CELLTYPE"
+  # COL_pval = 'pval'
+  COL_pval = 'pval_DIFF'
   COL_pval_UP = 'pval_UP'
   COL_pval_DOWN = 'pval_DOWN'
-  # COL_pval_adj = 'pval_adjusted'
+  
+  # These indicate p-values that have been readjusted
+  #  at celltype level for keeping the signal.
   COL_pval_readj = 'pval_readj_on_celltypes'
   COL_pval_readj_UP = 'pval_readj_on_celltypes_UP'
   COL_pval_readj_DOWN = 'pval_readj_on_celltypes_DOWN'
-  
   
   dt_ctypes = dt[
     Category == COL_LIGAND_RECEPTOR_CELLTYPES
@@ -356,52 +124,14 @@ get_celltypes_enrichment <- function(dt, cols, use_adjpval=NULL) {
       )
       ]
   
-  
-  ### Previously computed adjustment based on use_adjpval. Dropped since it
-  ###  is better to store both raw and adj pval and let other actors decide
-  ###  which one to use.
-  # if (use_adjpval) {
-  #   
-  #   # Subset the ORA records on LIGAND_RECEPTOR_CELLTYPES category and
-  #   #  adjust pvals based only on the selected entries to control statistical
-  #   #  power.
-  #   dt_ctypes = dt[
-  #     Category == COL_LIGAND_RECEPTOR_CELLTYPES
-  #     ][,
-  #     c(COL_pval_readj, COL_pval_readj_UP, COL_pval_readj_DOWN) := .(
-  #       p.adjust(get(COL_pval), method='BH'),
-  #       p.adjust(get(COL_pval_UP), method='BH'),
-  #       p.adjust(get(COL_pval_DOWN), method='BH')
-  #       )
-  #   ]
-  #   dt_ctypes = dt_ctypes[
-  #     get(COL_pval_readj_UP) < 0.05 | get(COL_pval_readj_DOWN) < 0.05
-  #   ]
-  #   
-  #   # dt_ctypes = dt[Category == COL_LIGAND_RECEPTOR_CELLTYPES
-  #   #                & get(COL_pval_adj) < 0.05]
-  #   message('get_celltypes_enrichment: readjusted pval on celltypes ORA.')
-  # 
-  # } else {
-  #   dt_ctypes = dt[
-  #     Category == COL_LIGAND_RECEPTOR_CELLTYPES
-  #       & (get(COL_pval_UP) < 0.05 | get(COL_pval_DOWN) < 0.05)
-  #   ]
-  #   # dt_ctypes = dt[Category == COL_LIGAND_RECEPTOR_CELLTYPES
-  #   #                & get(COL_pval) < 0.05]
-  #   message('get_celltypes_enrichment: uses non-adjusted pval')
-  #   
-  # }
-  # message('get_celltypes_enrichment: subsets results with pval/pval_adj < 0.05, may be too strict.')
-  
   dt_ctypes = dt_ctypes[, c("Ligand_cell", "Receptor_cell") := list(
-    sub(" : .*", "", Value),  # substitute w/ regex
-    sub(".* : ", "", Value)
+    sub("_.*", "", Value),  # substitute w/ regex
+    sub(".*_", "", Value)
   )
   ]
   
   cols_to_select = c(
-    "Tissue", "Ligand_cell", "Receptor_cell", "OR", "OR_UP", "OR_DOWN",
+    "Tissue", "Ligand_cell", "Receptor_cell", "OR_DIFF", "OR_UP", "OR_DOWN",
     COL_pval, COL_pval_UP, COL_pval_DOWN,
     COL_pval_readj, COL_pval_readj_UP, COL_pval_readj_DOWN
   )
@@ -411,6 +141,8 @@ get_celltypes_enrichment <- function(dt, cols, use_adjpval=NULL) {
   return(dt_ctypes)
 }
 
+# Bipartite graph ----
+
 analyze_Graph <- function(dt_ora, 
                           dt_filtered,
                           tissue, 
@@ -418,6 +150,14 @@ analyze_Graph <- function(dt_ora,
                           use_adjpval=TRUE,
                           dir=NULL,
                           analysis_name=NULL) {
+  
+  ora_has_tissue = 'Tissue' %in% names(dt_ora)
+  filt_has_tissue = 'Tissue' %in% names(dt_filtered)
+  
+  if( !(ora_has_tissue & filt_has_tissue) ) {
+    stop(paste0('analyze_Graph: Filtered and ORA must have a tissue specified.',
+                ' Insert a dummy tissue for compatibility with current code.'))
+  }
   
   message('Solve the low statistical power issue by controlling num interactions
           in the BH adjustment.')
@@ -595,10 +335,12 @@ construct_graph <- function(dt_ora, tissue, dt_filtered=NULL) {
   dt_edge = dt_edge[, .(
     'Ligand_cell' = paste0(Ligand_cell, ' (L)'),
     'Receptor_cell' = paste0(Receptor_cell, ' (R)'),
-    'OR' = OR,
+    # 'OR' = OR,
+    'OR_DIFF' = OR_DIFF,
     'OR_UP' = OR_UP,
     'OR_DOWN' = OR_DOWN,
-    'pval' = pval,
+    # 'pval' = pval,
+    'pval_DIFF' = pval_DIFF,
     'pval_UP' = pval_UP,
     'pval_DOWN' = pval_DOWN,
     'pval_adj' = pval_readj_on_celltypes,
@@ -653,22 +395,25 @@ setup_graph <- function(G, config=GRAPH_CONFIG, use_adjpval) {
 }
 
 # To be moved
-# count_celltypes_tissue <- function(dt, tissue) {
-#   # @dt - dt_filtered
-#   dt_t = dt[TISSUE == tissue]
-#   counts_dt = funion(
-#     dt_t[, .(
-#       name = L_CELLTYPE,
-#       counts = (L_NCELLS_old + L_NCELLS_young)/2  # average counts in young-old
-#     )],
-#     dt_t[, .(
-#       name = R_CELLTYPE,
-#       counts = (R_NCELLS_old + R_NCELLS_young)/2  # average counts in young-old
-#     )],
-#   )
-#   counts_dt = counts_dt[order(counts_dt$name)]
-#   return(counts_dt)
-# }
+count_celltypes_tissue <- function(dt, tissue) {
+  # @dt - dt_filtered
+  
+  # dt_t = dt[TISSUE == tissue]
+  dt_t = copy(dt)
+  
+  counts_dt = funion(
+    dt_t[, .(
+      name = L_CELLTYPE,
+      counts = (L_NCELLS_OLD + L_NCELLS_YOUNG)/2  # average counts in young-old
+    )],
+    dt_t[, .(
+      name = R_CELLTYPE,
+      counts = (R_NCELLS_OLD + R_NCELLS_YOUNG)/2  # average counts in young-old
+    )],
+  )
+  counts_dt = counts_dt[order(counts_dt$name)]
+  return(counts_dt)
+}
 
 add_vertex_size <- function(G) {
   
@@ -724,7 +469,8 @@ add_vertex_size <- function(G) {
 count_interactions_cellpairs_tissue <- function(dt_filtered, tissue) {
   return(
     dt_filtered[
-      TISSUE == tissue,
+      # TISSUE == tissue,
+      ,
       .(count = .N),
       by = .(L_CELLTYPE, R_CELLTYPE)
       ][, .(
@@ -829,7 +575,7 @@ plot_graph <- function(G,
   SUBTITLE = ''
   # SUBTITLE = paste0('Difference graph of overrepresented celltype ',
   #                   'communication that get\n altered with ageing')
-  
+
   if( !is.null(path) ) {pdf(path)}
   
   plot.igraph(
