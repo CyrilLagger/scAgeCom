@@ -1,0 +1,353 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(data.table)
+library(purrr)
+library(ggplot2)
+library(scDiffCom)
+library(scales)
+library(igraph)
+
+source("../../src/src_1_filtering.R")
+
+DATA_PATH = "../../../data/pipeline_output/analysis_4_data_diffcom_filter.rds"
+
+datasets = readRDS(DATA_PATH)
+
+message("Dataset composition:")
+str(datasets, max.level=1)
+
+message("Dataset structure:")
+str(datasets[[1]], max.level=1)
+
+message("Dataset tissues:")
+map(datasets, ~ unique(.x[["TISSUE"]]))
+
+
+cols = get_default_colnames()
+
+datasets = map(
+    datasets,
+    ~ analyze_CCI(
+      data = .x,
+      cols = cols,
+      cutoff_score = quantile(c(.x$LR_SCORE_old, .x$LR_SCORE_young), 0.75)
+    )
+)
+
+datasets_filtered = map(
+    datasets,
+    ~ .x[!(CASE_TYPE %in% c("FFF"))]
+)
+
+str(datasets_filtered[[1]], max.level=1)
+```
+
+
+```{r}
+source("../../src/src_2_ora.R")
+ora_dir = '../../../results/ORA/'
+
+
+if ( !exists('ora_results') ){
+  ora_results <- map(
+    datasets_filtered,
+    ~ analyze_ORA(.x, cols, with_pseudocounts=TRUE),
+  )
+} else {
+  message('Using precomputed ora_results.')
+}
+
+map(
+  1:length(ora_results),
+  ~ save_ora(ora_results[[.x]], file.path(ora_dir, paste0(names(ora_results)[.x], '.tsv')))
+)
+
+head(ora_results$calico)
+```
+
+
+Let's install a suite of subgraph mining software for R
+https://stackoverflow.com/questions/48255675/subgraphmining-package-not-available
+
+Tried it, the package is too much legacy and broken.
+
+GENERIC PLAYGROUND
+```{r}
+ora_dt[Tissue == 'Liver' & Category == 'LR_CELLTYPES'& (pval_adjusted_DOWN <= 0.05 | pval_adjusted_UP <= 0.05) & (OR_UP >= 1 | OR_DOWN >= 1)]
+
+dt = datasets_filtered$tms_facs
+# names(dt)
+
+(ggplot(data=dt, aes(L_NCELLS_young, R_NCELLS_young))
+ + geom_point(aes(color=LR_KEEP_DIFF))
+ + ggtitle('N cell bias: young')
+)
+
+(ggplot(data=dt, aes(L_NCELLS_old, R_NCELLS_old))
+ + geom_point(aes(color=LR_KEEP_DIFF))
+ + ggtitle('N cell bias: old')
+)
+
+(ggplot(data=dt, aes(L_NCELLS_young, L_NCELLS_old))
+ + geom_point(aes(color=LR_KEEP_DIFF))
+ + ggtitle('N cell bias: ligand cells young vs old')
+)
+
+(ggplot(data=dt, aes(R_NCELLS_young, R_NCELLS_old))
+ + geom_point(aes(color=LR_KEEP_DIFF))
+ + ggtitle('N cell bias: receptor cells young vs old')
+)
+# coord_cartesian(xlim = c(0, 5))
+```
+
+FPM PLAYGROUND
+```{r}
+# apriori stuff
+library(arules)
+library(glue)
+source("../../src/src_3_fpm.R")
+
+fpm = map(
+  datasets_filtered,
+  ~ analyze_FreqItemSets(
+    .x, cols,
+    target = 'closed frequent itemsets',
+    support = 0.000001,
+    confidence = 0.0001
+  )
+)
+
+fpm$tms_facs$LGENE_LCELL[lhs %like% 'Liver']
+fpm$tms_facs$RGENE_RCELL[lhs %like% 'Liver']
+
+```
+
+
+GRAPH PLAYGROUND
+```{r}
+source("../../src/src_2_ora.R")
+G = construct_graph(ora_results$tms_facs, 'Liver', datasets_filtered$tms_facs)
+  # Setup
+# G = setup_graph(G)
+```
+
+
+```{r}
+source("../../src/src_2_ora.R")
+dir = "../../../results/Graphs"
+if ( !dir.exists(dir) ) {dir.create(dir)}
+analyze_Graph(
+  ora_results$tms_facs,
+  datasets_filtered$tms_facs,
+  "Liver", 
+  config=GRAPH_CONFIG, 
+  use_adjpval=FALSE,
+  dir=NULL,
+  analysis_name=NULL)
+
+```
+
+
+```{r}
+source("../../src/src_2_ora.R")
+
+analyze <- function(dataset_name) {
+  tissues = unique(ora_results[[dataset_name]]$Tissue)
+  # Rm All
+  tissues = tissues[ !(tissues == 'All') ]
+  
+  analysis_name = paste0(dataset_name, '_adjpval')
+  
+  # map(tissues, ~ plot_graph(ora_results$tms_facs, .x))
+  map(
+    tissues, 
+    ~ analyze_Graph(
+      ora_results[[dataset_name]],
+      datasets_filtered[[dataset_name]],
+      .x,
+      config=GRAPH_CONFIG,
+      use_adjpval=TRUE,
+      dir=dir, 
+      analysis_name=analysis_name
+      )
+    )
+}
+
+map(
+  names(datasets),
+  analyze
+)
+```
+
+  
+```{r eval=FALSE, include=FALSE}
+TISSUE = 'Kidney'
+
+dt_ctypes = get_celltypes_enrichment(ora_results$tms_droplet, cols, FALSE)
+
+# ncols = dim(dt_ctypes)[2]
+# dt_edge = dt_ctypes[Tissue == TISSUE, 2:ncols]
+dt_edge = dt_ctypes[Tissue == TISSUE, .SD, .SDcols = !c('Tissue')]
+
+dt_edge = dt_edge[, .(
+    'Ligand_cell' = paste0(Ligand_cell, ' (L)'),
+    'Receptor_cell' = paste0(Receptor_cell, ' (R)'),
+    'OR' = OR,
+    'OR_UP' = OR_UP,
+    'OR_DOWN' = OR_DOWN
+)]
+
+dt_edge[is.na(dt_edge)] = 1
+
+# Shouldn't have Inf with pseudocounts
+if (sum(dt_edge==Inf) > 0) {
+  message('()?: Inf value present in edge data.table. Clipping.')
+}
+dt_edge[dt_edge == Inf] = min(dt_edge[, list(OR, OR_UP, OR_DOWN)], 50)
+
+G = graph_from_data_frame(d = dt_edge,
+                              directed = TRUE,
+                              vertices = NULL)
+
+# delete_edges(net, E(net)[weight<cut.off])
+
+# V(G)$type
+# Infer vertex type (Ligand or Receptor) from name
+vertex_types = map_lgl(
+    strsplit(V(G)$name, '[()]'),
+    ~ .x[2] == 'L',
+)
+
+# E(G)
+# edge_attr(G)
+# vertex_attr(G)
+# graph_attr(G)
+
+
+# colrs <- c("gray50", "tomato", "gold")
+# V(G)$color
+# V(G)$size
+# V(G)$label
+# V(G)$label.color
+# V(G)$label.cex
+# V(G)$label.font
+# V(G)$shape ? (transmitters as triangles to right, receivers as triangles to left)
+
+# COLOR_UP = "#003399"
+# CUTOFF_UP = 2
+# COLOR_DOWN = "#CC0000"
+# CUTOFF_DOWN = 2
+# COLOR_BOTH = "#FFCC33"
+# COLOR_NONE = "#999999"
+
+# color_edge <- function(edge) {
+#     
+#     # COLOR_UP = "red"
+#     # CUTOFF_UP = 2
+#     # COLOR_DOWN = "blue"
+#     # CUTOFF_DOWN = 2
+#     # COLOR_BOTH = "yellow"
+#     # COLOR_NONE = "slategrey"
+#     # CUTOFF_ALL = 2  # might be better to check OR_UP and OR_DOWN
+#     
+#     if ((edge$OR_UP >= CUTOFF_UP) & (edge$OR_DOWN >= CUTOFF_DOWN)) {
+#         return(COLOR_BOTH)
+#     } else if (edge$OR_UP >= CUTOFF_UP) {
+#         return(COLOR_UP)
+#     } else if (edge$OR_DOWN >= CUTOFF_DOWN) {
+#         return(COLOR_DOWN)
+#     } else {
+#         return(COLOR_NONE)
+#     }
+# }
+# 
+# weight_edge <- function(edge, min_width, max_width, min_value, max_value) {
+#     
+#     (c + min_width)*(max_width/min_width)
+#     
+#     if ((edge$OR_UP >= CUTOFF_UP) & (edge$OR_DOWN >= CUTOFF_DOWN)) {
+#         return(edge$OR)
+#     } else if (edge$OR_UP >= CUTOFF_UP) {
+#         return(edge$OR_UP)
+#     } else if (edge$OR_DOWN >= CUTOFF_DOWN) {
+#         return(edge$OR_DOWN)
+#     } else {
+#         return(1)
+#     }
+# }
+
+E(G)$arrow.size <- .2
+
+# PUT everything in a function, gets too cluttered
+E(G)$width <- 2.5  #map_dbl(E(G), weight_edge, min_width=2, max_width=5, min_value=min(E(G)$), max_value=max(E(G)$))  # map OR to (2,5) interval
+
+E(G)$edge.color <- map_chr(E(G), color_edge)
+
+layout_bipartite = layout_as_bipartite(G, types=vertex_types, hgap=10, vgap=10)
+layout_bipartite_vertical = layout_bipartite[, 2:1]
+
+plot <- function() {
+    plot.igraph(
+        G, 
+        layout = layout_bipartite_vertical,
+        vertex.color = '#33FF66',
+        vertex.size = 10,
+        vertex.label.dist = 1.5,
+        vertex.label.cex = 1.2,
+        edge.color = E(G)$edge.color,
+        edge.width = E(G)$edge.width,
+        main = paste0('Communication profile with age: ', TISSUE),
+        margin = 0.5,
+        sub = 'Difference graph of overrepresented celltype communication that get\n altered with ageing'
+    )
+  
+    legend_labels = c(
+      'Significant, but small effect',
+      'Upregulated', 
+      'Downregulated', 
+      'Altered')
+    legend_colors = c(COLOR_NONE, COLOR_UP, COLOR_DOWN, COLOR_BOTH)
+        
+    legend(x=-1.5, y=-1.1, 
+           legend = legend_labels,
+           title = 'Edge color legend',
+           bty = 'o',
+           pch = c(15),
+           col = legend_colors,
+           cex = 0.7,
+           pt.cex = 1,
+           bg = '#CCCCCC',
+           ncol = 2
+    )
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
