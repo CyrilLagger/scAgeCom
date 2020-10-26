@@ -1,0 +1,140 @@
+---
+title: "R Notebook"
+---
+
+This notebook presents the heatmaps and bipartite graphs.
+
+```{r}
+library(data.table)
+library(purrr)
+library(pheatmap)
+library(RColorBrewer)
+library(scales)
+library(igraph)
+
+
+RESULTS_PATH = '../../data_scAgeCom/testing/scdiffcom_tms_facs_mixed_Spleen.rds'
+results = readRDS(RESULTS_PATH)
+
+source('../src/utils.R')
+results = add_dummy_tissue(results)
+
+str(results, max.level = 1)
+```
+
+# Heatmaps
+
+Internally, we convert dt_ora to dt_ctypes, a data.table that storesedge data - a row describes an edge between a ligand and receptor celltype with edge attributes including: OR, OR_UP, OR_DOWN. This data.table is used to build the heatmaps.
+
+Below code was initially made to work with multiple datasets and tissues. For now we test on a single tissue, but code is left  for future development.
+
+```{r}
+source('../src/visualizations.R')
+
+create_heatmaps_dirs = function(base_dir, dir_names){
+  # Create paths
+  heatmaps_dirs = map_chr(
+    dir_names,
+    ~ file.path(base_dir, .x)
+  )  
+  # Create dirs at paths
+  map(
+    heatmaps_dirs,
+    ~ dir.create(.x, showWarnings=FALSE)
+  )
+  heatmaps_dirs = as.list(heatmaps_dirs)
+  names(heatmaps_dirs) = dir_names
+  return(heatmaps_dirs)
+}
+
+construct_heatmaps = function(ora_dt, dir){
+  dt_ctypes = get_celltypes_enrichment(ora_dt)
+  build_heatmaps(dt_ctypes, dir)
+}
+
+HEATMAPS_BASE_DIR = "../../data_scAgeCom/analysis/heatmaps"
+heatmaps_dirs = create_heatmaps_dirs(HEATMAPS_BASE_DIR, c('test_dataset'))
+construct_heatmaps(results$ORA, heatmaps_dirs$test_dataset)
+```
+
+# Number of cells bias
+
+```{r}
+library(ggplot2)
+dt = results$scdiffcom_dt_filtered
+
+(ggplot(data=dt, aes(L_NCELLS_YOUNG, R_NCELLS_YOUNG))
+ + geom_point(aes(color=DIFFERENTIALLY_EXPRESSED))
+ + ggtitle('N cell bias: young')
+)
+
+(ggplot(data=dt, aes(L_NCELLS_OLD, R_NCELLS_OLD))
+ + geom_point(aes(color=DIFFERENTIALLY_EXPRESSED))
+ + ggtitle('N cell bias: old')
+)
+
+(ggplot(data=dt, aes(L_NCELLS_YOUNG, L_NCELLS_OLD))
+ + geom_point(aes(color=DIFFERENTIALLY_EXPRESSED))
+ + ggtitle('N cell bias: ligand cells young vs old')
+)
+
+(ggplot(data=dt, aes(R_NCELLS_YOUNG, R_NCELLS_OLD))
+ + geom_point(aes(color=DIFFERENTIALLY_EXPRESSED))
+ + ggtitle('N cell bias: receptor cells young vs old')
+)
+# coord_cartesian(xlim = c(0, 5))
+```
+
+# Bipartite graphs for cell-cell communication
+
+
+```{r}
+source("../src/visualizations.R")
+source("../src/utils.R")  # for loading GRAPH_CONFIG
+
+dir = "../../data_scAgeCom/analysis/Graphs"
+if ( !dir.exists(dir) ) {dir.create(dir)}
+
+analyze_Graph(
+  results$ORA,
+  results$scdiffcom_dt_filtered,
+  "DummyTissue",
+  config=GRAPH_CONFIG,
+  use_adjpval=TRUE,
+  dir=dir,
+  analysis_name="DummyTest")
+
+
+### Below code was being used for multiple datasets/tissues analyses
+# analyze <- function(dataset_name, use_adjpval=FALSE) {
+#   tissues = unique(results$ora[[dataset_name]]$Tissue)
+#   
+#   # rm All
+#   tissues = tissues[ !(tissues == 'All') ]
+#   
+#   if( use_adjpval) {
+#     analysis_name = paste0(dataset_name, '_with_adjpval')
+#   } else {
+#     analysis_name = paste0(dataset_name, '_without_adjpval') 
+#   }
+# 
+#   map(
+#     tissues, 
+#     ~ analyze_Graph(
+#       results$ora[[dataset_name]],
+#       results$filtered[[dataset_name]]$results,
+#       .x,
+#       config=GRAPH_CONFIG,
+#       use_adjpval=use_adjpval,
+#       dir=dir, 
+#       analysis_name=analysis_name
+#       )
+#     )
+# }
+# 
+# 
+# map(
+#   names(results$filtered),
+#   ~ analyze(.x, use_adjpval=TRUE)
+# )
+```
