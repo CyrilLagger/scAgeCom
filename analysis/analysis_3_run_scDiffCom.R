@@ -13,11 +13,12 @@
 
 library(Seurat)
 library(scDiffCom)
-library(foreach)
-library(doParallel)
-library(pbapply)
+library(future)
+library(progressr)
 
-pboptions(type = "txt")
+future::plan(multiprocess)
+options(future.globals.maxSize = 64 * 1000 ^ 3)
+options(progressr.enable = TRUE)
 
 ## Set up fixed parameters that should not change ####
 
@@ -31,11 +32,11 @@ run_test <- FALSE
 ## Path where the Seurat files are stored ####
 
 dataset_paths <- c(
-  tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_facs.rds",
-  tms_droplet = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_droplet.rds",
-  calico_kidney = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_kidney.rds",
-  calico_lung = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_lung.rds",
-  calico_spleen = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_calico_spleen.rds"
+  tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_tms_facs.rds",
+  tms_droplet = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_tms_droplet.rds",
+  calico_kidney = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_kidney.rds",
+  calico_lung = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_lung.rds",
+  calico_spleen = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_spleen.rds"
 )
 
 ## Load the curated LR interactions ####
@@ -46,7 +47,7 @@ LR6db_curated <- scDiffCom::LR6db$LR6db_curated
 
 analysis_list <- list(
   list(dataset = "calico", type = "default"),
-  list(dataset = "calico", type = "subtype"),
+  #list(dataset = "calico", type = "subtype")#,
   list(dataset = "tms_facs", type = "mixed"),
   list(dataset = "tms_facs", type = "female"),
   list(dataset = "tms_facs", type = "male"),
@@ -60,10 +61,15 @@ analysis_list <- list(
 ## Do the analysis ####
 
 for(analysis in analysis_list) {
+  #future.apply::future_lapply(analysis_list, function(analysis) {
   message(paste0("Start analysis of ", analysis$dataset, "_", analysis$type))
-  output_dir <- paste0(dir_data_output, "/scdiffcom_",
-                       analysis$dataset, "_", analysis$type, "_",
-                       normalization, "_log", is_log, "_", n_iter, "iter")
+  if(!run_test) {
+    output_dir <- paste0(dir_data_output, "/scdiffcom_",
+                         analysis$dataset, "_", analysis$type, "_",
+                         normalization, "_log", is_log, "_", n_iter, "iter")
+  } else {
+    output_dir <- paste0(dir_data_output, "/scdiffcom_test_run")
+  }
   if(!dir.exists(output_dir)) {
     message("Create output directory.")
     dir.create(output_dir)
@@ -108,44 +114,54 @@ for(analysis in analysis_list) {
     n_tissue <- 3
   }
   if(run_test){
-    tissue_list <- tissue_list[1:2]
-    n_tissue <- 2
+    #tissue_list <- tissue_list[1:3]
+    tissue_list <- tissue_list[tissue_list == "Lung"]
+    n_tissue <- 1
   }
-  message("Setup parallel environment.")
-  registerDoParallel(cores= min(n_tissue, 30))
-  message("Start tissue per tissue scDiffCom analysis (in parallel).")
-  foreach(i = 1:n_tissue, .packages = c("Seurat", "scDiffCom")) %dopar% {
+  #message("Setup parallel environment.")
+  #registerDoParallel(cores= min(n_tissue, 30))
+  #message("Start tissue per tissue scDiffCom analysis (in parallel).")
+  #foreach(i = 1:n_tissue, .packages = c("Seurat", "scDiffCom")) %dopar% {
+  #foreach(i = 1:n_tissue, .packages = c("Seurat", "scDiffCom")) %do% {
+  for(i in 1:n_tissue) {
+    #future.apply::future_lapply(1:n_tissue, function(i) {
     tiss <- tissue_list[i]
     message(paste0("Analysis of the ", tiss, ". Tissue ", i, " out of ", n_tissue, "."))
     if(analysis$dataset %in% c("tms_facs", "tms_droplet")) {
       message("Subset Seurat object")
       cells_tiss <- colnames(seurat_obj)[which(seurat_obj$tissue == tiss)]
       seurat_tiss <- subset(seurat_obj, cells = cells_tiss)
-      cell_type_id <- "cell_ontology_class"
+      cell_type_id <- "cell_ontology_scdiffcom"
       if(analysis$type == "sex") {
-        condition_id == "sex"
+        condition_id <- "sex"
+        cond1_name <- "female"
+        cond2_name <- "male"
       } else {
-        condition_id == "age_group"
+        condition_id <- "age_group"
+        cond1_name <- "YOUNG"
+        cond2_name <- "OLD"
       }
     } else if(analysis$dataset == "calico") {
       seurat_tiss <- seurat_list[[tiss]]
       condition_id <- "age_group"
-      if(analysis$type == subtype) {
+      cond1_name <- "YOUNG"
+      cond2_name <- "OLD"
+      if(analysis$type == "subtype") {
         cell_type_id <- "subtype"
       } else {
-        cell_type_id <- "cell_type"
+        cell_type_id <- "cell_ontology_scdiffcom"
       }
     }
-    Seurat::DefaultAssay(seurat_tiss) <- "RNA"
+    DefaultAssay(seurat_tiss) <- "RNA"
     message("Size-factor normalization:")
-    seurat_tiss <- Seurat::NormalizeData(seurat_tiss, assay = "RNA")
+    seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
     dt_res <- scDiffCom::run_scdiffcom(
       seurat_obj = seurat_tiss,
       LR_object = LR6db_curated,
       celltype_col_id = cell_type_id,
       condition_col_id = condition_id,
-      cond1_name = "YOUNG",
-      cond2_name = "OLD",
+      cond1_name = cond1_name,
+      cond2_name = cond2_name,
       assay = "RNA",
       slot = "data",
       log_scale = is_log,
@@ -159,14 +175,16 @@ for(analysis in analysis_list) {
       cutoff_logfc = log(1.1),
       return_distr = FALSE,
       seed = 42,
-      verbose = TRUE
+      verbose = TRUE,
+      sparse = TRUE
     )
     message(paste0("Saving results for the ", tiss, "."))
     saveRDS(dt_res, file = paste0(output_dir, "/scdiffcom_", tiss, ".rds"))
-    NULL
+    #NULL
   }
+  #)
 }
-
+#)
 
 
 

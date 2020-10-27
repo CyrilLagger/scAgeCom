@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## cyril.lagger@liverpool.ac.uk - October 2020
 ##
 ## Provide some statistacal information about tissue,
 ## cell-types, genes, LR-pair and sex.
@@ -17,6 +17,7 @@ library(ggplot2)
 library(gridExtra)
 library(grid)
 library(gtable)
+library(ontoProc)
 
 ## Analysis data path ####
 dir_data_analysis <- "../data_scAgeCom/analysis/"
@@ -28,6 +29,19 @@ seurat_md <- lapply(
   seurat_md,
   setDT
 )
+
+## Check that scDiffCom cell-type annotations are all in cell-ontology ####
+cl = getCellOnto()
+cl_names <- cl$name
+
+all_scdiffcom_ontology <- unique(unlist(lapply(
+  seurat_md,
+  function(i) i$cell_ontology_scdiffcom
+)))
+
+all_scdiffcom_ontology %in% cl_names
+all_scdiffcom_ontology[!all_scdiffcom_ontology %in% cl_names]
+#the eventual remaining non-cl cases are not going to appear in scDiffCom results because of low cell counts
 
 ## Add and modify metadata ####
 
@@ -59,11 +73,16 @@ seurat_md$tms_droplet[, age_group := ifelse(age %in% c('1m', '3m'), 'YOUNG', 'OL
 seurat_md$calico[, age_group := ifelse(age == "young", 'YOUNG', 'OLD')]
 
 # add tissue-cell types
-seurat_md[1:2] <- lapply(seurat_md[1:2], function(x) {
-  x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class, sep = "_")
+seurat_md <- lapply(seurat_md, function(x) {
+  x$tissue_cell_ontology <- paste(x$tissue, x$cell_ontology_scdiffcom, sep = "_")
+  if("cell_ontology_class" %in% colnames(x)) {
+    x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class)
+  } else {
+    x$tissue_cell_type <- paste(x$tissue, x$cell_type)
+  }
   return(x)
 })
-seurat_md$calico[, tissue_cell_type := paste(tissue, cell_type, sep = "_")]
+
 seurat_md$calico_subtype <- copy(seurat_md$calico)
 seurat_md$calico_subtype[, tissue_cell_type := paste(tissue, subtype, sep = "_")]
 
@@ -72,6 +91,7 @@ seurat_md$calico_subtype[, tissue_cell_type := paste(tissue, subtype, sep = "_")
 seurat_md <- lapply(seurat_md, function(x) {
   x$tissue <- as.character(x$tissue)
   x$age_group <- as.character(x$age_group)
+  x$tissue_cell_ontology <- as.character(x$tissue_cell_ontology)
   x$tissue_cell_type <- as.character(x$tissue_cell_type)
   x$sex <- as.character(x$sex)
   return(x)
@@ -83,9 +103,9 @@ tables_age_vs_sex <- lapply(
   seurat_md,
   function(md) {
     sapply(
-      unique(md$tissue_cell_type),
+      unique(md$tissue_cell_ontology),
       function(tct) {
-        temp <- md[md$tissue_cell_type == tct,]
+        temp <- md[md$tissue_cell_ontology == tct,]
         table(temp$age_group, temp$sex)
       },
       simplify = FALSE,
@@ -97,9 +117,9 @@ odds_age_vs_sex <- lapply(
   seurat_md,
   function(md) {
     sapply(
-      unique(md$tissue_cell_type),
+      unique(md$tissue_cell_ontology),
       function(tct) {
-        temp <- md[md$tissue_cell_type == tct,]
+        temp <- md[md$tissue_cell_ontology == tct,]
         tb <- table(temp$age_group, temp$sex) 
         if(ncol(tb) == 2 & nrow(tb) == 2) {
           res <- fisher.test(tb + 1)$estimate
@@ -112,38 +132,78 @@ odds_age_vs_sex <- lapply(
   }
 )
 
-## merge ontology id together to have one2one relationship with tissue cell type
+## merge ontology id together to have one2one relationship with tissue cell type ####
+
+#warning cell_ontology_id from the original TMS files are wrong!
+seurat_md <- lapply(
+  seurat_md,
+  function(md) {
+    md[, tissue_cell_ontology_id_wrong := paste0(unique(cell_ontology_id), collapse = ","), by = "tissue_cell_ontology"]
+  }
+)
+
+# instead use ontology from CL directly
+cl_conversion <- data.table(
+  cell_type = all_scdiffcom_ontology,
+  ontology_id = sapply(all_scdiffcom_ontology, function(i) {
+    if(i %in%  cl_names) {
+      return(names(cl_names[cl_names %in%  i ]))
+    } else {
+      return(NA)
+    }
+  })
+)
 
 seurat_md <- lapply(
   seurat_md,
   function(md) {
-    md[, tissue_cell_type_ontology_id := paste0(unique(cell_ontology_id), collapse = ","), by = "tissue_cell_type"]
+    md[cl_conversion, on = "cell_ontology_scdiffcom==cell_type", cell_ontology_id_scdiffcom := i.ontology_id]
   }
 )
 
 ## Create counts table for presentation and to save as csv ####
 
-cell_types_full_table  <- rbindlist(
+cell_types_full_table_old  <- rbindlist(
   l = lapply(
     1:4,
     function(i) {
-      temp <- seurat_md[[i]][, c("tissue", "tissue_cell_type", "tissue_cell_type_ontology_id", "age_group", "sex")]
+      temp <- seurat_md[[i]][, c("tissue", "tissue_cell_type", "tissue_cell_ontology_id_wrong", "age_group", "sex")]
       temp[, dataset := names(seurat_md)[[i]]]
-      temp <- temp[, .N, by = c("dataset", "tissue", "tissue_cell_type", "tissue_cell_type_ontology_id", "age_group", "sex")]
+      temp <- temp[, .N, by = c("dataset", "tissue", "tissue_cell_type", "tissue_cell_ontology_id_wrong", "age_group", "sex")]
       return(temp)
     }
   ),
   use.names = TRUE
 )
-cell_types_full_table [, tct_ontology_id := paste0(unique(tissue_cell_type_ontology_id), collapse = ","), by = "tissue_cell_type"]
-cell_types_full_table <- dcast.data.table(
-  cell_types_full_table,
+cell_types_full_table_old[, tct_ontology_id := paste0(unique(tissue_cell_ontology_id_wrong), collapse = ","), by = "tissue_cell_type"]
+cell_types_full_table_old <- dcast.data.table(
+  cell_types_full_table_old,
   formula = tissue + tissue_cell_type + tct_ontology_id ~ dataset + age_group + sex ,
   value.var = "N"
 )
 
-fwrite(cell_types_full_table, paste0(dir_data_analysis, "a1_cell_types_full_table.csv"))
+fwrite(cell_types_full_table_old, paste0(dir_data_analysis, "a1_cell_types_full_table_old.csv"))
 
+cell_types_full_table_new  <- rbindlist(
+  l = lapply(
+    1:4,
+    function(i) {
+      temp <- seurat_md[[i]][, c("tissue", "tissue_cell_ontology", "cell_ontology_id_scdiffcom", "age_group", "sex")]
+      temp[, dataset := names(seurat_md)[[i]]]
+      temp <- temp[, .N, by = c("dataset", "tissue", "tissue_cell_ontology", "cell_ontology_id_scdiffcom", "age_group", "sex")]
+      return(temp)
+    }
+  ),
+  use.names = TRUE
+)
+cell_types_full_table_new[, tct_ontology_id := paste0(unique(cell_ontology_id_scdiffcom), collapse = ","), by = "tissue_cell_ontology"]
+cell_types_full_table_new <- dcast.data.table(
+  cell_types_full_table_new,
+  formula = tissue + tissue_cell_ontology + tct_ontology_id ~ dataset + age_group + sex ,
+  value.var = "N"
+)
+
+fwrite(cell_types_full_table_new, paste0(dir_data_analysis, "a1_cell_types_full_table_new.csv"))
 
 cell_types_tissue_table <- lapply(
   seurat_md,
@@ -249,23 +309,23 @@ tct_more_5cells <- lapply(
   seurat_md,
   filter_by_cells,
   min_cells = 5,
+  group_1 = "tissue_cell_ontology",
+  group_2 = "age_group",
+  all_or_any = "all"
+)
+tct2_more_5cells <- lapply(
+  seurat_md,
+  filter_by_cells,
+  min_cells = 5,
   group_1 = "tissue_cell_type",
   group_2 = "age_group",
-  all_or_any = "any"
+  all_or_any = "all"
 )
 tct_more_10cells <- lapply(
   seurat_md,
   filter_by_cells,
   min_cells = 10,
-  group_1 = "tissue_cell_type",
-  group_2 = "age_group",
-  all_or_any = "any"
-)
-tct_more_10cells_all <- lapply(
-  seurat_md,
-  filter_by_cells,
-  min_cells = 10,
-  group_1 = "tissue_cell_type",
+  group_1 = "tissue_cell_ontology",
   group_2 = "age_group",
   all_or_any = "all"
 )
@@ -273,13 +333,13 @@ tct_more_10cells_all <- lapply(
 tct_female_more_5cells <- lapply(
   seurat_md[1:2],
   function(md) {
-    filter_by_cells(md[md$sex == "female",], 5, "tissue_cell_type", "age_group")
+    filter_by_cells(md[md$sex == "female",], 5, "tissue_cell_type", "age_group", "all")
   }
 )
 tct_male_more_5cells <- lapply(
   seurat_md[1:2],
   function(md) {
-    filter_by_cells(md[md$sex == "male",], 5, "tissue_cell_type", "age_group")
+    filter_by_cells(md[md$sex == "male",], 5, "tissue_cell_type", "age_group", "all")
   }
 )
 tct_sex_more_5cells <- lapply(
@@ -300,10 +360,10 @@ create_summary_df <- function(
   if(!is_sex) {
     number_tct <- sapply(tct_distr, length)
     df <- data.frame(
-    name = c("Tabula Muris Senis - FACS", "Tabula Muris Senis - Droplet", "Calico"),
-    tissue_number = c(sapply(tissue_distr, length)[1:2], 3),
-    cell_type_number = c(number_tct[1:2], sum(number_tct[3:5]))
-  )
+      name = c("Tabula Muris Senis - FACS", "Tabula Muris Senis - Droplet", "Calico"),
+      tissue_number = c(sapply(tissue_distr, length)[1:2], 3),
+      cell_type_number = c(number_tct[1:2], sum(number_tct[3]))
+    )
   } else {
     df <- data.frame(
       name = c("Tabula Muris Senis - FACS", "Tabula Muris Senis - Droplet"),
@@ -381,7 +441,7 @@ plot_cells_per_tissue
 # number of cell-types per tissues
 celltype_distr <- lapply(seurat_md, function(md) {
   setDT(md)
-  unique(md[,c("tissue", "tissue_cell_type")])
+  unique(md[,c("tissue", "tissue_cell_ontology")])
 })
 
 plot_celltypes_per_tissue <- cowplot::plot_grid(
@@ -401,15 +461,12 @@ plot_celltypes_per_tissue <- cowplot::plot_grid(
   #hjust = -0.5, vjust = -0.5
 )
 plot_celltypes_per_tissue
-ggsave(paste0(dir_data_analysis, "analysis_1_plot_celltypes_per_tissue.png"),
+ggsave(paste0(dir_data_analysis, "a_1_plot_celltypes_per_tissue.png"),
        plot = plot_celltypes_per_tissue, scale = 2.4)
-
 
 ## Comparison of common tissues ####
 
-
-
-seurat_common_md <- lapply(seurat_md_2, function(x) {
+seurat_common_md <- lapply(seurat_md, function(x) {
   x <- x[x$tissue %in% c("Kidney", "Lung", "Spleen"),]
   x$tissue <- factor(x$tissue, levels = sort(unique(as.character(x$tissue))))
   return(x)
