@@ -16,58 +16,49 @@ library(glue)
 library(scDiffCom)
 library(arules)
 
-source("src/src_1_filtering.R")
-
-#library(igraph)
-#library(purrr)
-#library(pheatmap)
-#library(RColorBrewer)
-#library(ggplot2)
-#library(gridExtra)
-#library(grid)
-#library(gtable)
-
-
 ## Specify the directory with scDiffCom results ####
-dir_results <- "../data_scAgeCom/scDiffCom_all_results"
-
+dir_results <- "../data_scAgeCom/scdiffcom_all_results"
 dir_data_analysis <- "../data_scAgeCom/analysis/"
-
-## Get all results directories and all tissues in each directories ####
 
 RESULT_PATHS <- list.dirs(dir_results, recursive = FALSE)
 
 DATASETS <- lapply(
   RESULT_PATHS, 
-  function(i) {
-    if(grepl("sex", i)) {
-      conds <- c("female", "male")
-    } else {
-      conds <- c("YOUNG", "OLD")
-    }
-    tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(i))
-    results <- bind_tissues(
-      path = i,
-      list_of_tissues =  tissues, 
-      conds = conds,
-      pre_filtering = TRUE,
-      min_cells = 5
-    )
-    results <- analyze_CCI_per_tissue(
-      results,
-      conds = conds,
-      cutoff_quantile = 0.25,
-      recompute_BH = TRUE
-    )
-    results <- results[!(CASE_TYPE %in% c("FFF"))]
-    list(
-      id = gsub(".*scdiffcom_", "", i),
-      tissues = tissues,
-      conds = conds,
-      results = results
+  function(path) {
+    tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(path))
+    data.table::rbindlist(
+      l = lapply(
+        X = tissues,
+        FUN = function(
+          tiss
+        ) 
+        {
+          dt <- readRDS(paste0(path, "/scdiffcom_", tiss, ".rds"))
+          dt <- dt$scdiffcom_dt_filtered
+          dt[, TISSUE := tiss]
+          print(head(dt))
+          return(dt)
+        }),
+      use.names = TRUE,
+      fill = TRUE
     )
   }
 )
+
+lapply(
+  RESULT_PATHS, 
+  function(path) {
+    tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(path))
+    lapply(tissues, function(i) {
+      dt <- readRDS(paste0(path, "/scdiffcom_", i, ".rds"))
+      print(class(dt$scdiffcom_dt_filtered)  == c("data.table", "data.frame"))
+      } )
+  }
+)
+
+test <- readRDS("../data_scAgeCom/scdiffcom_all_results/scdiffcom_tms_facs_mixed_size_factor_logTRUE_10000iter/scdiffcom_Bladder.rds")
+
+class(test$scdiffcom_dt_filtered) == c("data.table", "data.frame")
 
 ## Rename datasets ####
 lapply(DATASETS, function(i) i$id)

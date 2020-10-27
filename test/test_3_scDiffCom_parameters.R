@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## cyril.lagger@liverpool.ac.uk - October 2020
 ##
 ## Check the behaviour of scDiffCom in functions of
 ## its parameters.
@@ -17,271 +17,345 @@ library(data.table)
 library(ggplot2)
 library(e1071)
 library(UpSetR)
+library(future)
 
 ## Data path ####
 dir_data_test <- "../data_scAgeCom/test/"
 
-## Load a Seurat objects ####
+## Load Seurat objects ####
 
-#here the file corresponds to the Liver tissue from TMS FACS data.
-seurat_t3 <- readRDS(paste0(dir_data_test, "data_seurat_example_facs_liver.rds"))
-seurat_t3$age_group <- ifelse(seurat_t3$age %in% c('1m', '3m'), 'young', 'old' )
-seurat_t3$cell_ontology_class <- as.character(seurat_t3$cell_ontology_class)
+seurat_objects_t3 <- list(
+  facs_liver = readRDS(paste0(dir_data_test, "seurat_testing_tms_facs_liver.rds")),
+  facs_spleen = readRDS(paste0(dir_data_test, "seurat_testing_tms_facs_spleen.rds")),
+  droplet_spleen = readRDS(paste0(dir_data_test, "seurat_testing_tms_droplet_spleen.rds")),
+  calico_spleen = readRDS(paste0(dir_data_test, "seurat_testing_calico_spleen.rds"))
+)
+seurat_objects_t3 <- lapply(
+  seurat_objects_t3,
+  function(obj) {
+    obj$age_group <- ifelse(obj$age %in% c('1m', '3m', "young"), 'YOUNG', 'OLD' )
+    return(obj)
+  }
+)
+seurat_objects_t3 <- lapply(
+  seurat_objects_t3,
+  NormalizeData,
+  normalization.method = "LogNormalize",
+  assay = "RNA",
+  scale.factor = 10000
+)
 
 ## Load interactions ####
 LR_t3 <- scDiffCom::LR6db$LR6db_curated
 
-## Normalization choice ####
-seurat_t3 <- NormalizeData(seurat_t3, assay = "RNA")
-seurat_t3 <- SCTransform(
-  object = seurat_t3,
-  return.only.var.genes = FALSE
-)
-
 ## Create a list of parameters to test ####
 
 #Note: We want to look at normalization and log-scale.
-#      We also want to check the usage of one-sided vs two-sided test for differential p-values.
 
 param_t3 <- list(
-  R_log = list(id = "R_log_two",assay = "RNA", log_scale = TRUE),
-  R_nlog = list(id = "R_nlog_two", assay = "RNA", log_scale = FALSE),
-  S_log_two = list(id = "S_log_two", assay = "SCT", log_scale = TRUE),
-  S_nlog_two = list(id = "S_nlog_two", assay = "SCT", log_scale = FALSE)
+  SF_log = list(id = "SF_log", assay = "RNA", log_scale = TRUE),
+  SF_nlog = list(id = "SF_nlog", assay = "RNA", log_scale = FALSE),
+  SCT_log = list(id = "SCT_log", assay = "SCT", log_scale = TRUE),
+  SCT_nlog = list(id = "SCT_nlog", assay = "SCT", log_scale = FALSE)
 )
 
 ## Run scDiffCom on all parameters ####
 
-#create a data.table with all conditions
-#it will take some times, so we use 1000 iterations as a start
-# diffcom_bind_t3 <- rbindlist(
-#   lapply(
-#     param_t3_short,
-#     function(
-#       param
-#     ) {
-#       run_diffcom(
-#         seurat_obj = seurat_t3,
-#         LR_data = LR_t3,
-#         seurat_cell_type_id = "cell_ontology_class",
-#         condition_id = "age_group",
-#         assay = param[["assay"]],
-#         slot = "data",
-#         log_scale = param[["log_scale"]],
-#         min_cells = 5,
-#         threshold = 0.1,
-#         iterations = 1000,
-#         one_sided = param[["one_sided"]],
-#         permutation_analysis = TRUE,
-#         return_distr = FALSE
-#       )
-#     }
-#   ),
-#   idcol = "param_group"
+#Note: We also return the distribution, but this requires quite a lot of memory
+#      So we perform it one seurat object at a time
+
+seurat_object_temp <- seurat_objects_t3$droplet_spleen
+seurat_object_temp <- SCTransform(seurat_object_temp, return.only.var.genes = TRUE)
+
+plan(sequential)
+# scdiffcom_t3_temp <- lapply(
+#   param_t3,
+#   function(
+#     param
+#   ) {
+#     run_scdiffcom(
+#       seurat_object = seurat_object_temp,
+#       LR_object = LR_t3,
+#       celltype_col_id = "cell_ontology_scdiffcom",
+#       condition_col_id = "age_group",
+#       cond1_name = "YOUNG",
+#       cond2_name = "OLD",
+#       assay = param[["assay"]],
+#       slot = "data",
+#       log_scale = param[["log_scale"]],
+#       min_cells = 5,
+#       pct_threshold = 0.1,
+#       permutation_analysis = TRUE,
+#       iterations = 1000,
+#       cutoff_quantile_score = 0.25,
+#       cutoff_pval_specificity = 0.05,
+#       cutoff_pval_de = 0.05,
+#       cutoff_logfc = log(1.1),
+#       return_distr = TRUE,
+#       seed = 42,
+#       verbose = TRUE,
+#       sparse = TRUE
+#     )
+#   }
 # )
 
+saveRDS(scdiffcom_t3_temp, file = paste0(dir_data_test, "t3_data_scDiffCom_allparameters_droplet_spleen.rds"))
 
-## Preprocessing, filtering and saving results ####
-#not needed if already saved
+## Reading the results ####
 
-#only keep detected interactions in either young or old samples
-#diffcom_bind_t3 <- diffcom_bind_t3[LR_DETECTED_young == TRUE | LR_DETECTED_old == TRUE]
-#diffcom_bind_t3[, TISSUE := "Liver"]
-
-#apply filtering analysis to get the different regulation cases
-#source("src/src_1_filtering.R")
-#diffcom_bind_t3 <- rbindlist(
-#   l = lapply(
-#     unique(diffcom_bind_t3$param_group),
-#     function(param) {
-#       temp <- diffcom_bind_t3[param_group == param]
-#       temp <- analyze_CCI_per_tissue(
-#         data = temp,
-#         cutoff_quantile = 0.25,
-#         cutoff_logFC_abs = log(1.1),
-#         is_log = param_t3_short[[param]]$log_scale
-#       )
-#     }
-#   ),
-#   use.names = TRUE
-#)
-
-#save results
-#saveRDS(diffcom_bind_t3, file = paste0(dir_data_test, "t3_data_scDiffCom_allparameters_1000iter.rds"))
-
-## Load previously saved results ####
-
-#read files
-diffcom_bind_t3 <- readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_1000iter.rds"))
-
-## Compare classification for each parameter ####
-
-diffcom_bind_t3[ , CASE_TYPE_2 := ifelse(CASE_TYPE %in% c("FTTU", "TTTU"),
-                                         "UP",
-                                         ifelse(CASE_TYPE %in% c("TFTD", "TTTD"),
-                                                "DOWN",
-                                                ifelse(CASE_TYPE == "FFF",
-                                                       "FFF",
-                                                       "FLAT")))]
-diffcom_bind_t3[, CCI := paste(LR_CELLTYPE, LR_NAME, sep = "_")]
-
-#look how the CCIs are distributed
-ftable(diffcom_bind_t3$param_group, diffcom_bind_t3$CASE_TYPE)
-ftable(diffcom_bind_t3$param_group, diffcom_bind_t3$CASE_TYPE_2)
-
-diffcom_bind_t3[, param_case := paste(param_group, CASE_TYPE_2, sep = "_")]
-param_case_list <- unique(diffcom_bind_t3$param_case)
-CCI_per_param_list <- sapply(param_case_list, function(i) {
-  diffcom_bind_t3[param_case == i]$CCI
-})
-UpSetR::upset(fromList(CCI_per_param_list), nsets = 16, order.by = "freq", nintersects = 35)
-
-#look and remove the CCI that are consistent over all parameter cases
-dcast_param_t3 <- dcast(
-  diffcom_bind_t3[, c("CCI", "param_group", "CASE_TYPE_2")],
-  formula = CCI ~ param_group,
-  value.var = "CASE_TYPE_2"
+scdiffcom_t3 <-  list(
+  facs_liver = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_facs_liver.rds")),
+  facs_spleen = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_facs_spleen.rds")),
+  droplet_spleen = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_droplet_spleen.rds")),
+  calico_spleen = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_calico_spleen.rds"))
 )
-dcast_param_t3[, is_eq := R_log == R_nlog & R_nlog == S_log & S_log == S_nlog]
-
-CCI_conserved <- dcast_param_t3[is_eq == TRUE]$CCI
-CCI_non_conserved <- dcast_param_t3[is_eq == FALSE | is.na(is_eq)]$CCI
-CCI_non_conserved_noNA <- dcast_param_t3[is_eq == FALSE]$CCI
-CCI_per_param_list_2_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
-  diffcom_bind_t3[param_case == i & CCI %in% CCI_conserved]$CCI
-})
-CCI_per_param_list_2_non_conserved <- sapply(param_case_list, function(i) {
-  diffcom_bind_t3[param_case == i & CCI %in% CCI_non_conserved]$CCI
-})
-CCI_per_param_list_2_non_conserved_noNA <- sapply(param_case_list, function(i) {
-  diffcom_bind_t3[param_case == i & CCI %in% CCI_non_conserved_noNA]$CCI
-})
-CCI_per_param_list_2_conserved <- sapply(param_case_list, function(i) {
-  diffcom_bind_t3[param_case == i & CCI %in% CCI_conserved]$CCI
-})
-
-
-UpSetR::upset(fromList(CCI_per_param_list_2_conserved), nsets = 16, order.by = "freq", nintersects = 35)
-UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved), nsets = 16, order.by = "freq", nintersects = 35)
-UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved_noNA), nsets = 16, order.by = "freq", nintersects = 35)
-
-
-#Note: we can observe some differences in the classification depending on the processing methods.
-#      There is a priori no clear way to define a better approach based only on this data.
-
-## Compare ORA results for each parameter ####
-source("src/src_2_ora.R")
-
-ora_list_t3 <- sapply(
-  unique(diffcom_bind_t3$param_group),
-  function(param) {
-    res <- analyze_ORA(diffcom_bind_t3[param_group == param])
-  },
-  simplify = FALSE
-)
-
-ora_up_LR_NAME <- rbindlist(
-  l = lapply(
-    ora_list_t3,
-    function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_adjusted_UP <= 0.05 & OR_UP >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_UP", "OR_UP")]
-    }
-  ),
-  use.names = TRUE,
-  idcol = "param"
-)
-ora_down_LR_NAME <- rbindlist(
-  l = lapply(
-    ora_list_t3,
-    function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_NAME" & pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_DOWN", "OR_DOWN")]
-    }
-  ),
-  use.names = TRUE,
-  idcol = "param"
-)
-
-ora_up_LR_CELLTYPE <- rbindlist(
-  l = lapply(
-    ora_list_t3,
-    function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_adjusted_UP <= 0.05 & OR_UP >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_UP", "OR_UP")]
-    }
-  ),
-  use.names = TRUE,
-  idcol = "param"
-)
-ora_down_LR_CELLTYPE <- rbindlist(
-  l = lapply(
-    ora_list_t3,
-    function(i) {
-      res <- i[Tissue == "Liver" & Category == "LR_CELLTYPE" & pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1]
-      res <- res[, c("Tissue", "Category", "Value", "pval_adjusted_DOWN", "OR_DOWN")]
-    }
-  ),
-  use.names = TRUE,
-  idcol = "param"
-)
-
-param_list <- unique(ora_up_LR_NAME$param)
-
-ora_up_LR_NAME_per_param <- sapply(param_list, function(i) {
-  ora_up_LR_NAME[param == i]$Value
-})
-ora_down_LR_NAME_per_param <- sapply(param_list, function(i) {
-  ora_down_LR_NAME[param == i]$Value
-})
-ora_up_LR_CELLTYPE_per_param <- sapply(param_list, function(i) {
-  ora_up_LR_CELLTYPE[param == i]$Value
-})
-ora_down_LR_CELLTYPE_per_param <- sapply(param_list, function(i) {
-  ora_down_LR_CELLTYPE[param == i]$Value
-})
-UpSetR::upset(fromList(ora_up_LR_NAME_per_param), nsets = 4, order.by = "freq")
-UpSetR::upset(fromList(ora_down_LR_NAME_per_param), nsets = 4, order.by = "freq")
-UpSetR::upset(fromList(ora_up_LR_CELLTYPE_per_param), nsets = 4, order.by = "freq")
-UpSetR::upset(fromList(ora_down_LR_CELLTYPE_per_param), nsets = 4, order.by = "freq")
 
 ## Compare LR scores ####
 
-#build score data.tables
-comp_LR_score_old <- dcast(
-  diffcom_bind_t3[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_old")],
-  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
-  value.var = "LR_SCORE_old"
-)
-comp_LR_score_young <- dcast(
-  diffcom_bind_t3[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_young")],
-  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
-  value.var = "LR_SCORE_young"
+scdiffcom_t3_comp <- lapply(
+  scdiffcom_t3,
+  function(dataset) {
+    common_cci <- Reduce(
+      intersect,
+      lapply(
+        dataset,
+        function (param) {
+          param$scdiffcom_dt_filtered[, CCI := paste(LR_CELLTYPE, LR_NAME)]
+          param$scdiffcom_dt_filtered[["CCI"]]
+        }
+      )
+    )
+    dt <- rbindlist(
+      lapply(
+        dataset,
+        function(param) {
+          param$scdiffcom_dt_filtered[CCI %in% common_cci]
+        }
+      ),
+      use.names = TRUE,
+      idcol = "param_group"
+    )
+    dcast(
+      dt[, c("param_group", "CCI", "LR_SCORE_OLD", "LR_SCORE_YOUNG", "LOGFC", "REGULATION")],
+      formula = CCI ~ param_group,
+      value.var = c("LR_SCORE_OLD", "LR_SCORE_YOUNG", "LOGFC", "REGULATION")
+    )
+  }
 )
 
-g_comp_LR_score_old <- cowplot::plot_grid(
+scdiffcom_t3_logfc_table <- dcast(
+  rbindlist(
+    lapply(
+      scdiffcom_t3,
+      function(dataset) {
+        rbindlist(
+          lapply(
+            dataset,
+            function(param) {
+              param$scdiffcom_dt_filtered[, CCI := paste(LR_CELLTYPE, LR_NAME)]
+              param$scdiffcom_dt_filtered[,c("CCI", "LOGFC")]
+            }
+          ),
+          use.names = TRUE,
+          idcol = "param_group"
+        )
+      }
+    ),
+    use.names = TRUE,
+    idcol = "dataset"
+  ),
+  formula = CCI + dataset ~ param_group,
+  value.var = "LOGFC"
+)
+
+ggplot(scdiffcom_t3_logfc_table, aes(x = SCT_log, y = SCT_nlog)) + geom_point() + geom_smooth()
+ggplot(scdiffcom_t3_logfc_table, aes(x = SF_nlog, y = SCT_nlog)) + geom_point() + geom_smooth()
+
+
+scdiffcom_t3_distr_params <- lapply(
+  scdiffcom_t3,
+  function(dataset) {
+    dt <- rbindlist(
+      lapply(
+        dataset,
+        function(param) {
+          distr <- param$scdiffcom_distributions$distr_diff
+          mat <- apply(
+            distr,
+            MARGIN = 1,
+            function(mat_row) {
+              m <- mean(mat_row)
+              md <- median(mat_row)
+              sd <- sd(mat_row)
+              ratio <- m/sd
+              skewn <- skewness(mat_row)
+              return(c("mean" = m, "median" = md, "sd" = sd, "ratio" = ratio, "skewness" = skewn))
+            }
+          )
+          as.data.table(t(mat))
+        }
+      ),
+      use.names = TRUE,
+      idcol = "param_group"
+    )
+  }
+)
+
+scdiffcom_t3_distr_params <- rbindlist(
+  scdiffcom_t3_distr_params,
+  use.names = TRUE,
+  idcol = "dataset"
+)
+
+
+ggplot(scdiffcom_t3_distr_params, aes(x = ratio)) +
+  geom_boxplot(aes(color = param_group)) +
+  facet_wrap(~dataset)
+ggplot(scdiffcom_t3_distr_params, aes(x = skewness)) +
+  geom_boxplot(aes(color = param_group)) +
+  facet_wrap(~dataset)
+
+
+scdiffcom_t3_pval_comp <- rbindlist(
+  lapply(
+    scdiffcom_t3,
+    function(dataset) {
+      rbindlist(
+        lapply(
+          dataset,
+          function(param) {
+            pval_2sided <- rowSums(
+              abs(param$scdiffcom_distributions$distr_diff[,1:1000]) >= 
+                abs(param$scdiffcom_distributions$distr_diff[,1001])
+            ) /1000
+            temp1 <- rowSums(
+              param$scdiffcom_distributions$distr_diff[,1:1000] >= 
+                param$scdiffcom_distributions$distr_diff[,1001]) /1000
+            temp2 <- rowSums(
+              param$scdiffcom_distributions$distr_diff[,1:1000] <= 
+                param$scdiffcom_distributions$distr_diff[,1001]) /1000
+            pval_1sided <- pmin(temp1, temp2)
+            data.table(
+              pval_2sided = pval_2sided,
+              pval_1sided = pval_1sided
+            )
+          }
+        ),
+        use.names = TRUE,
+        idcol = "param_group"
+      )
+    }
+  ),
+  use.names = TRUE,
+  idcol = "dataset"
+)
+  
+
+ggplot(scdiffcom_t3_pval_comp, aes(x = pval_2sided, y = 2*pval_1sided)) + 
+  geom_point() + 
+  geom_vline(xintercept = 0.05) +
+  geom_hline(yintercept = 0.05) +
+  facet_grid(param_group ~ dataset)
+
+scdiffcom_t3_pval_comp[, sig_2sided := ifelse(pval_2sided <= 0.05, "sig2", "non-sig2")]
+scdiffcom_t3_pval_comp[, sig_1sided := ifelse(2*pval_1sided <= 0.05, "sig1", "non-sig1")]
+
+scdiffcom_t3_signif_table <- dcast(
+  scdiffcom_t3_pval_comp[,.N, by = c("sig_1sided", "sig_2sided", "dataset", "param_group")],
+  formula = dataset + param_group ~ sig_1sided + sig_2sided,
+  value.var = "N"
+)
+
+
+
+
+
+##build score data.tables ####
+comp_LR_score_OLD <- dcast(
+  scdiffcom_t3_dt_filtered[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_OLD")],
+  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
+  value.var = "LR_SCORE_OLD"
+)
+comp_LR_score_YOUNG <- dcast(
+  scdiffcom_t3_dt_filtered[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LR_SCORE_YOUNG")],
+  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
+  value.var = "LR_SCORE_YOUNG"
+)
+
+comp_LR_logfc_abs <- dcast(
+  scdiffcom_t3_dt_filtered[, c("param_group", "LR_SORTED", "L_CELLTYPE", "R_CELLTYPE", "LOGFC_ABS")],
+  formula = LR_SORTED + L_CELLTYPE + R_CELLTYPE ~ param_group,
+  value.var = "LOGFC_ABS"
+)
+
+ggplot(comp_LR_logfc_abs, aes(x = SF_log, y = SCT_log)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+ggplot(comp_LR_logfc_abs, aes(x = SF_nlog, y = SCT_nlog)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+g_comp_LR_logfc_abs <- cowplot::plot_grid(
   plotlist = list(
-    ggplot(comp_LR_score_old, aes(x = R_log_one, y = R_nlog_one)) +
+    ggplot(comp_LR_logfc_abs, aes(x = SF_log, y = SF_nlog)) +
+      geom_point() +
+      xlab(expression(xi[SFlog])) +
+      ylab(expression(xi[SFnlog])) +
+      geom_smooth(method = "lm"),
+    ggplot(comp_LR_logfc_abs, aes(x = SF_log, y = SCT_log)) +
+      geom_point() +
+      xlab(expression(xi[SFlog])) +
+      ylab(expression(xi[SCTlog]))+
+      geom_smooth(method = "lm"),
+    ggplot(comp_LR_logfc_abs, aes(x = SF_log, y = SCT_nlog)) +
+      geom_point() +
+      xlab(expression(xi[SFlog])) +
+      ylab(expression(xi[SCTnlog]))+
+      geom_smooth(method = "lm"),
+    ggplot(comp_LR_logfc_abs, aes(x = SF_nlog, y = SCT_log)) +
+      geom_point() +
+      xlab(expression(xi[SFnlog])) +
+      ylab(expression(xi[SCTlog]))+
+      geom_smooth(method = "lm"),
+    ggplot(comp_LR_logfc_abs, aes(x = SF_nlog, y = SCT_nlog)) +
+      geom_point() +
+      xlab(expression(xi[SFnlog])) +
+      ylab(expression(xi[SCTnlog]))+
+      geom_smooth(method = "lm"),
+    ggplot(comp_LR_logfc_abs, aes(x = SCT_log, y = SCT_nlog)) +
+      geom_point() +
+      xlab(expression(xi[SCTlog])) +
+      ylab(expression(xi[SCTnlog]))+
+      geom_smooth(method = "lm")
+  ),
+  ncol = 2,
+  align = "v"
+)
+
+g_comp_LR_score_OLD <- cowplot::plot_grid(
+  plotlist = list(
+    ggplot(comp_LR_score_OLD, aes(x = SF_log, y = SF_nlog)) +
       geom_point() +
       xlab(expression(xi[SFlog])) +
       ylab(expression(xi[SFnlog])),
-    ggplot(comp_LR_score_old, aes(x = R_log_one, y = S_log_one)) +
+    ggplot(comp_LR_score_OLD, aes(x = SF_log, y = SCT_log)) +
       geom_point() +
       xlab(expression(xi[SFlog])) +
       ylab(expression(xi[SCTlog])),
-    ggplot(comp_LR_score_old, aes(x = R_log_one, y = S_nlog_one)) +
+    ggplot(comp_LR_score_OLD, aes(x = SF_log, y = SCT_nlog)) +
       geom_point() +
       xlab(expression(xi[SFlog])) +
       ylab(expression(xi[SCTnlog])),
-    ggplot(comp_LR_score_old, aes(x = R_nlog_one, y = S_log_one)) +
+    ggplot(comp_LR_score_OLD, aes(x = SF_nlog, y = SCT_log)) +
       geom_point() +
       xlab(expression(xi[SFnlog])) +
       ylab(expression(xi[SCTlog])),
-    ggplot(comp_LR_score_old, aes(x = R_nlog_one, y = S_nlog_one)) +
+    ggplot(comp_LR_score_OLD, aes(x = SF_nlog, y = SCT_nlog)) +
       geom_point() +
       xlab(expression(xi[SFnlog])) +
       ylab(expression(xi[SCTnlog])),
-    ggplot(comp_LR_score_old, aes(x = S_log_one, y = S_nlog_one)) +
+    ggplot(comp_LR_score_OLD, aes(x = SCT_log, y = SCT_nlog)) +
       geom_point() +
       xlab(expression(xi[SCTlog])) +
       ylab(expression(xi[SCTnlog]))
@@ -289,163 +363,186 @@ g_comp_LR_score_old <- cowplot::plot_grid(
   ncol = 2,
   align = "v"
 )
-g_comp_LR_score_old
-ggsave(paste0(dir_data_test, "t3_plot_compParam_scores.png"), g_comp_LR_score_old, scale = 2)
+g_comp_LR_score_OLD
+ggsave(paste0(dir_data_test, "t3_plot_compParam_scores.png"), g_comp_LR_score_OLD, scale = 2)
 
 #histogram for score distributions only for detected CCI 
 
-create_histo_score_detected_old <- function(group) {
-  ggplot(diffcom_bind_t3[param_group == group & LR_DETECTED_old == TRUE], aes(x = LR_SCORE_old)) +
+create_histo_score_detected_OLD <- function(group) {
+  ggplot(diffcom_bind_t3[param_group == group & LR_DETECTED_OLD == TRUE], aes(x = LR_SCORE_OLD)) +
     geom_histogram(bins = 50) +
-    xlab(expression(xi[old])) +
+    xlab(expression(xi[OLD])) +
     ylab("Counts") +
     theme(text=element_text(size=20)) #+
-    #scale_y_log10()
+  #scale_y_log10()
 }
-create_histo_score_detected_young <- function(group) {
-  ggplot(diffcom_bind_t3[param_group == group & LR_DETECTED_young == TRUE], aes(x = LR_SCORE_young)) +
+create_histo_score_detected_YOUNG <- function(group) {
+  ggplot(diffcom_bind_t3[param_group == group & LR_DETECTED_YOUNG == TRUE], aes(x = LR_SCORE_YOUNG)) +
     geom_histogram(bins = 50) +
-    xlab(expression(xi[young])) +
+    xlab(expression(xi[YOUNG])) +
     ylab("Counts") +
     theme(text=element_text(size=20)) #+
   #scale_y_log10()
 }
 
-g_distr_score_old <- cowplot::plot_grid(
-  plotlist = lapply(list("R_log_one", "R_nlog_one", "S_log_one", "S_nlog_one"), create_histo_score_detected_old),
+g_distr_score_OLD <- cowplot::plot_grid(
+  plotlist = lapply(list("SF_log", "SF_nlog", "SCT_log", "SCT_nlog"), create_histo_score_detected_OLD),
   ncol = 2,
   align = "v",
   labels = c("SF-log", "SF-nlog", "SCT-log", "SCT-nlog")
 )
-g_distr_score_old 
-ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_old.png"), g_distr_score_old, scale = 2)
-g_distr_score_young <- cowplot::plot_grid(
-  plotlist = lapply(list("R_log_one", "R_nlog_one", "S_log_one", "S_nlog_one"), create_histo_score_detected_young),
+g_distr_score_OLD 
+ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_OLD.png"), g_distr_score_OLD, scale = 2)
+g_distr_score_YOUNG <- cowplot::plot_grid(
+  plotlist = lapply(list("SF_log", "SF_nlog", "SCT_log", "SCT_nlog"), create_histo_score_detected_YOUNG),
   ncol = 2,
   align = "v",
   labels = c("SF-log", "SF-nlog", "SCT-log", "SCT-nlog")
 )
-g_distr_score_young
-ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_young.png"), g_distr_score_young, scale = 2)
+g_distr_score_YOUNG
+ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_YOUNG.png"), g_distr_score_YOUNG, scale = 2)
 
-## Run scDiffCom to return distributions on all parameters ####
 
-#Note: returning all the distributions requires quite a lot of memory
-#      If we do 1000 iterations for the 8 parameter choices, we get 5.4 GB.
-#      We don't save the full results, as it takes only 16 minutes to get it. 
-#      But we will save other downstream results later on.
-diffcom_distr_bind_t3 <- lapply(
-  param_t3_short,
-  function(
-    param
-  ) {
-    run_diffcom(
-      seurat_obj = seurat_t3,
-      LR_data = LR_t3,
-      seurat_cell_type_id = "cell_ontology_class",
-      condition_id = "age_group",
-      assay = param[["assay"]],
-      slot = "data",
-      log_scale = param[["log_scale"]],
-      min_cells = 5,
-      threshold = 0.1,
-      iterations = 1000,
-      one_sided = param[["one_sided"]],
-      permutation_analysis = TRUE,
-      return_distr = TRUE
-    )
-  }
+## Create a copy of the results but with larger logfc threshold ####
+
+scdiffcom_t3_bis <- lapply(
+  scdiffcom_t3,
+  scDiffCom::run_filtering_and_ORA,
+  new_cutoff_logfc = log(1.5)
 )
 
-## Compute distribution properties
-distr_properties <- lapply(diffcom_distr_bind_t3, function(distr_param) {
-  lapply(distr_param, function(mat) {
-    res <- apply(mat, MARGIN = 1, function(mat_row) {
-      m <- mean(mat_row)
-      md <- median(mat_row)
-      sd <- sd(mat_row)
-      #shapiro <- shapiro.test(mat_row)$p.value
-      skewn <- skewness(mat_row)
-      return(c("mean" = m, "median" = md, "sd" = sd, "skewness" = skewn))
-    })
-    as.data.table(t(res))
-  })
-})
+## Create data.tables of raw CCIs, filtered CCIs and ORA for each parameter ####
 
-#create a data.table with all properties
-distr_t3_full_table <- rbindlist(
-  l = lapply(
-    distr_properties,
-    function(x) {
-      rbindlist(
-        l = x,
-        idcol = "distribution_type"
-      )
-    }
-  ),
+scdiffcom_t3_dt_raw <- rbindlist(
+  lapply(scdiffcom_t3, function(i) i$scdiffcom_dt_raw),
   idcol = "param_group"
 )
-saveRDS(distr_t3_full_table, paste0(dir_data_test, "t3_data_scDiffCom_distribution_table.rds"))
 
-distr_t3_full_table <- readRDS(paste0(dir_data_test, "t3_data_scDiffCom_distribution_table.rds"))
-
-## Look at mean/sd ratio ####
-
-#Note 1: we expect it to be close to zero for distr_diff
-#Note 2: We need to correct for the cases when there are zero cell-types (it is not a problem in itsel as
-#        these cases are treated separately or filtered out in our main analysis.)
-
-distr_t3_full_table[, mean_sd := mean/sd]
-
-g_mean_sd <- cowplot::plot_grid(
-  plotlist = lapply(names(param_t3_short), function(param) {
-    ggplot(distr_t3_full_table[param_group == param & distribution_type == "distr_diff" & mean_sd > -0.1], aes(x = mean_sd)) +
-      geom_histogram(bins = 100) +
-      xlab(expression(mu/sigma)) +
-      ylab("Counts") +
-      theme(text=element_text(size=20))
-  }),
-  ncol = 2,
-  align = "v",
-  labels = c("R_log", "R_nlog", "S_log", "S_nlog")
+scdiffcom_t3_dt_filtered <- rbindlist(
+  lapply(scdiffcom_t3, function(i) i$scdiffcom_dt_filtered),
+  idcol = "param_group"
 )
-g_mean_sd 
-ggsave(paste0(dir_data_test, "t3_plot_comp_mean_sd.png"), g_mean_sd, scale = 2)
 
-
-## Look at the skewness ####
-
-g_skewness <- cowplot::plot_grid(
-  plotlist = lapply(names(param_t3_short), function(param) {
-    ggplot(distr_t3_full_table[param_group == param & distribution_type == "distr_diff"], aes(x = skewness)) +
-      geom_histogram(bins = 100) +
-      xlab("skewness") +
-      ylab("Counts") +
-      theme(text=element_text(size=20))
-  }),
-  ncol = 2,
-  align = "v",
-  labels = c("R_log", "R_nlog", "S_log", "S_nlog")
+scdiffcom_t3_dt_ORA <- rbindlist(
+  lapply(scdiffcom_t3, function(i) i$ORA),
+  idcol = "param_group"
 )
-g_skewness
-ggsave(paste0(dir_data_test, "t3_plot_comp_skewness.png"), g_skewness, scale = 2)
 
-ggplot(distr_t3_full_table[distribution_type == "distr_diff" & param_group %in% c("S_log", "S_nlog")], aes(x = skewness, color = param_group)) +
-  geom_histogram(bins = 100, position = "identity", alpha = 0.4) +
-  xlab("skewness") +
-  ylab("Counts") +
-  theme(text=element_text(size=20))
-ggplot(distr_t3_full_table[distribution_type == "distr_diff" & param_group %in% c("S_log", "R_log")], aes(x = skewness, color = param_group)) +
-  geom_histogram(bins = 100, position = "identity", alpha = 0.4) +
-  xlab("skewness") +
-  ylab("Counts") +
-  theme(text=element_text(size=20))
+scdiffcom_t3_dt_raw_bis <- rbindlist(
+  lapply(scdiffcom_t3_bis, function(i) i$scdiffcom_dt_raw),
+  idcol = "param_group"
+)
 
-#note: we cleary see that the log-normalized cases are less skewed. Therefore we will work only with log-normalized data
-# in our main analysis. 
-# We also decide to work with size-factor normalization because there is no clear argument to choose between this one and scTransform
-# and in this way the data are normalized as in the original TMS paper. Moreover, it is not clear is scTransform
-# can be applied to non-UMI data (so to the FACS dataset)
+scdiffcom_t3_dt_filtered_bis <- rbindlist(
+  lapply(scdiffcom_t3_bis, function(i) i$scdiffcom_dt_filtered),
+  idcol = "param_group"
+)
+
+scdiffcom_t3_dt_ORA_bis <- rbindlist(
+  lapply(scdiffcom_t3_bis, function(i) i$ORA),
+  idcol = "param_group"
+)
+
+## Compare classification for each parameter ####
+
+#look how the CCIs are distributed
+ftable(scdiffcom_t3_dt_filtered$param_group, scdiffcom_t3_dt_filtered$REGULATION)
+ftable(scdiffcom_t3_dt_filtered_bis$param_group, scdiffcom_t3_dt_filtered_bis$REGULATION)
+ftable(scdiffcom_t3_dt_filtered$param_group, scdiffcom_t3_dt_filtered$REGULATION_SIMPLE)
+ftable(scdiffcom_t3_dt_filtered_bis$param_group, scdiffcom_t3_dt_filtered_bis$REGULATION_SIMPLE)
+
+
+hist(scdiffcom_t3_dt_filtered[param_group == "SCT_log"]$LOGFC_ABS, breaks = 50)
+hist(scdiffcom_t3_dt_filtered[param_group == "SCT_nlog"]$LOGFC_ABS, breaks = 50)
+
+hist(scdiffcom_t3_dt_filtered[param_group == "SF_log"]$LOGFC_ABS, breaks = 50)
+hist(scdiffcom_t3_dt_filtered[param_group == "SF_nlog"]$LOGFC_ABS, breaks = 50)
+
+
+log(2)
 
 
 
+
+
+scdiffcom_t3_dt_filtered[, CCI := paste(LR_CELLTYPE, LR_NAME, sep = "_")]
+scdiffcom_t3_dt_filtered_bis[, CCI := paste(LR_CELLTYPE, LR_NAME, sep = "_")]
+
+scdiffcom_t3_dt_filtered[, param_case := paste(param_group, REGULATION_SIMPLE, sep = "_")]
+scdiffcom_t3_dt_filtered_bis[, param_case := paste(param_group, REGULATION_SIMPLE, sep = "_")]
+
+param_case_list <- unique(scdiffcom_t3_dt_filtered$param_case)
+
+CCI_per_param_list <- sapply(param_case_list, function(i) {
+  scdiffcom_t3_dt_filtered[param_case == i]$CCI
+})
+UpSetR::upset(fromList(CCI_per_param_list), nsets = 12, order.by = "freq", nintersects = 35)
+CCI_per_param_list_bis <- sapply(param_case_list, function(i) {
+  scdiffcom_t3_dt_filtered_bis[param_case == i]$CCI
+})
+UpSetR::upset(fromList(CCI_per_param_list_bis), nsets = 12, order.by = "freq", nintersects = 35)
+
+
+#look and remove the CCI that are consistent over all parameter cases
+dcast_param_t3 <- dcast(
+  scdiffcom_t3_dt_filtered[, c("CCI", "param_group", "REGULATION_SIMPLE")],
+  formula = CCI ~ param_group,
+  value.var = "REGULATION_SIMPLE"
+)
+dcast_param_t3[, is_eq := SF_log == SF_nlog & SF_nlog == SCT_log & SCT_log == SCT_nlog]
+
+CCI_conserved <- dcast_param_t3[is_eq == TRUE]$CCI
+CCI_non_conserved <- dcast_param_t3[is_eq == FALSE | is.na(is_eq)]$CCI
+CCI_non_conserved_noNA <- dcast_param_t3[is_eq == FALSE]$CCI
+CCI_per_param_list_2_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
+  scdiffcom_t3_dt_filtered[param_case == i & CCI %in% CCI_conserved]$CCI
+})
+CCI_per_param_list_2_non_conserved <- sapply(param_case_list, function(i) {
+  scdiffcom_t3_dt_filtered[param_case == i & CCI %in% CCI_non_conserved]$CCI
+})
+CCI_per_param_list_2_non_conserved_noNA <- sapply(param_case_list, function(i) {
+  scdiffcom_t3_dt_filtered[param_case == i & CCI %in% CCI_non_conserved_noNA]$CCI
+})
+CCI_per_param_list_2_conserved <- sapply(param_case_list, function(i) {
+  scdiffcom_t3_dt_filtered[param_case == i & CCI %in% CCI_conserved]$CCI
+})
+
+
+UpSetR::upset(fromList(CCI_per_param_list_2_conserved), nsets = 12, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved), nsets = 12, order.by = "freq", nintersects = 35)
+UpSetR::upset(fromList(CCI_per_param_list_2_non_conserved_noNA), nsets = 12, order.by = "freq", nintersects = 35)
+
+
+#Note: we can observe some differences in the classification depending on the processing methods.
+#      It is not clear which is the best method, but most of the time 3 of the 4 groups match together. 
+#      Usually it is up (or down) that goes to flat in one of the 4 cases.
+
+## Compare ORA results for each parameter ####
+
+
+ora_up_LR_NAME <- scdiffcom_t3_dt_ORA[Category == "LR_NAME" & pval_adjusted_UP <= 0.05 & OR_UP >= 1,
+                                      c("Category", "Value", "pval_adjusted_UP", "OR_UP", "param_group")]
+ora_down_LR_NAME <- scdiffcom_t3_dt_ORA[Category == "LR_NAME" & pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1,
+                                      c("Category", "Value", "pval_adjusted_UP", "OR_UP", "param_group")]
+ora_up_LR_CELLTYPE <- scdiffcom_t3_dt_ORA[Category == "LR_CELLTYPE" & pval_adjusted_UP <= 0.05 & OR_UP >= 1,
+                                      c("Category", "Value", "pval_adjusted_UP", "OR_UP", "param_group")]
+ora_down_LR_CELLTYPE <- scdiffcom_t3_dt_ORA[Category == "LR_CELLTYPE" & pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1,
+                                        c("Category", "Value", "pval_adjusted_UP", "OR_UP", "param_group")]
+
+
+ora_up_LR_NAME_per_param <- sapply(param_t3, function(i) {
+  ora_up_LR_NAME[param_group %in% i]$Value
+})
+ora_down_LR_NAME_per_param <- sapply(param_t3, function(i) {
+  ora_down_LR_NAME[param_group %in% i]$Value
+})
+ora_up_LR_CELLTYPE_per_param <- sapply(param_t3, function(i) {
+  ora_up_LR_CELLTYPE[param_group %in% i]$Value
+})
+ora_down_LR_CELLTYPE_per_param <- sapply(param_t3, function(i) {
+  ora_down_LR_CELLTYPE[param_group %in% i]$Value
+})
+UpSetR::upset(fromList(ora_up_LR_NAME_per_param), nsets = 4, order.by = "freq")
+UpSetR::upset(fromList(ora_down_LR_NAME_per_param), nsets = 4, order.by = "freq")
+UpSetR::upset(fromList(ora_up_LR_CELLTYPE_per_param), nsets = 4, order.by = "freq")
+UpSetR::upset(fromList(ora_down_LR_CELLTYPE_per_param), nsets = 4, order.by = "freq")
