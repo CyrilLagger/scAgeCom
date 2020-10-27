@@ -67,3 +67,73 @@ save_list_dfs <- function(l, dir) {
   }
   
 }
+
+
+fetch_results = function(filtered_path, ora_path) {
+  filtered = readRDS(filtered_path)
+  ora = readRDS(ora_path)
+  names(ora) = names(filtered)
+  message('ora object is unnammed')
+  return(list(
+    filtered = filtered,
+    ora = ora
+  ))
+}
+
+
+GRAPH_CONFIG = list(
+  
+  EDGE_COLORING = list(
+    COLOR_UP = "#4285F4",
+    CUTOFF_UP = 1.1,
+    COLOR_DOWN = "#DB4437",
+    CUTOFF_DOWN = 1.1,
+    COLOR_BOTH = "#F4B400",
+    COLOR_ROBUST = "#0F9D58",
+    # COLOR_NONE = "#dde2e4"
+    COLOR_NONE = rgb(0.2, 0.2, 0.2, alpha=0.2)
+  ),
+  
+  EDGE_STYLE = list(
+    ARROW_SIZE = 0.5,
+    WIDTH = 2.5  # will be adjusted by |OR|
+  ),
+  
+  LAYOUT = list(
+    HGAP = 10,
+    VGAP = 10
+  ),
+  
+  VERTEX_STYLE = list(
+    SIZE = 10,
+    LABEL_DIST = 1.5,
+    LABEL_CEX = 1.2,
+    COLOR = '#33FF66'
+  ),
+  
+  LEGEND = list(
+    LEGEND_LABELS = c(
+      'Significant, but small effect',
+      'Upregulated', 
+      'Downregulated', 
+      'Altered'),
+    PCH = c(15),
+    CEX = 0.7,
+    PT.CEX = 1,
+    BG = '#CCCCCC',
+    NCOL = 2
+  )
+  
+)
+
+add_dummy_tissue = function(results) {
+  message(paste0('utils.R add_dummy_tissue: upgrade warning:',
+                 'A constant tissue column `Tissue` with `DummyTissue` value is inserted',
+                 'for backwards compatibility. Will be solved later'))
+  
+  DUMMY_TISSUE = 'DummyTissue'
+  results$scdiffcom_dt_raw$Tissue = DUMMY_TISSUE
+  results$scdiffcom_dt_filtered$Tissue = DUMMY_TISSUE
+  results$ORA$Tissue = DUMMY_TISSUE
+  return(results)
+}
