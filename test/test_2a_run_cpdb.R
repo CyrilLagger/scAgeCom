@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## cyril.lagger@liverpool.ac.uk - October 2020
 ##
 ## Script that show how to run CELLPHONEDB from 
 ## the scDiffCom package.

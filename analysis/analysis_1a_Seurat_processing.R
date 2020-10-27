@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## cyril.lagger@liverpool.ac.uk - October 2020
 ##
 ## Check the scRNA-seq dataset preprocessing.
 ##
@@ -14,6 +14,7 @@
 ## Libraries ####
 
 library(Seurat)
+library(data.table)
 
 ## Paths of the Seurat objects ####
 
@@ -81,6 +82,154 @@ identical(seurat_objects$tms_droplet$n_genes, unique_genes$tms_droplet)
 droplet_n_genes_diff <- seurat_objects$tms_droplet$n_genes - unique_genes$tms_droplet
 droplet_n_genes_diff[droplet_n_genes_diff != 0]
 
+## Add new cell-type naming convention (only do it once, then save the new Seurat objects) ####
+
+celltype_conversion <- read.csv(paste0(dir_data_analysis, "scDiffCom_cell_types.csv"), stringsAsFactors = FALSE)
+celltype_conversion <- celltype_conversion[, c("Tissue", "TMS.Calico.cell.type", "scDiffCom.cell.type")]
+colnames(celltype_conversion) <- c("tissue", "cell_ontology_class", "cell_ontology_scdiffcom")
+setDT(celltype_conversion)
+celltype_conversion <- unique(celltype_conversion)
+
+celltype_check <- celltype_conversion[, c("tissue", "cell_ontology_class")]
+any(duplicated(celltype_check))
+
+#
+md_tms_facs <- seurat_objects$tms_facs[[]]
+md_tms_facs$cell_ontology_class <- as.character(md_tms_facs$cell_ontology_class)
+setDT(md_tms_facs)
+md_tms_facs[
+  celltype_conversion,
+  on = c("tissue", "cell_ontology_class"),
+  cell_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+sort(table(md_tms_facs$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_tms_facs$cell_ontology_scdiffcom))
+anyNA(md_tms_facs$cell_ontology_scdiffcom)
+md_tms_facs[, cell_ontology_scdiffcom := ifelse(is.na(cell_ontology_scdiffcom),
+                                                cell_ontology_class,
+                                                cell_ontology_scdiffcom)]
+sort(table(md_tms_facs$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_tms_facs$cell_ontology_scdiffcom))
+anyNA(md_tms_facs$cell_ontology_scdiffcom)
+identical(as.character(md_tms_facs$cell_ontology_class), as.character(seurat_objects$tms_facs$cell_ontology_class))
+seurat_objects$tms_facs$cell_ontology_scdiffcom <- md_tms_facs$cell_ontology_scdiffcom
+
+#
+md_tms_droplet <- seurat_objects$tms_droplet[[]]
+md_tms_droplet$cell_ontology_class <- as.character(md_tms_droplet$cell_ontology_class)
+setDT(md_tms_droplet)
+md_tms_droplet[
+  celltype_conversion,
+  on = c("tissue", "cell_ontology_class"),
+  cell_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+sort(table(md_tms_droplet$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_tms_droplet$cell_ontology_scdiffcom))
+anyNA(md_tms_droplet$cell_ontology_scdiffcom)
+md_tms_droplet[, cell_ontology_scdiffcom := ifelse(is.na(cell_ontology_scdiffcom),
+                                                   cell_ontology_class,
+                                                   cell_ontology_scdiffcom)]
+sort(table(md_tms_droplet$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_tms_droplet$cell_ontology_scdiffcom))
+anyNA(md_tms_droplet$cell_ontology_scdiffcom)
+identical(as.character(md_tms_droplet$cell_ontology_class), as.character(seurat_objects$tms_droplet$cell_ontology_class))
+seurat_objects$tms_droplet$cell_ontology_scdiffcom <- md_tms_droplet$cell_ontology_scdiffcom
+
+#
+md_calico_kidney <- seurat_objects$calico_kidney[[]]
+md_calico_kidney$cell_type <- as.character(md_calico_kidney$cell_type)
+setDT(md_calico_kidney)
+md_calico_kidney[
+  celltype_conversion[tissue == "Kidney"],
+  on = c("cell_type==cell_ontology_class"),
+  cell_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+sort(table(md_calico_kidney$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_calico_kidney$cell_ontology_scdiffcom))
+anyNA(md_calico_kidney$cell_ontology_scdiffcom)
+md_calico_kidney[, cell_ontology_scdiffcom := ifelse(is.na(cell_ontology_scdiffcom),
+                                                     cell_type,
+                                                     cell_ontology_scdiffcom)]
+anyNA(md_calico_kidney$cell_ontology_scdiffcom)
+md_calico_kidney[
+  celltype_conversion[tissue == "Kidney"],
+  on = c("subtype==cell_ontology_class"),
+  subtype_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+md_calico_kidney[, subtype_ontology_scdiffcom := ifelse(is.na(subtype_ontology_scdiffcom),
+                                                        subtype,
+                                                        subtype_ontology_scdiffcom)]
+identical(md_calico_kidney$cell_ontology_scdiffcom, md_calico_kidney$subtype_ontology_scdiffcom)
+identical(as.character(md_calico_kidney$cell_type), as.character(seurat_objects$calico_kidney$cell_type))
+seurat_objects$calico_kidney$cell_ontology_scdiffcom <- md_calico_kidney$cell_ontology_scdiffcom
+
+#
+md_calico_lung <- seurat_objects$calico_lung[[]]
+md_calico_lung$cell_type <- as.character(md_calico_lung$cell_type)
+setDT(md_calico_lung)
+md_calico_lung[
+  celltype_conversion[tissue == "Lung"],
+  on = c("cell_type==cell_ontology_class"),
+  cell_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+sort(table(md_calico_lung$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_calico_lung$cell_ontology_scdiffcom))
+anyNA(md_calico_lung$cell_ontology_scdiffcom)
+md_calico_lung[, cell_ontology_scdiffcom := ifelse(is.na(cell_ontology_scdiffcom),
+                                                   cell_type,
+                                                   cell_ontology_scdiffcom)]
+anyNA(md_calico_lung$cell_ontology_scdiffcom)
+md_calico_lung[
+  celltype_conversion[tissue == "Lung"],
+  on = c("subtype==cell_ontology_class"),
+  subtype_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+md_calico_lung[, subtype_ontology_scdiffcom := ifelse(is.na(subtype_ontology_scdiffcom),
+                                                      subtype,
+                                                      subtype_ontology_scdiffcom)]
+identical(md_calico_lung$cell_ontology_scdiffcom, md_calico_lung$subtype_ontology_scdiffcom)
+identical(as.character(md_calico_lung$cell_type), as.character(seurat_objects$calico_lung$cell_type))
+seurat_objects$calico_lung$cell_ontology_scdiffcom <- md_calico_lung$cell_ontology_scdiffcom
+
+#
+md_calico_spleen <- seurat_objects$calico_spleen[[]]
+md_calico_spleen$cell_type <- as.character(md_calico_spleen$cell_type)
+setDT(md_calico_spleen)
+md_calico_spleen[
+  celltype_conversion[tissue == "Spleen"],
+  on = c("cell_type==cell_ontology_class"),
+  cell_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+sort(table(md_calico_spleen$cell_ontology_scdiffcom), decreasing = TRUE)
+sort(unique(md_calico_spleen$cell_ontology_scdiffcom))
+anyNA(md_calico_spleen$cell_ontology_scdiffcom)
+md_calico_spleen[, cell_ontology_scdiffcom := ifelse(is.na(cell_ontology_scdiffcom),
+                                                     cell_type,
+                                                     cell_ontology_scdiffcom)]
+anyNA(md_calico_spleen$cell_ontology_scdiffcom)
+md_calico_spleen[
+  celltype_conversion[tissue == "Spleen"],
+  on = c("subtype==cell_ontology_class"),
+  subtype_ontology_scdiffcom := i.cell_ontology_scdiffcom
+  ]
+md_calico_spleen[, subtype_ontology_scdiffcom := ifelse(is.na(subtype_ontology_scdiffcom),
+                                                        subtype,
+                                                        subtype_ontology_scdiffcom)]
+identical(md_calico_spleen$cell_ontology_scdiffcom, md_calico_spleen$subtype_ontology_scdiffcom)
+identical(as.character(md_calico_spleen$cell_type), as.character(seurat_objects$calico_spleen$cell_type))
+seurat_objects$calico_spleen$cell_ontology_scdiffcom <- md_calico_spleen$cell_ontology_scdiffcom
+
+##
+saveRDS(seurat_objects$tms_facs,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_tms_facs.rds")
+saveRDS(seurat_objects$tms_droplet,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_tms_droplet.rds")
+saveRDS(seurat_objects$calico_kidney,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_kidney.rds")
+saveRDS(seurat_objects$calico_lung,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_lung.rds")
+saveRDS(seurat_objects$calico_spleen,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_spleen.rds")
 
 ## Save metadata to be used in other scripts not on the server ####
 
@@ -89,3 +238,16 @@ seurat_md <- lapply(seurat_objects, function(i) {
 })
 
 saveRDS(seurat_md, paste0(dir_data_analysis, "analysis_1_data_seurat_md.rds"))
+
+## Save the spleen tissue for testing
+tms_facs_spleen <- subset(seurat_objects$tms_facs, subset = tissue == "Spleen")
+tms_droplet_spleen <- subset(seurat_objects$tms_droplet, subset = tissue == "Spleen")
+tms_facs_liver <- subset(seurat_objects$tms_facs, subset = tissue == "Liver")
+saveRDS(tms_facs_spleen,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_testing_tms_facs_spleen.rds")
+saveRDS(tms_droplet_spleen,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_testing_tms_droplet_spleen.rds")
+saveRDS(tms_facs_liver,
+        "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_testing_tms_facs_liver.rds")
+
+
