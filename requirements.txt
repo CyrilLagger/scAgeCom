@@ -1,0 +1,11 @@
+data.table
+purrr
+igraph
+glue
+pheatmap
+RColorBrewer
+scales
+arules
+ontoProc
+ontologyIndex
+ontologyPlot
