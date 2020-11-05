@@ -143,7 +143,8 @@ get_celltypes_enrichment <- function(dt, use_adjpval=NULL) {
 
 # Bipartite graph ----
 
-analyze_Graph <- function(dt_ora, 
+analyze_Graph <- function(
+  dt_ora, 
                           dt_filtered,
                           tissue, 
                           config=GRAPH_CONFIG, 

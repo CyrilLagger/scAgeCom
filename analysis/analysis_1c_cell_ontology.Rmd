@@ -1,0 +1,193 @@
+---
+title: "R Notebook"
+---
+
+Cell-ontology analysis and cell-type annotation of TMS and Calico datasets.
+
+First we load the csv file that contains all the cell types and the annotations.
+
+```{r}
+library(data.table)
+DATASET_PATH <- "../../data_scAgeCom/analysis/scDiffCom_cell_types.csv"
+
+cell_types_dt <- setDT(read.csv(DATASET_PATH, stringsAsFactors = FALSE))
+  
+message("Dataset composition:")
+cell_types_dt
+
+message("Datase columns:")
+colnames(cell_types_dt)
+
+```
+
+# Cell-types and families
+
+Look at the content of the table. Note that for now some annotations are unsure, so we just need to clean a bit (e.g. remove special characters)
+
+```{r}
+message("Extract all tissues:")
+tissues <- unique(cell_types_dt$Tissue)
+head(tissues)
+
+message("Extract cell-types as names in the original studies:")
+cell_types_original <- unique(cell_types_dt$TMS.Calico.cell.type)
+head(cell_types_original)
+tissue_cell_types_original <- unique(paste(cell_types_dt$Tissue, cell_types_dt$TMS.Calico.cell.type, sep = "_"))
+head(tissue_cell_types_original)
+
+message("Extract cell-types as renamed for scDiffCom analysis:")
+cell_types_scdiffcom <- unique(cell_types_dt$scDiffCom.cell.type)
+head(cell_types_scdiffcom)
+tissue_cell_types_scdiffcom <- unique(paste(cell_types_dt$Tissue, cell_types_dt$scDiffCom.cell.type, sep = "_"))
+head(tissue_cell_types_scdiffcom)
+
+message("Extract familiy annotation")
+family_annotation <- unique(cell_types_dt$Family...broad)
+family_annotation <- family_annotation[!(family_annotation == "" | grepl("\\+|\\?| or |\\,", family_annotation))]
+sort(family_annotation)
+
+```
+
+# Cell ontology generalities
+
+We'll look at the cell ontology.
+
+General purpose ontology manipulation in R can be done with ontologyX tools (ontologyIndex, ontologyPlot, ontologySimilarity?) and ontoProc offers bio-geared ontology functionality.
+
+```{r}
+library(ontoProc)
+library(ontologyIndex)
+library(ontologyPlot)
+library(purrr)
+```
+
+General ontologies are often stored in .owl format and, in terms of technologies, ontologies can be served by graph databases. OBO, the open biological ontologies foundation, offers bio-related ontologies in .OBO format:
+http://www.obofoundry.org/ontology/cl.html
+
+getCellOnto() can be used to extract ontology and represent it as orthology_index class as defined by the orthologyIndex package. orthologyIndex is a package for general-purpose low-level ontology manipulation.
+
+Let's explore oncoProc functionality
+```{r}
+cl = getCellOnto()  # just be careful with the version of the package/database
+# cl = get_ontology(file='../../data/cl.obo')
+cl_names <- cl$name
+
+cl$name['CL:0000127']
+
+# Plot CL for terms
+cell_v = c("CL:0000492", "CL:0001054", "CL:0000236", "CL:0000625",
+   "CL:0000576", "CL:0000623", "CL:0000451", "CL:0000556")
+onto_plot2(cl, cell_v)
+
+# feats = CLfeats(cl, "CL:0000492")
+
+# Names from cell line ontology
+# cleannames = cleanCLOnames()
+
+# Start app and dataframes with cell types properties
+# ctmarks(cl)
+
+
+# onto_roots(cl)
+recognizedPredicates()
+```
+
+Explore ontologyIndex functionality
+```{r}
+# Explore the data structure
+str(cl, max.level=1)
+term = "CL:0000492"
+cl$name[term]
+cl$parents[term]
+cl$name[cl$ancestors[[term]]]
+
+# Get term properties
+get_term_property(
+    ontology=cl, 
+    property="ancestors",
+    term="CL:0000492",
+    as_names=TRUE
+)
+
+# Remove redundant terms from a set of terms
+terms = c("CL:0000492", "CL:0001054", "CL:0000236", "CL:0000625",
+   "CL:0000576", "CL:0000623")
+minimal = minimal_set(cl, terms)
+
+# Find all ancestors of a set of terms
+ancestors_ids = get_ancestors(cl, terms)
+cl$name[ancestors_ids]
+
+# Operations on subclasses
+# intersection_with_descendants()
+# exclude_descendants()
+# prune_descendants()
+
+properties = names(cl)
+# cl$has_high_plasma_membrane_amount
+
+```
+
+
+# Below: to refresh and add parts from other scripts
+
+
+
+```{r}
+
+# -------- function to plot cell types per tissue and family
+plot_celltypes <- function(dt, tissue=tissues, family=family_annotation, action="save"){
+  our_tissue_cell_types <- subset(dt, Tissue %in% tissue & Family...broad %in% family)
+  #our_tissue_cell_types <- unique(c(our_tissue_cell_types$scDiffCom.cell.type,
+  #                                  our_tissue_cell_types$TMS.Calico.cell.type))
+  # to use only scDiffCom cell types, comment line above and uncomment line below
+  our_tissue_cell_types <- unique(our_tissue_cell_types$scDiffCom.cell.type)
+  
+  tissue_names <- cl_names[cl_names %in% our_tissue_cell_types]
+  
+  if(action == "show"){
+    onto_plot2(cl, names(tissue_names), cex = 0.8)
+  } else {
+    if(length(tissue) == 1 & length(family) == 1){
+      png(file=paste0("Plots/Mixed/",tissue,"_",family,".png"),width=2000, height=1000)
+      onto_plot2(cl, names(tissue_names), cex = 0.8)
+      dev.off()
+    } else if(length(family) == 1 & identical(tissue,all_tissues)) {
+      png(file=paste0("Plots/Families/",family,".png"),width=2000, height=1000)
+      onto_plot2(cl, names(tissue_names), cex = 0.8)
+      dev.off()
+    } else if(length(tissue) == 1 & identical(family,all_cellfamily)) {
+      png(file=paste0("Plots/Tissues/",tissue,".png"),width=2000, height=1000)
+      onto_plot2(cl, names(tissue_names), cex = 0.8)
+      dev.off()
+    } else {
+      onto_plot2(cl, names(tissue_names), cex = 0.8)
+      message("Please save plot manually to give it a proper name")
+    }
+  }
+}
+
+
+# -------- Using function
+
+# Plot and show all cell types for one tissue
+plot_celltypes(tissue = "Liver", action = "show")
+
+# Plot and save one cell type for one tissue
+plot_celltypes(tissue = "Spleen", family = "leukocyte")
+
+# Plot and save all cell types for each tissue
+sapply(all_tissues, function(x){
+  plot_celltypes(tissue = x)
+}
+)
+# Plot and save each cell type families for all tissues
+sapply(all_cellfamily, function(x){
+  plot_celltypes(family = x)
+}
+)
+
+
+```
+
+
