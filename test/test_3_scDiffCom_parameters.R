@@ -171,6 +171,7 @@ scdiffcom_t3_logfc_table <- dcast(
 ggplot(scdiffcom_t3_logfc_table, aes(x = SCT_log, y = SCT_nlog)) + geom_point() + geom_smooth()
 ggplot(scdiffcom_t3_logfc_table, aes(x = SF_nlog, y = SCT_nlog)) + geom_point() + geom_smooth()
 
+ggplot(scdiffcom_t3_logfc_table, aes(x = SF_log, y = SF_nlog)) + geom_point() + geom_smooth(model = "lm")
 
 scdiffcom_t3_distr_params <- lapply(
   scdiffcom_t3,

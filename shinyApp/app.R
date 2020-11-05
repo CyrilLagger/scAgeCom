@@ -1,4 +1,11 @@
-
+####################################################
+##
+## Project: scAgeCom
+##
+## cyril.lagger@liverpool.ac.uk - October 2020
+##
+####################################################
+##
 
 ## Load libraries ####
 
@@ -13,70 +20,103 @@ library(shinyWidgets)
 #to display NA in DT
 options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
 
-## Load data ####
+## Load full data ####
 
-#LR database
 LR6db <- readRDS("data/LR6db_curated.rds")
 cols_to_show_LR6db <- c("LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
                         "DATABASE", "SOURCE", "ANNOTATION", "FAMILY", "SUBFAMILY")
 
-#scDiffCom results
-scdiffcom_data <- readRDS("data/a4_data_diffcom_all_filtered.rds")
-lapply(scdiffcom_data, function(data) {
-  data$results[, L_TCT := paste(TISSUE, L_CELLTYPE, sep = "_")]
-  data$results[, R_TCT := paste(TISSUE, R_CELLTYPE, sep = "_")]
-  data$results[, LOG2FC := LOGFC*log2(exp(1))]
-  data$results[, Direction := ifelse(
-    CASE_TYPE == "TFTD", "Down (disappears)",
-    ifelse(
-      CASE_TYPE == "TTTD", "Down",
-      ifelse(
-        CASE_TYPE == "TTTU", "Up",
-        ifelse(
-          CASE_TYPE == "FTTU", "Up (appears)",
-          "Flat"
-        )
+scdiffcom_data <- readRDS("data/a4_data_results_nlog.rds")
+
+## Process filtered data ####
+
+scdiffcom_data_filtered <- rbindlist(
+  lapply(
+    scdiffcom_data,
+    function(i) {
+      rbindlist(
+        lapply(
+          i,
+          function(tiss) {
+            tiss$scdiffcom_dt_filtered
+          }
+        ),
+        use.names = TRUE,
+        idcol = "TISSUE",
+        fill = TRUE
       )
-    )
-  )]
-  setnames(
-    data$results,
-    old = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF"),
-    new = c("Emitter cell type", "Receiver cell type", "Adj. P-value")
-  )
-  return(data)
-})
-#cols_to_show_scdiffcom <- c("TISSUE", "LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3", "Emitter cell type", "Receiver cell type",
-#                            "LOG2FC", "Adj. P-value", "Direction")
-
-cols_to_show_scdiffcom <- c("TISSUE", "LR_NAME", "Emitter cell type", "Receiver cell type",
-                          "LOG2FC", "Adj. P-value", "Direction")
+    }
+  ),
+  use.names = TRUE,
+  idcol = "DATASET"
+)
+scdiffcom_data_filtered[, c("L_TCT", "R_TCT", "LOG2FC") := list(
+  paste(TISSUE, L_CELLTYPE, sep = ": "),
+  paste(TISSUE, R_CELLTYPE, sep = ": "),
+  LOGFC*log2(exp(1))
+)]
+dataset_name_conversion <- data.table(
+  old_names = unique(scdiffcom_data_filtered$DATASET),
+  Dataset = c("Calico Data", "TMS Droplet Data", "TMS FACS Data")
+)
+scdiffcom_data_filtered[dataset_name_conversion, on = "DATASET==old_names", Dataset := i.Dataset]
+setnames(
+  scdiffcom_data_filtered,
+  old = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF", "LR_NAME"),
+  new = c("Emitter cell type", "Receiver cell type", "Adj. P-value", "LR_GENES")
+)
+cols_to_show_scdiffcom <- c("TISSUE", "LR_GENES", "Emitter cell type", "Receiver cell type",
+                          "LOG2FC", "Adj. P-value", "REGULATION")
 cols_numeric_scdiffcom <- c("LOG2FC", "Adj. P-value")
-#names(scdiffcom_data) <- lapply(scdiffcom_data, function(i) {i$id})
 
-#ORA data
-ora_data <- readRDS("data/a4_data_ora.rds")
-ora_data <- lapply(ora_data, function(data) {
-  setnames(
-    data,
-    old = c("OR", "pval_adjusted", "OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN"),
-    new = c("Odds Ratio", "Adj. P-value", "Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down")
-  )
-  return(data)
-})
-cols_to_show_ora <- c("Tissue", "Category", "Value", "Odds Ratio",
-                      "Adj. P-value", "Odds Ratio Up", "Adj. P-value Up",
-                      "Odds Ratio Down", "Adj. P-value Down")
-cols_numeric_ora<- c("Odds Ratio", "Adj. P-value", "Odds Ratio Up", "Adj. P-value Up",
-                     "Odds Ratio Down", "Adj. P-value Down")
+## Process ORA data ####
+
+scdiffcom_data_ora <- rbindlist(
+  lapply(
+    scdiffcom_data,
+    function(i) {
+      rbindlist(
+        lapply(
+          i,
+          function(tiss) {
+            tiss$ORA
+          }
+        ),
+        use.names = TRUE,
+        idcol = "TISSUE",
+        fill = TRUE
+      )
+    }
+  ),
+  use.names = TRUE,
+  idcol = "DATASET"
+)
+scdiffcom_data_ora[dataset_name_conversion, on = "DATASET==old_names", Dataset := i.Dataset]
+setnames(
+  scdiffcom_data_ora,
+  old = c("OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN",
+          "OR_DIFF", "pval_adjusted_DIFF", "OR_FLAT", "pval_adjusted_FLAT"),
+  new = c("Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down",
+          "Odds Ratio", "Adj. P-value", "Odds Ratio Stable", "Adj. P-value Stable")
+)
+cols_to_show_ora <- c("TISSUE", "Category", "Value",
+                      "Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down",
+                      "Odds Ratio", "Adj. P-value", "Odds Ratio Stable", "Adj. P-value Stable")
+cols_numeric_ora<- c("Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down",
+                     "Odds Ratio", "Adj. P-value", "Odds Ratio Stable", "Adj. P-value Stable")
 
 ## Utility functions ####
 
-show_DT <- function(data, cols_to_show, cols_numeric) {
-  res <- DT::datatable(data[, ..cols_to_show],
-                options = list(
-                  pageLength = 10
-                )
+show_DT <- function(
+  data,
+  cols_to_show,
+  cols_numeric
+) {
+  res <- DT::datatable(
+    data[, ..cols_to_show],
+    options = list(
+      pageLength = 10
+    )
   ) 
   if(!is.null(cols_numeric)) {
     res <- DT::formatSignif(res, columns = cols_numeric, digits = 3 )
@@ -84,8 +124,10 @@ show_DT <- function(data, cols_to_show, cols_numeric) {
   return(res)
 }
 
-show_volcano <- function(data) {
-  ggplot(data, aes(x = LOG2FC, y = -log10(`Adj. P-value` + 1E-4))) +
+show_volcano <- function(
+  data
+  ) {
+  ggplot(data, aes(x = LOG2FC, y = -log10(`Adj. P-value` + 1E-3))) +
     geom_point() +
     geom_hline(yintercept = -log10(0.05)) +
     geom_vline(xintercept = log2(1.1)) +
@@ -97,9 +139,11 @@ show_volcano <- function(data) {
     theme(text=element_text(size=20))
 }
 
+## Shiny  UI code ####
+
 ui <- fluidPage(
   navbarPage(
-    "Age-related changes in mouse intercellular communication. (For testing only!)",
+    "Age-related changes in mouse intercellular communication. (Alpha version)",
     tabPanel(
       "Main Results",
       sidebarLayout(
@@ -107,7 +151,7 @@ ui <- fluidPage(
           selectInput(
             inputId = "dataset_selection",
             label = "Dataset",
-            choices = names(scdiffcom_data)
+            choices = unique(scdiffcom_data_filtered$Dataset)
           ),
           uiOutput("tissue_selection"),
           uiOutput("ligand_cell_selection"),
@@ -137,19 +181,14 @@ ui <- fluidPage(
           selectInput(
             inputId = "ora_dataset_selection",
             label = "Dataset",
-            choices = names(scdiffcom_data)
+            choices = unique(scdiffcom_data_ora$Dataset)
           ),
           uiOutput("ora_tissue_selection"),
           uiOutput("ora_category_selection"),
           selectInput(
             inputId = "ora_direction",
             label = "Direction",
-            choices = list("Up", "Down", "Both")
-          ),
-          selectInput(
-            inputId = "ora_correlation",
-            label = "Correlation",
-            choices = list("Change", "Stable")
+            choices = list("Up", "Down", "Either direction", "Stable")
           ),
           sliderInput(
             inputId = "ora_slider_pvalue",
@@ -191,13 +230,15 @@ ui <- fluidPage(
   )
 )
 
+## Shiny server code ####
+
 server <- function(input, output) {
   output$tissue_selection <- renderUI({
     pickerInput(
       inputId = "tissue_select",
       "Tissue",
-      choices = scdiffcom_data[[input$dataset_selection]]$tissues,
-      selected = scdiffcom_data[[input$dataset_selection]]$tissues,
+      choices = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection][["TISSUE"]])),
+      selected = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection][["TISSUE"]])),
       options = list(`actions-box` = TRUE),
       multiple = T
     )
@@ -206,8 +247,8 @@ server <- function(input, output) {
     pickerInput(
       inputId = "L_cell_select",
       "Emitter cell Type",
-      choices = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, L_TCT]),
-      selected = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, L_TCT]),
+      choices = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, L_TCT])),
+      selected = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, L_TCT])),
       options = list(`actions-box` = TRUE),
       multiple = T
     )
@@ -216,8 +257,8 @@ server <- function(input, output) {
     pickerInput(
       inputId = "R_cell_select",
       "Receiver cell Type",
-      choices = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, R_TCT]),
-      selected = unique(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select, R_TCT]),
+      choices = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, R_TCT])),
+      selected = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, R_TCT])),
       options = list(`actions-box` = TRUE),
       multiple = T
     )
@@ -227,7 +268,7 @@ server <- function(input, output) {
       inputId = "slider_log2fc",
       label = "LOG2FC filter",
       min = 0, 
-      max = max(ceiling(abs(scdiffcom_data[[input$dataset_selection]]$results$LOG2FC))),
+      max = min(max(ceiling(abs(scdiffcom_data_filtered[Dataset %in% input$dataset_selection][["LOG2FC"]]))), 12),
       value = 0,
       step = 0.01
     )
@@ -236,29 +277,35 @@ server <- function(input, output) {
     req(input$tissue_select, input$L_cell_select, input$R_cell_select)
     show_DT(
       setorder(
-        scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select &
-                                                  L_TCT %in% input$L_cell_select &
-                                                  R_TCT %in% input$R_cell_select &
-                                                  `Adj. P-value` <= input$slider_pvalue &
-                                                  abs(LOG2FC) >= input$slider_log2fc],
+        scdiffcom_data_filtered[
+          Dataset %in% input$dataset_selection &
+            TISSUE %in% input$tissue_select &
+            L_TCT %in% input$L_cell_select &
+            R_TCT %in% input$R_cell_select &
+            `Adj. P-value` <= input$slider_pvalue &
+            abs(LOG2FC) >= input$slider_log2fc
+          ],
         -LOG2FC,
         `Adj. P-value`
       ),
-            cols_to_show_scdiffcom, cols_numeric_scdiffcom)
+      cols_to_show_scdiffcom, cols_numeric_scdiffcom)
   })
   output$scdiffcom_volcano <- renderPlot({
     req(input$tissue_select, input$L_cell_select, input$R_cell_select)
-    show_volcano(scdiffcom_data[[input$dataset_selection]]$results[TISSUE %in% input$tissue_select &
-                                                           L_TCT %in% input$L_cell_select &
-                                                           R_TCT %in% input$R_cell_select &
-                                                           `Adj. P-value` <= input$slider_pvalue &
-                                                           abs(LOG2FC) >= input$slider_log2fc])
+    show_volcano(scdiffcom_data_filtered[
+      Dataset %in% input$dataset_selection &
+        TISSUE %in% input$tissue_select &
+        L_TCT %in% input$L_cell_select &
+        R_TCT %in% input$R_cell_select &
+        `Adj. P-value` <= input$slider_pvalue &
+        abs(LOG2FC) >= input$slider_log2fc
+      ])
   })
   output$ora_tissue_selection <- renderUI({
     pickerInput(
       inputId = "ora_tiss_select",
       "Tissue",
-      choices = unique(ora_data[[input$ora_dataset_selection]][, Tissue]),
+      choices = sort(unique(scdiffcom_data_ora[Dataset %in% input$ora_dataset_selection][["TISSUE"]])),
       options = list(`actions-box` = TRUE),
       multiple = FALSE
     )
@@ -267,42 +314,41 @@ server <- function(input, output) {
     pickerInput(
       inputId = "ora_cat_select",
       "Category",
-      choices = unique(ora_data[[input$ora_dataset_selection]][Tissue %in% input$ora_tiss_select, Category]),
+      choices = sort(unique(scdiffcom_data_ora[
+        Dataset %in% input$ora_dataset_selection &
+          TISSUE %in% input$ora_tiss_select
+        ][["Category"]])),
       options = list(`actions-box` = TRUE),
       multiple = FALSE
     )
   })
   output$ora_table <- DT::renderDataTable({
     req(input$ora_tiss_select, input$ora_cat_select)
-    data <- ora_data[[input$ora_dataset_selection]][Tissue %in% input$ora_tiss_select &
-                                                  Category %in% input$ora_cat_select]
+    data <- scdiffcom_data_ora[
+      Dataset %in% input$ora_dataset_selection & 
+        TISSUE %in% input$ora_tiss_select &
+        Category %in% input$ora_cat_select
+      ]
     if(input$ora_direction == "Up") {
-      if(input$ora_correlation == "Change") {
-        data <- data[`Odds Ratio Up` >= 1, c("Tissue", "Category", "Value", "Odds Ratio Up", "Adj. P-value Up")]
-      } else {
-        data <- data[`Odds Ratio Up` <= 1, c("Tissue", "Category", "Value", "Odds Ratio Up", "Adj. P-value Up")]
-      }
+      data <- data[`Odds Ratio Up` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio Up", "Adj. P-value Up")]
       data <- data[`Adj. P-value Up` <= input$ora_slider_pvalue]
       setorder(data, `Adj. P-value Up`)
       cols_numeric <- c("Odds Ratio Up", "Adj. P-value Up")
     } else if(input$ora_direction == "Down") {
-      if(input$ora_correlation == "Change") {
-        data <- data[`Odds Ratio Down` >= 1, c("Tissue", "Category", "Value", "Odds Ratio Down", "Adj. P-value Down")]
-      } else {
-        data <- data[`Odds Ratio Down` <= 1, c("Tissue", "Category", "Value", "Odds Ratio Down", "Adj. P-value Down")]
-      }
+      data <- data[`Odds Ratio Down` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio Down", "Adj. P-value Down")]
       data <- data[`Adj. P-value Down` <= input$ora_slider_pvalue]
       setorder(data, `Adj. P-value Down`)
       cols_numeric <- c("Odds Ratio Down", "Adj. P-value Down")
-    } else if(input$ora_direction == "Both") {
-      if(input$ora_correlation == "Change") {
-        data <- data[`Odds Ratio` >= 1, c("Tissue", "Category", "Value", "Odds Ratio", "Adj. P-value")]
-      } else {
-        data <- data[`Odds Ratio` <= 1, c("Tissue", "Category", "Value", "Odds Ratio", "Adj. P-value")]
-      }
+    } else if(input$ora_direction == "Either direction") {
+      data <- data[`Odds Ratio` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio", "Adj. P-value")]
       data <- data[`Adj. P-value` <= input$ora_slider_pvalue]
       setorder(data, `Adj. P-value`)
       cols_numeric <- c("Odds Ratio", "Adj. P-value")
+    } else if(input$ora_direction == "Stable") {
+      data <- data[`Odds Ratio Stable` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio Stable", "Adj. P-value Stable")]
+      data <- data[`Adj. P-value Stable` <= input$ora_slider_pvalue]
+      setorder(data, `Adj. P-value Stable`)
+      cols_numeric <- c("Odds Ratio Stable", "Adj. P-value Stable")
     }
     show_DT(
       data,
@@ -349,4 +395,9 @@ server <- function(input, output) {
   })
 }
 
-shinyApp(ui = ui, server = server)
+## Shiny final call ####
+
+shinyApp(
+  ui = ui,
+  server = server
+)
