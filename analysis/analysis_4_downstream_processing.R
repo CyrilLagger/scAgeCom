@@ -305,6 +305,68 @@ DATASETS_light <- lapply(
 
 
 ##################
+table(DATASETS_light$calico_nlog$Kidney$scdiffcom_dt_filtered$LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG)
+
+DATASETS_light$calico_nlog$Kidney$scdiffcom_dt_filtered[, .N, by = c("LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG",
+                                                                     "LR_DETECTED_AND_SIGNIFICANT_IN_OLD",
+                                                                     "REGULATION") ]
+
+
+reg_counts <- rbindlist(
+  lapply(
+    DATASETS_light,
+    function(i) {
+      rbindlist(
+        lapply(
+          i,
+          function(tiss) {
+            tiss$scdiffcom_dt_filtered[, .N, by = c("LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG",
+                                                    "LR_DETECTED_AND_SIGNIFICANT_IN_OLD",
+                                                    "REGULATION_SIMPLE") ][, V1 := N/sum(N)*100]
+          }
+        ),
+        use.names = TRUE,
+        idcol = "Tissue"
+      )
+    }
+  ),
+  use.names = TRUE,
+  idcol = "Dataset"
+)
+
+reg_counts[, dataset := gsub("\\_.*","", Dataset)]
+reg_counts[, temp := paste(dataset, REGULATION_SIMPLE, sep = "_")]
+reg_counts <- reg_counts[ order(REGULATION_SIMPLE)]
+
+ggplot(reg_counts, aes(x= REGULATION_SIMPLE, y = V1)) + geom_boxplot() + facet_grid(vars(dataset))
+ggplot(reg_counts[Tissue %in% c("Spleen", "Kidney", "Lung")], aes(x= REGULATION_SIMPLE, y = V1)) + geom_boxplot() + facet_grid(vars(dataset))
+ggplot(reg_counts[Tissue %in% c("Spleen", "Kidney", "Lung")], aes(x= temp, y = V1)) + geom_boxplot()
+
+
+######
+
+
+reg_counts_facs2 <- dcast(
+  reg_counts_facs,
+  formula = Tissue ~ LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG + LR_DETECTED_AND_SIGNIFICANT_IN_OLD + REGULATION,
+  value.var = "V1"
+)
+
+
+
+
+reg_counts_droplet <- reg_counts$droplet_nlog
+reg_counts_droplet[, temp := paste(LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG, LR_DETECTED_AND_SIGNIFICANT_IN_OLD, REGULATION, sep = "_")]
+reg_counts_droplet2 <- dcast(
+  reg_counts_droplet,
+  formula = Tissue ~ LR_DETECTED_AND_SIGNIFICANT_IN_YOUNG + LR_DETECTED_AND_SIGNIFICANT_IN_OLD + REGULATION,
+  value.var = "V1"
+)
+
+ggplot(reg_counts_droplet, aes(x= temp, y = V1)) + geom_boxplot()
+
+
+
 
 library(ontoProc)
 onto_go <- getGeneOnto()
@@ -335,7 +397,7 @@ DATASET_GO <- lapply(
 
 
 test <- scDiffCom::run_ORA(
-  scdiffcom_result = DATASETS_light$facs_nlog$Liver,
+  scdiffcom_result = DATASETS_light$droplet_nlog$Limb_Muscle,
   verbose = TRUE,
   categories = c("L_CELLTYPE", "R_CELLTYPE", "LR_CELLTYPE", "LR_NAME",
                  "GO"),
@@ -350,8 +412,6 @@ ggplot(test$scdiffcom_dt_filtered, aes(x = LOGFC, y = -log10(BH_PVAL_DIFF+1E-4))
   geom_point()
 
 test_ora <- test$ORA
-
-
 
 test_ora <- merge.data.table(
   test_ora,
@@ -395,10 +455,13 @@ test_ora[pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1 & Category == "LR_CELLTYPE"]$
 
 
 ggplot(test_ora_goInter_up, aes(x = log10(OR_UP), y = -log10(pval_adjusted_UP), label = name )) + geom_point() +
-  geom_text(aes(label=ifelse(OR_UP >= 20, name, "")), position=position_jitter(width=0.1,height=0.1))
+  geom_text(aes(label=ifelse(OR_UP >= 1, name, "")), position=position_jitter(width=0.1,height=0.1))
 
 ggplot(test_ora_goInter_down, aes(x = log10(OR_DOWN), y = -log10(pval_adjusted_DOWN), label = name )) + geom_point() +
   geom_text(aes(label=ifelse(OR_DOWN >= 1, name, "")), position=position_jitter(width=0.1,height=0.11))
+
+
+intersect(test_ora_goInter_up$name, test_ora_goInter_down$name)
 
 test_ora_goInter_up[order(pval_adjusted_UP)][1:50]$name
 onto_plot2(onto_go, exclude_descendants(onto_go, c("GO:0003674" ,"GO:0005575") , 

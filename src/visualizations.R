@@ -19,6 +19,9 @@ build_heatmaps <- function(dt, dir_path) {
   for (tissue in tissues) {
     
     dt_edge = dt[Tissue == tissue, 2:ncols]
+    
+    print(colnames(dt_edge))
+    
     nrows = dim(dt_edge)[1]
     if (nrows == 1) {message(paste0("One edge for: ", tissue))}
     
@@ -380,11 +383,12 @@ construct_graph <- function(dt_ora, tissue, dt_filtered=NULL) {
 }
 
 infer_vertex_types <- function(vertex_names) {
-  
+  print(vertex_names)
   vertex_types = map_lgl(
     strsplit(vertex_names, '[()]'),
-    ~ .x[2] == 'L',
+    ~ .x[2] == 'L'
   )
+  print(vertex_types)
   return(vertex_types)
 }
 
