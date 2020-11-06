@@ -64,18 +64,19 @@ LR_t1 <- scDiffCom::LR6db$LR6db_curated
 #       --uncomment the lines if you want to test it
 #       --scdiffcom can be run in parallel through the future package
 
-?run_scdiffcom
+?run_interaction_analysis
 future::plan(sequential)
 scdiffcom_t1 <- lapply(
-  seurat_objects_t1,
+  seq_along(seurat_objects_t1),
   function(i) {
-    run_scdiffcom(
-      seurat_object = i,
+    run_interaction_analysis(
+      seurat_object = seurat_objects_t1[[i]],
       LR_object = LR_t1,
-      celltype_col_id = "cell_ontology_scdiffcom",
-      condition_col_id = "age_group",
+      celltype_column_id  = "cell_ontology_scdiffcom",
+      condition_column_id = "age_group",
       cond1_name = "YOUNG",
       cond2_name = "OLD",
+      object_name = names(seurat_objects_t1[[i]]), 
       assay = "RNA",
       slot = "data",
       log_scale = TRUE,
