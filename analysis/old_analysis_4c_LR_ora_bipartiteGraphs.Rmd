@@ -13,9 +13,18 @@ library(scales)
 library(igraph)
 
 
-RESULTS_PATH = '../../data_scAgeCom/testing/scdiffcom_tms_facs_mixed_Spleen.rds'
-results = readRDS(RESULTS_PATH)
+#RESULTS_PATH = '../../data_scAgeCom/testing/scdiffcom_tms_facs_mixed_Spleen.rds'
+#results = readRDS(RESULTS_PATH)
+results <- readRDS("../../data_scAgeCom/analysis/a4_data_results_nlog.rds")
+results <- results$droplet_nlog$Limb_Muscle
 
+results$ORA$OR_UP[is.infinite(results$ORA$OR_UP)] <- max(results$ORA$OR_UP[is.finite(results$ORA$OR_UP)])
+results$ORA$OR_DOWN[is.infinite(results$ORA$OR_DOWN)] <- max(results$ORA$OR_DOWN[is.finite(results$ORA$OR_DOWN)])
+results$ORA$OR_DIFF[is.infinite(results$ORA$OR_DIFF)] <- max(results$ORA$OR_DIFF[is.finite(results$ORA$OR_DIFF)])
+
+results$ORA$OR_UP[results$ORA$OR_UP == 0] <- min(results$ORA$OR_UP[results$ORA$OR_UP > 0])
+results$ORA$OR_DOWN[results$ORA$OR_DOWN == 0] <- min(results$ORA$OR_DOWN[results$ORA$OR_DOWN > 0])
+results$ORA$OR_DIFF[results$ORA$OR_DIFF == 0] <- min(results$ORA$OR_DIFF[results$ORA$OR_DIFF > 0])
 source('../src/utils.R')
 results = add_dummy_tissue(results)
 

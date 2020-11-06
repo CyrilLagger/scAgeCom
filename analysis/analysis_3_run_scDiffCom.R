@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - October 2020
+## cyril.lagger@liverpool.ac.uk - November 2020
 ##
 ## Apply scDiffCom to all three datasets.
 ##
@@ -24,7 +24,7 @@ options(progressr.enable = TRUE)
 
 normalization <- "size_factor"
 min_cells <- 5
-is_log <- TRUE
+is_log <- FALSE
 n_iter <- 10000
 dir_data_output <- getwd()
 run_test <- FALSE
@@ -49,13 +49,13 @@ analysis_list <- list(
   list(dataset = "calico", type = "default"),
   #list(dataset = "calico", type = "subtype")#,
   list(dataset = "tms_facs", type = "mixed"),
-  list(dataset = "tms_facs", type = "female"),
-  list(dataset = "tms_facs", type = "male"),
-  list(dataset = "tms_facs", type = "sex"),
-  list(dataset = "tms_droplet", type = "mixed"),
-  list(dataset = "tms_droplet", type = "female"),
-  list(dataset = "tms_droplet", type = "male"),
-  list(dataset = "tms_droplet", type = "sex")
+  #list(dataset = "tms_facs", type = "female"),
+  #list(dataset = "tms_facs", type = "male"),
+  #list(dataset = "tms_facs", type = "sex"),
+  list(dataset = "tms_droplet", type = "mixed")#,
+  #list(dataset = "tms_droplet", type = "female"),
+  #list(dataset = "tms_droplet", type = "male"),
+  #list(dataset = "tms_droplet", type = "sex")
 )
 
 ## Do the analysis ####
@@ -155,13 +155,14 @@ for(analysis in analysis_list) {
     DefaultAssay(seurat_tiss) <- "RNA"
     message("Size-factor normalization:")
     seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
-    dt_res <- scDiffCom::run_scdiffcom(
+    dt_res <- scDiffCom::run_interaction_analysis(
       seurat_obj = seurat_tiss,
       LR_object = LR6db_curated,
-      celltype_col_id = cell_type_id,
-      condition_col_id = condition_id,
+      celltype_column_id = cell_type_id,
+      condition_column_id = condition_id,
       cond1_name = cond1_name,
       cond2_name = cond2_name,
+      object_name = tiss,
       assay = "RNA",
       slot = "data",
       log_scale = is_log,
@@ -172,7 +173,7 @@ for(analysis in analysis_list) {
       cutoff_quantile_score = 0.25,
       cutoff_pval_specificity = 0.05,
       cutoff_pval_de = 0.05,
-      cutoff_logfc = log(1.1),
+      cutoff_logfc = log(1.2),
       return_distr = FALSE,
       seed = 42,
       verbose = TRUE,
