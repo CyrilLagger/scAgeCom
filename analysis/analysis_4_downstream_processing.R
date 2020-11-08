@@ -13,8 +13,8 @@
 ## Libraries ####
 library(scDiffCom)
 library(data.table)
-library(clusterProfiler)
-library(org.Mm.eg.db)
+#library(clusterProfiler)
+#library(org.Mm.eg.db)
 
 ## Specify the directory with scDiffCom results ####
 dir_results <- "../data_scAgeCom/scdiffcom_results/"
@@ -43,92 +43,64 @@ DATASETS <- lapply(
 
 ## Set the names manually, be careful to check what you are doing ####
 RESULT_PATHS
-names(DATASETS) <- c("calico_nlog", "calico_log", "droplet_nlog", "droplet_log", "facs_nlog", "facs_log")
+names(DATASETS) <- c("calico_nlog")#, "calico_log", "droplet_nlog", "droplet_log", "facs_nlog", "facs_log")
 
 ## Let us focus on the not log-transformed data and change some parameters ####
 
 # Based on our test analysis we choose to focus on the non-log-transformed
 DATASETS <- DATASETS[grepl("_nlog", names(DATASETS))]
 
-test <- DATASETS$droplet_nlog$Kidney
+get_reg_pct_behaviour <- function(
+  object,
+  logfc_cuts,
+  score_cuts
+) {
+  rbindlist(
+    lapply(
+      logfc_cuts,
+      function(logfc_cut) {
+        rbindlist(
+          lapply(
+            score_cuts,
+            function(score_cut) {
+              temp_obj <- run_filtering_and_ORA(
+                object = object,
+                new_cutoff_quantile_score = score_cut,
+                new_cutoff_logfc = logfc_cut,
+                skip_ORA = TRUE
+              )
+              dt <- scDiffCom:::get_cci_table_filtered(temp_obj)
+              res <- dt[, .N, by = c("REGULATION")][, pct := N/sum(N)*100]
+            }
+          ),
+          use.names = TRUE,
+          idcol = "score_cut"
+        )
+      }
+    ),
+    use.names = TRUE,
+    idcol = "logfc_cut"
+  )
+}
 
-test <- run_filtering_and_ORA(test)
+logfc_cuts <- c(1.1, 1.2, 1.3, 1.4, 1.5)
+names(logfc_cuts) <- logfc_cuts
+logfc_cuts <- log(logfc_cuts)
 
-test <- scDiffCom:::run_scoring(test, categories = "GO")
+score_cuts <- c(0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4)
+names(score_cuts) <- score_cuts
 
-test2 <- test$SCORES
-test2 <- test2[Category == "GO_UNION"]
-
-test3 <- test$ORA
-test3 <- test3[Category == "GO_intersection"]
-test3 <- test3[pval_UP <- 0.05 & OR_UP >= 1]
+pct_reg_dt <- get_reg_pct_behaviour(DATASETS$calico_nlog$Lung, logfc_cuts = logfc_cuts, score_cuts = score_cuts)
 
 
-test3b <- test3[Category == "LR_NAME"]
+ggplot(pct_reg_dt[REGULATION == "FLAT"], aes(x = logfc_cut, y = pct)) + geom_point() +
+  facet_grid(vars(score_cut))
 
-test4 <- merge.data.table(
-  test3,
-  test2,
-  by = c("Value", "Category"),
-  all = TRUE
-)
+ggplot(pct_reg_dt[REGULATION == "FLAT"], aes(x = logfc_cut, y = pct, color = score_cut)) + geom_point()
 
-plot(test4$OR_UP, test4$pval_UP)
-plot(test4$DIFF, test4$pval_UP)
-plot(test4$OR_UP, test4$DIFF)
+ggplot(pct_reg_dt[REGULATION == "FLAT"], aes(x = logfc_cut, y = N, color = score_cut)) + geom_point()
 
-plot(test4$DIFF, -log10(test4$pval_UP))
-
-test4 <- test4[, c("Value", "Category", "OR_UP", "pval_UP", "OR_DOWN", "pval_DOWN", "SCORE_UP", "SCORE_DOWN", "DIFF")]
-
-test5 <- merge.data.table(
-  test3,
-  go_id_name_dt,
-  by.x = "Value",
-  by.y = "ID",
-  all.x = TRUE
-)
-
-test6 <- test5[pval_UP <= 0.01 & OR_UP >= 1]
-test7 <- test5[pval_DOWN <= 0.01 & OR_DOWN >= 1]
-test8 <- test7[OR_UP <= 1]
-
-ggplot(test$scdiffcom_dt_filtered, aes(x = LOGFC, color = REGULATION_SIMPLE)) +
-  geom_histogram(bins = 100, position = "identity", alpha = 0.5) 
-  scale_y_log10()
-
-ggplot(test$scdiffcom_dt_filtered[REGULATION_SIMPLE == "UP"], aes(x = LOGFC)) + geom_histogram(bins = 100)
-
-ggplot(test$scdiffcom_dt_filtered, aes(x = LOGFC)) +
-  geom_histogram(bins = 500)
-
-unique(testp$LR)
-
-testp <- test$scdiffcom_dt_filtered
-testp$ap <- ifelse(testp$LR_NAME == "Sost:Lrp5", TRUE, FALSE)
-
-ggplot(testp, aes(x = LOGFC, y = -log10(BH_PVAL_DIFF+ 1E-4), color = ap)) +
-  geom_point() 
-
-theme(legend.position = "none")
-
-ggplot(test$scdiffcom_dt_filtered, aes(x = LOGFC)) +
-  geom_density()
-
-hist(test$scdiffcom_dt_filtered[LIGAND_1 == "Ccl5"]$LOGFC, breaks = 10)
-
-mean(test$scdiffcom_dt_filtered[LR_NAME == "Arpc5:Adrb2"]$LOGFC)
-
-distr1 <- test$scdiffcom_dt_filtered[LIGAND_1 == "Ccl5"]$LOGFC
-distr2 <- test$scdiffcom_dt_filtered[LR_NAME != "Arpc5:Adrb2"]$LOGFC
-distr3 <- test$scdiffcom_dt_filtered$LOGFC
-
-ks.test(distr1, distr2)
-ks.test(distr1, distr3)
-
-t.test(distr1,distr3)
-wilcox.test(distr1,distr3)
-
+ggplot(pct_reg_dt[REGULATION == "UP"], aes(x = logfc_cut, y = N, color = score_cut)) + geom_point()
 ## Varies some parameters ####
 
 DATASETS_new <- lapply(
@@ -274,13 +246,13 @@ lapply(
       i,
       function(tiss) {
         tiss$scdiffcom_dt_filtered[,
-          GENAGE := ifelse(
-            LIGAND_1 %in% genage_mouse$Gene.Symbol | LIGAND_2 %in% genage_mouse$Gene.Symbol |
-              RECEPTOR_1 %in% genage_mouse$Gene.Symbol | RECEPTOR_2 %in% genage_mouse$Gene.Symbol,
-            "longevity associated",
-            "not longevity associated"
-          )
-          ]
+                                   GENAGE := ifelse(
+                                     LIGAND_1 %in% genage_mouse$Gene.Symbol | LIGAND_2 %in% genage_mouse$Gene.Symbol |
+                                       RECEPTOR_1 %in% genage_mouse$Gene.Symbol | RECEPTOR_2 %in% genage_mouse$Gene.Symbol,
+                                     "longevity associated",
+                                     "not longevity associated"
+                                   )
+                                   ]
       }
     )
   }
@@ -448,8 +420,8 @@ ggplot(test_ora[pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1 & Category == "LR_CELL
   geom_text(aes(label = Value))
 
 intersect(
-test_ora[pval_adjusted_UP <= 0.05 & OR_UP >= 1 & Category == "LR_CELLTYPE"]$Value,
-test_ora[pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1 & Category == "LR_CELLTYPE"]$Value
+  test_ora[pval_adjusted_UP <= 0.05 & OR_UP >= 1 & Category == "LR_CELLTYPE"]$Value,
+  test_ora[pval_adjusted_DOWN <= 0.05 & OR_DOWN >= 1 & Category == "LR_CELLTYPE"]$Value
 )
 
 
@@ -469,7 +441,7 @@ onto_plot2(onto_go, exclude_descendants(onto_go, c("GO:0003674" ,"GO:0005575") ,
 
 
 onto_plot2(onto_go, remove_links(onto_go, exclude_descendants(onto_go, c("GO:0003674" ,"GO:0005575") , 
-                                        test_ora_goInter_up[order(pval_adjusted_UP)]$Value), hard = TRUE))
+                                                              test_ora_goInter_up[order(pval_adjusted_UP)]$Value), hard = TRUE))
 
 
 
