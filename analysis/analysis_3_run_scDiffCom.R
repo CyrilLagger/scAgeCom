@@ -46,22 +46,23 @@ LR6db_curated <- scDiffCom::LR6db$LR6db_curated
 ## List of analysis to do over datasets and sex
 
 analysis_list <- list(
-  list(dataset = "calico", type = "default"),
+  #list(dataset = "calico", type = "default"),
   #list(dataset = "calico", type = "subtype")#,
-  list(dataset = "tms_facs", type = "mixed"),
+  #list(dataset = "tms_facs", type = "mixed"),
   #list(dataset = "tms_facs", type = "female"),
   #list(dataset = "tms_facs", type = "male"),
   #list(dataset = "tms_facs", type = "sex"),
-  list(dataset = "tms_droplet", type = "mixed")#,
+  #list(dataset = "tms_droplet", type = "mixed")#,
   #list(dataset = "tms_droplet", type = "female"),
   #list(dataset = "tms_droplet", type = "male"),
-  #list(dataset = "tms_droplet", type = "sex")
+  #list(dataset = "tms_droplet", type = "sex"),
+  list(dataset = "tms_facs", type = "overall"),
+  list(dataset = "tms_droplet", type = "overall")
 )
 
 ## Do the analysis ####
 
 for(analysis in analysis_list) {
-  #future.apply::future_lapply(analysis_list, function(analysis) {
   message(paste0("Start analysis of ", analysis$dataset, "_", analysis$type))
   if(!run_test) {
     output_dir <- paste0(dir_data_output, "/scdiffcom_",
@@ -89,14 +90,20 @@ for(analysis in analysis_list) {
     } else {
       group_filter <- "age_group"
     }
-    md_temp <- seurat_obj@meta.data
-    tokeep <- apply(
-      table(as.character(md_temp$tissue), as.character(md_temp[[group_filter]])) >= min_cells,
-      MARGIN = 1,
-      FUN = all
-    )
-    tissue_list <- names(tokeep[tokeep])
-    n_tissue <- length(tissue_list)
+    if(analysis$type == "overall") {
+      seurat_obj$tissue_cell_ontology_scdiffcom <- paste(seurat_obj$tissue, seurat_obj$cell_ontology_scdiffcom, sep = "_")
+      tissue_list <- "overall"
+      n_tissue <- 1
+    } else {
+      md_temp <- seurat_obj@meta.data
+      tokeep <- apply(
+        table(as.character(md_temp$tissue), as.character(md_temp[[group_filter]])) >= min_cells,
+        MARGIN = 1,
+        FUN = all
+      )
+      tissue_list <- names(tokeep[tokeep])
+      n_tissue <- length(tissue_list)
+    }
   }
   if(analysis$dataset == "calico") {
     seurat_kidney <- readRDS(dataset_paths[["calico_kidney"]])
@@ -118,20 +125,18 @@ for(analysis in analysis_list) {
     tissue_list <- tissue_list[tissue_list == "Lung"]
     n_tissue <- 1
   }
-  #message("Setup parallel environment.")
-  #registerDoParallel(cores= min(n_tissue, 30))
-  #message("Start tissue per tissue scDiffCom analysis (in parallel).")
-  #foreach(i = 1:n_tissue, .packages = c("Seurat", "scDiffCom")) %dopar% {
-  #foreach(i = 1:n_tissue, .packages = c("Seurat", "scDiffCom")) %do% {
   for(i in 1:n_tissue) {
-    #future.apply::future_lapply(1:n_tissue, function(i) {
     tiss <- tissue_list[i]
     message(paste0("Analysis of the ", tiss, ". Tissue ", i, " out of ", n_tissue, "."))
     if(analysis$dataset %in% c("tms_facs", "tms_droplet")) {
-      message("Subset Seurat object")
-      cells_tiss <- colnames(seurat_obj)[which(seurat_obj$tissue == tiss)]
-      seurat_tiss <- subset(seurat_obj, cells = cells_tiss)
-      cell_type_id <- "cell_ontology_scdiffcom"
+      if(analysis$type == "overall") {
+        cell_type_id <- "tissue_cell_ontology_scdiffcom"
+      } else {
+        message("Subset Seurat object")
+        cells_tiss <- colnames(seurat_obj)[which(seurat_obj$tissue == tiss)]
+        seurat_tiss <- subset(seurat_obj, cells = cells_tiss)
+        cell_type_id <- "cell_ontology_scdiffcom"
+      }
       if(analysis$type == "sex") {
         condition_id <- "sex"
         cond1_name <- "female"
@@ -181,11 +186,8 @@ for(analysis in analysis_list) {
     )
     message(paste0("Saving results for the ", tiss, "."))
     saveRDS(dt_res, file = paste0(output_dir, "/scdiffcom_", tiss, ".rds"))
-    #NULL
   }
-  #)
 }
-#)
 
 
 
