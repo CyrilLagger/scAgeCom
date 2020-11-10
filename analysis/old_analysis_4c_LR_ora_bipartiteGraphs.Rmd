@@ -110,6 +110,7 @@ analyze_Graph(
   "DummyTissue",
   config=GRAPH_CONFIG,
   use_adjpval=TRUE,
+  disperse=TRUE,
   dir=dir,
   analysis_name="DummyTest")
 
@@ -147,3 +148,5 @@ analyze_Graph(
 #   ~ analyze(.x, use_adjpval=TRUE)
 # )
 ```
+
+
