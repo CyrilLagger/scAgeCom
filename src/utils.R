@@ -84,14 +84,14 @@ fetch_results = function(filtered_path, ora_path) {
 GRAPH_CONFIG = list(
   
   EDGE_COLORING = list(
-    COLOR_UP = "#4285F4",
+    COLOR_UP = "#4285F4",  # blue
     CUTOFF_UP = 1.1,
-    COLOR_DOWN = "#DB4437",
+    COLOR_DOWN = "#DB4437", # red
     CUTOFF_DOWN = 1.1,
     COLOR_BOTH = "#F4B400",
     COLOR_ROBUST = "#0F9D58",
     # COLOR_NONE = "#dde2e4"
-    COLOR_NONE = rgb(0.2, 0.2, 0.2, alpha=0.2)
+    COLOR_NONE = rgb(0.2, 0.2, 0.2, alpha=0.1)
   ),
   
   EDGE_STYLE = list(
@@ -100,8 +100,8 @@ GRAPH_CONFIG = list(
   ),
   
   LAYOUT = list(
-    HGAP = 10,
-    VGAP = 10
+    HGAP = 20,
+    VGAP = 20
   ),
   
   VERTEX_STYLE = list(
