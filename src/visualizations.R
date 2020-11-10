@@ -599,8 +599,6 @@ vertex_sort_keys = function(v_names, from, G, config) {
   return(sort_keys)
 }
 
-config = GRAPH_CONFIG
-layout = G$layout
 
 # layout modifiers
 sort_layout_vertices = function(layout, G, config, disperse) {
