@@ -130,6 +130,7 @@ for(analysis in analysis_list) {
     message(paste0("Analysis of the ", tiss, ". Tissue ", i, " out of ", n_tissue, "."))
     if(analysis$dataset %in% c("tms_facs", "tms_droplet")) {
       if(analysis$type == "overall") {
+        seurat_tiss <- seurat_obj
         cell_type_id <- "tissue_cell_ontology_scdiffcom"
       } else {
         message("Subset Seurat object")
