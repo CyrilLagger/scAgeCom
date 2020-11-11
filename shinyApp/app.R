@@ -2,110 +2,41 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - October 2020
+## cyril.lagger@liverpool.ac.uk - November 2020
 ##
 ####################################################
 ##
 
-## Load libraries ####
+## Libraries ####
 
 library(shiny)
-library(data.table)
-library(DT)
-library(ggplot2)
 library(shinyWidgets)
+library(DT)
+library(data.table)
+library(ggplot2)
+library(scDiffCom)
+library(ComplexUpset)
 
-## Global options ####
+## Source code ####
 
-#to display NA in DT
-options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
+source("ui_scAgeCom.R", local = TRUE)
+source("server_scAgeCom.R", local = TRUE)
 
-## Load full data ####
+## Global Data ####
 
-LR6db <- readRDS("data/LR6db_curated.rds")
-cols_to_show_LR6db <- c("LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
-                        "DATABASE", "SOURCE", "ANNOTATION", "FAMILY", "SUBFAMILY")
-
-scdiffcom_data <- readRDS("data/a4_data_results_nlog.rds")
-
-## Process filtered data ####
-
-scdiffcom_data_filtered <- rbindlist(
-  lapply(
-    scdiffcom_data,
-    function(i) {
-      rbindlist(
-        lapply(
-          i,
-          function(tiss) {
-            tiss$scdiffcom_dt_filtered
-          }
-        ),
-        use.names = TRUE,
-        idcol = "TISSUE",
-        fill = TRUE
-      )
-    }
-  ),
-  use.names = TRUE,
-  idcol = "DATASET"
+LR6db_curated <- readRDS("data/LR6db_curated.rds")
+cols_to_show_LR6db <- c(
+  "LIGAND_1", "LIGAND_2",
+  "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
+  "DATABASE", "SOURCE"
 )
-scdiffcom_data_filtered[, c("L_TCT", "R_TCT", "LOG2FC") := list(
-  paste(TISSUE, L_CELLTYPE, sep = ": "),
-  paste(TISSUE, R_CELLTYPE, sep = ": "),
-  LOGFC*log2(exp(1))
-)]
-dataset_name_conversion <- data.table(
-  old_names = unique(scdiffcom_data_filtered$DATASET),
-  Dataset = c("Calico Data", "TMS Droplet Data", "TMS FACS Data")
-)
-scdiffcom_data_filtered[dataset_name_conversion, on = "DATASET==old_names", Dataset := i.Dataset]
-setnames(
-  scdiffcom_data_filtered,
-  old = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF", "LR_NAME"),
-  new = c("Emitter cell type", "Receiver cell type", "Adj. P-value", "LR_GENES")
-)
-cols_to_show_scdiffcom <- c("TISSUE", "LR_GENES", "Emitter cell type", "Receiver cell type",
-                          "LOG2FC", "Adj. P-value", "REGULATION")
-cols_numeric_scdiffcom <- c("LOG2FC", "Adj. P-value")
 
-## Process ORA data ####
+DATASETS_light <- readRDS("data/scdiffcom_objects_shiny.rds")
+cols_to_show_DATA <- c("Ligand-Receptor Genes", "Emitter Cell Type", "Receiver Cell Type",
+                            "LOG2FC", "Adj. P-Value", "REGULATION")
+cols_numeric_DATA <- c("LOG2FC", "Adj. P-Value")
 
-scdiffcom_data_ora <- rbindlist(
-  lapply(
-    scdiffcom_data,
-    function(i) {
-      rbindlist(
-        lapply(
-          i,
-          function(tiss) {
-            tiss$ORA
-          }
-        ),
-        use.names = TRUE,
-        idcol = "TISSUE",
-        fill = TRUE
-      )
-    }
-  ),
-  use.names = TRUE,
-  idcol = "DATASET"
-)
-scdiffcom_data_ora[dataset_name_conversion, on = "DATASET==old_names", Dataset := i.Dataset]
-setnames(
-  scdiffcom_data_ora,
-  old = c("OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN",
-          "OR_DIFF", "pval_adjusted_DIFF", "OR_FLAT", "pval_adjusted_FLAT"),
-  new = c("Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down",
-          "Odds Ratio", "Adj. P-value", "Odds Ratio Stable", "Adj. P-value Stable")
-)
-cols_to_show_ora <- c("TISSUE", "Category", "Value",
-                      "Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down",
-                      "Odds Ratio", "Adj. P-value", "Odds Ratio Stable", "Adj. P-value Stable")
-cols_numeric_ora<- c("Odds Ratio Up", "Adj. P-value Up", "Odds Ratio Down", "Adj. P-value Down",
-                     "Odds Ratio", "Adj. P-value", "Odds Ratio Stable", "Adj. P-value Stable")
-
-## Utility functions ####
+## Global functions ####
 
 show_DT <- function(
   data,
@@ -113,291 +44,54 @@ show_DT <- function(
   cols_numeric
 ) {
   res <- DT::datatable(
-    data[, ..cols_to_show],
+    data = data[, cols_to_show, with = FALSE],
     options = list(
       pageLength = 10
     )
   ) 
   if(!is.null(cols_numeric)) {
-    res <- DT::formatSignif(res, columns = cols_numeric, digits = 3 )
+    res <- DT::formatSignif(
+      table = res,
+      columns = cols_numeric,
+      digits = 3
+    )
   }
   return(res)
 }
 
 show_volcano <- function(
   data
-  ) {
-  ggplot(data, aes(x = LOG2FC, y = -log10(`Adj. P-value` + 1E-3))) +
+) {
+  ggplot(data, aes(
+    x = LOG2FC,
+    y = -log10(`Adj. P-Value` + 1E-4
+    ),
+    color = ifelse(
+      `Adj. P-Value` <= 0.05 & LOG2FC >= log2(1.2),
+      "red",
+      ifelse(
+        `Adj. P-Value` <= 0.05 & LOG2FC <= -log2(1.2),
+        "blue",
+        "green"
+      )
+      )
+  )) +
     geom_point() +
+    scale_color_identity() +
     geom_hline(yintercept = -log10(0.05)) +
-    geom_vline(xintercept = log2(1.1)) +
-    geom_vline(xintercept = -log2(1.1)) +
-    geom_vline(xintercept = log2(1.5)) +
-    geom_vline(xintercept = -log2(1.5)) +
+    geom_vline(xintercept = log2(1.2)) +
+    geom_vline(xintercept = -log2(1.2)) +
     xlab(expression(paste(Log[2], "FC"))) +
     ylab(expression(paste(-Log[10], " ", p[BH]))) +
     theme(text=element_text(size=20))
 }
 
-## Shiny  UI code ####
+## Options ####
+options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
 
-ui <- fluidPage(
-  navbarPage(
-    "Age-related changes in mouse intercellular communication. (Alpha version)",
-    tabPanel(
-      "Main Results",
-      sidebarLayout(
-        sidebarPanel(
-          selectInput(
-            inputId = "dataset_selection",
-            label = "Dataset",
-            choices = unique(scdiffcom_data_filtered$Dataset)
-          ),
-          uiOutput("tissue_selection"),
-          uiOutput("ligand_cell_selection"),
-          uiOutput("receptor_cell_selection"),
-          sliderInput(
-            inputId = "slider_pvalue",
-            label = "P-value filter",
-            min = 0, 
-            max = 1,
-            value = 1
-          ),
-          uiOutput("log2fc_slider"),
-          width = 3
-        ),
-        mainPanel(
-          tabsetPanel(
-            type = "tabs",
-            tabPanel("Table", DT::dataTableOutput("scdiffcom_table")),
-            tabPanel("Volcano Plot", plotOutput("scdiffcom_volcano"))
-          )
-        )
-      )),
-    tabPanel(
-      "ORA",
-      sidebarLayout(
-        sidebarPanel(
-          selectInput(
-            inputId = "ora_dataset_selection",
-            label = "Dataset",
-            choices = unique(scdiffcom_data_ora$Dataset)
-          ),
-          uiOutput("ora_tissue_selection"),
-          uiOutput("ora_category_selection"),
-          selectInput(
-            inputId = "ora_direction",
-            label = "Direction",
-            choices = list("Up", "Down", "Either direction", "Stable")
-          ),
-          sliderInput(
-            inputId = "ora_slider_pvalue",
-            label = "P-value filter",
-            min = 0, 
-            max = 1,
-            value = 1
-          ),
-          width = 3
-        ),
-        mainPanel(
-          tabsetPanel(
-            type = "tabs",
-            tabPanel("ORA", DT::dataTableOutput("ora_table")),
-            tabPanel("HeatMaps  (ToDo)")
-          )
-        )
-      )
-    ),
-    tabPanel(
-      "Ligand-Receptor DB",
-      sidebarLayout(
-        sidebarPanel(
-          pickerInput(
-            inputId = "LR6db_select",
-            "Database",
-            choices = c("SCSR", "CELLPHONEDB", "CELLCHAT", "NICHENET", "ICELLNET", "SCTENSOR"),
-            selected = c("SCSR", "CELLPHONEDB", "CELLCHAT", "NICHENET", "ICELLNET", "SCTENSOR"),
-            options = list(`actions-box` = TRUE),
-            multiple = T
-          ),
-          width = 2
-        ),
-        mainPanel(
-          DT::dataTableOutput("LR6db_table")
-        )
-      )
-    )
-  )
-)
-
-## Shiny server code ####
-
-server <- function(input, output) {
-  output$tissue_selection <- renderUI({
-    pickerInput(
-      inputId = "tissue_select",
-      "Tissue",
-      choices = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection][["TISSUE"]])),
-      selected = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection][["TISSUE"]])),
-      options = list(`actions-box` = TRUE),
-      multiple = T
-    )
-  })
-  output$ligand_cell_selection <- renderUI({
-    pickerInput(
-      inputId = "L_cell_select",
-      "Emitter cell Type",
-      choices = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, L_TCT])),
-      selected = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, L_TCT])),
-      options = list(`actions-box` = TRUE),
-      multiple = T
-    )
-  })
-  output$receptor_cell_selection <- renderUI({
-    pickerInput(
-      inputId = "R_cell_select",
-      "Receiver cell Type",
-      choices = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, R_TCT])),
-      selected = sort(unique(scdiffcom_data_filtered[Dataset %in% input$dataset_selection & TISSUE %in% input$tissue_select, R_TCT])),
-      options = list(`actions-box` = TRUE),
-      multiple = T
-    )
-  })
-  output$log2fc_slider <- renderUI({
-    sliderInput(
-      inputId = "slider_log2fc",
-      label = "LOG2FC filter",
-      min = 0, 
-      max = min(max(ceiling(abs(scdiffcom_data_filtered[Dataset %in% input$dataset_selection][["LOG2FC"]]))), 12),
-      value = 0,
-      step = 0.01
-    )
-  })
-  output$scdiffcom_table <- DT::renderDataTable({
-    req(input$tissue_select, input$L_cell_select, input$R_cell_select)
-    show_DT(
-      setorder(
-        scdiffcom_data_filtered[
-          Dataset %in% input$dataset_selection &
-            TISSUE %in% input$tissue_select &
-            L_TCT %in% input$L_cell_select &
-            R_TCT %in% input$R_cell_select &
-            `Adj. P-value` <= input$slider_pvalue &
-            abs(LOG2FC) >= input$slider_log2fc
-          ],
-        -LOG2FC,
-        `Adj. P-value`
-      ),
-      cols_to_show_scdiffcom, cols_numeric_scdiffcom)
-  })
-  output$scdiffcom_volcano <- renderPlot({
-    req(input$tissue_select, input$L_cell_select, input$R_cell_select)
-    show_volcano(scdiffcom_data_filtered[
-      Dataset %in% input$dataset_selection &
-        TISSUE %in% input$tissue_select &
-        L_TCT %in% input$L_cell_select &
-        R_TCT %in% input$R_cell_select &
-        `Adj. P-value` <= input$slider_pvalue &
-        abs(LOG2FC) >= input$slider_log2fc
-      ])
-  })
-  output$ora_tissue_selection <- renderUI({
-    pickerInput(
-      inputId = "ora_tiss_select",
-      "Tissue",
-      choices = sort(unique(scdiffcom_data_ora[Dataset %in% input$ora_dataset_selection][["TISSUE"]])),
-      options = list(`actions-box` = TRUE),
-      multiple = FALSE
-    )
-  })
-  output$ora_category_selection <- renderUI({
-    pickerInput(
-      inputId = "ora_cat_select",
-      "Category",
-      choices = sort(unique(scdiffcom_data_ora[
-        Dataset %in% input$ora_dataset_selection &
-          TISSUE %in% input$ora_tiss_select
-        ][["Category"]])),
-      options = list(`actions-box` = TRUE),
-      multiple = FALSE
-    )
-  })
-  output$ora_table <- DT::renderDataTable({
-    req(input$ora_tiss_select, input$ora_cat_select)
-    data <- scdiffcom_data_ora[
-      Dataset %in% input$ora_dataset_selection & 
-        TISSUE %in% input$ora_tiss_select &
-        Category %in% input$ora_cat_select
-      ]
-    if(input$ora_direction == "Up") {
-      data <- data[`Odds Ratio Up` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio Up", "Adj. P-value Up")]
-      data <- data[`Adj. P-value Up` <= input$ora_slider_pvalue]
-      setorder(data, `Adj. P-value Up`)
-      cols_numeric <- c("Odds Ratio Up", "Adj. P-value Up")
-    } else if(input$ora_direction == "Down") {
-      data <- data[`Odds Ratio Down` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio Down", "Adj. P-value Down")]
-      data <- data[`Adj. P-value Down` <= input$ora_slider_pvalue]
-      setorder(data, `Adj. P-value Down`)
-      cols_numeric <- c("Odds Ratio Down", "Adj. P-value Down")
-    } else if(input$ora_direction == "Either direction") {
-      data <- data[`Odds Ratio` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio", "Adj. P-value")]
-      data <- data[`Adj. P-value` <= input$ora_slider_pvalue]
-      setorder(data, `Adj. P-value`)
-      cols_numeric <- c("Odds Ratio", "Adj. P-value")
-    } else if(input$ora_direction == "Stable") {
-      data <- data[`Odds Ratio Stable` >= 1, c("TISSUE", "Category", "Value", "Odds Ratio Stable", "Adj. P-value Stable")]
-      data <- data[`Adj. P-value Stable` <= input$ora_slider_pvalue]
-      setorder(data, `Adj. P-value Stable`)
-      cols_numeric <- c("Odds Ratio Stable", "Adj. P-value Stable")
-    }
-    show_DT(
-      data,
-      cols_to_show = colnames(data),
-      cols_numeric = cols_numeric
-      )
-  })
-  output$LR6db_table <- DT::renderDataTable({
-   req(input$LR6db_select)
-    LR6db <- LR6db[apply(sapply(input$LR6db_select, function(i) {
-      grepl(i, LR6db$DATABASE)
-    }),
-    MARGIN = 1,
-    any
-    )]
-    
-    
-    # 
-    # if(!("SCSR" %in% input$LR6db_select)) {
-    #   LR6db <- LR6db[!grepl("SCSR", DATABASE)]
-    # }
-    # if(!("CELLPHONEDB" %in% input$LR6db_select)) {
-    #   LR6db <- LR6db[!grepl("CELLPHONEDB", DATABASE)]
-    # }
-    # if(!("NICHENET" %in% input$LR6db_select)) {
-    #   LR6db <- LR6db[!grepl("NICHENET", DATABASE)]
-    # }
-    # if(!("ICELLNET" %in% input$LR6db_select)) {
-    #   LR6db <- LR6db[!grepl("ICELLNET", DATABASE)]
-    # }
-    # if(!("CELLCHAT" %in% input$LR6db_select)) {
-    #   LR6db <- LR6db[!grepl("CELLCHAT", DATABASE)]
-    # }
-    # if(!("SCTENSOR" %in% input$LR6db_select)) {
-    #   LR6db <- LR6db[!grepl("SCTENSOR", DATABASE)]
-    # }
-    show_DT(
-      setorder(
-        LR6db,
-        LIGAND_1, LIGAND_2, RECEPTOR_1, RECEPTOR_2, RECEPTOR_3
-      ),
-      #LR6db,
-      cols_to_show_LR6db, NULL)
-  })
-}
-
-## Shiny final call ####
+## Main shinyApp call ####
 
 shinyApp(
-  ui = ui,
-  server = server
+  ui = ui_scAgeCom,
+  server = server_scAgeCom
 )
