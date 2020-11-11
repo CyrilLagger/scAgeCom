@@ -148,12 +148,13 @@ get_celltypes_enrichment <- function(dt, use_adjpval=NULL) {
 
 analyze_Graph <- function(
   dt_ora, 
-                          dt_filtered,
-                          tissue, 
-                          config=GRAPH_CONFIG, 
-                          use_adjpval=TRUE,
-                          dir=NULL,
-                          analysis_name=NULL) {
+  dt_filtered,
+  tissue, 
+  config=GRAPH_CONFIG, 
+  use_adjpval=TRUE,
+  disperse=TRUE,
+  dir=NULL,
+  analysis_name=NULL) {
   
   ora_has_tissue = 'Tissue' %in% names(dt_ora)
   filt_has_tissue = 'Tissue' %in% names(dt_filtered)
@@ -172,7 +173,7 @@ analyze_Graph <- function(
   G = construct_graph(dt_ora, tissue, dt_filtered=dt_filtered)
   
   # Setup
-  G = setup_graph(G, use_adjpval=use_adjpval)
+  G = setup_graph(G, use_adjpval=use_adjpval, disperse=disperse)
   
   # Save as edge table and plot
   if ( !is.null(dir) ) {
@@ -392,10 +393,10 @@ infer_vertex_types <- function(vertex_names) {
   return(vertex_types)
 }
 
-setup_graph <- function(G, config=GRAPH_CONFIG, use_adjpval) {
+setup_graph <- function(G, config=GRAPH_CONFIG, use_adjpval, disperse) {
   G = setup_vertices(G, config)
   G = setup_edges(G, config, use_adjpval)
-  G = setup_layout(G, config)
+  G = setup_layout(G, config, disperse)
   return(G)
 }
 
@@ -540,7 +541,7 @@ setup_edges <- function(G, config, use_adjpval) {
   return(G)
 }
 
-setup_layout <- function(G, config) {
+setup_layout <- function(G, config, disperse) {
   layout = layout_as_bipartite(
     G, 
     types = V(G)$vertex_types, 
@@ -548,10 +549,92 @@ setup_layout <- function(G, config) {
     vgap = config$LAYOUT$VGAP
   )
   layout = layout[, 2:1]  # horizontal to vertical
+  layout = sort_layout_vertices(layout, G, config, disperse)
   G$layout = layout
   return(G)
 }
 
+#### Functions for layout ####
+get_edges_from_vertex = function(v_name, G) {
+  # return(E(G)[from(v_name)])
+  return(incident(G, v_name, mode='out'))
+}
+
+get_edges_to_vertex = function(v_name, G) {
+  return(incident(G, v_name, mode='in'))
+}
+
+count_up_and_down_edges = function(edges, config) {
+  color_up = config$EDGE_COLORING$COLOR_UP
+  color_down = config$EDGE_COLORING$COLOR_DOWN
+  
+  counts = table(edges$edge.color)
+  num_up = as.integer(counts[color_up])
+  num_down = as.integer(counts[color_down])
+  
+  num_up = ifelse(is.na(num_up), 0, num_up)
+  num_down = ifelse(is.na(num_down), 0, num_down)
+  
+  return(list(N_UP=num_up, N_DOWN=num_down))
+}
+
+vertex_sort_key_atomic = function(v_name, from, G, config) {
+  
+  if(from) {
+    edges = get_edges_from_vertex(v_name, G)
+  }
+  else {
+    edges = get_edges_to_vertex(v_name, G)
+  }
+  counts = count_up_and_down_edges(edges, config)
+  sort_key = as.integer(counts$N_UP - counts$N_DOWN)
+  return(sort_key)
+}
+
+vertex_sort_keys = function(v_names, from, G, config) {
+  sort_keys = map_dbl(
+    v_names,
+    ~ vertex_sort_key_atomic(.x, from, G, config)
+  )
+  return(sort_keys)
+}
+
+
+# layout modifiers
+sort_layout_vertices = function(layout, G, config, disperse) {
+  
+  vertex_names = V(G)$name
+  num_v = length(vertex_names)
+  midpoint = num_v/2
+  ligand_vertices = vertex_names[1:midpoint]
+  receptor_vertices = vertex_names[(midpoint+1):num_v]
+  
+  ligand_keys = vertex_sort_keys(ligand_vertices, from=TRUE, G, config)
+  receptor_keys = vertex_sort_keys(receptor_vertices, from=FALSE, G, config)
+  
+  # TODO: refactor into clear code
+  # The reorders layout rows to achieve sorting
+  layout_copy = copy(layout)
+  new_layout = copy(layout)
+  new_layout[order(ligand_keys), ] = layout_copy[1:midpoint, ]
+  new_layout[midpoint + order(receptor_keys), ] = layout_copy[(midpoint+1):num_v, ]
+  
+  if(disperse) {
+    ## Make as function
+    # Get hgap
+    vgap = config$LAYOUT$HGAP
+    scale_factor = 3
+    
+    new_layout[1:midpoint, 2][ligand_keys==0] = new_layout[1:9, 2][ligand_keys==0] + scale_factor*vgap
+    new_layout[1:midpoint, 2][ligand_keys>0] = new_layout[1:9, 2][ligand_keys>0] + 2*scale_factor*vgap
+    
+    new_layout[(midpoint+1):num_v, 2][receptor_keys==0] = new_layout[(midpoint+1):num_v, 2][receptor_keys==0] + scale_factor*vgap
+    new_layout[(midpoint+1):num_v, 2][receptor_keys>0] = new_layout[(midpoint+1):num_v, 2][receptor_keys>0] + 2*scale_factor*vgap
+  }
+  # new_layout = disperse_layout_vertices(new_layout, G, config)
+  return(new_layout)
+}
+#### Write and plot functions ####
 write_as_edge_table <- function(G, path) {
   
   if (!is.null(path)) {
