@@ -52,8 +52,11 @@ LR6db_curated[, SOURCE_CLEAN := gsub(paste0(c(LR_rm_nichenet, LR_rm_sctensor, "u
 LR6db_curated[, SOURCE_CLEAN := gsub("pharmacology", "IUPHAR", SOURCE_CLEAN)]
 LR6db_curated[, SOURCE_CLEAN := gsub("kegg", "KEGG", SOURCE_CLEAN)]
 LR6db_curated[, SOURCE_CLEAN := gsub("fantom5", "ramilowski", SOURCE_CLEAN)]
+
 LR6db_curated[, SOURCE_no_digit := gsub(" ", "", gsub('[[:digit:]]+', '', SOURCE))]
 LR6db_curated[SOURCE_no_digit %in% c("", "; ", " ;", ";") | nchar(SOURCE_no_digit) <= 2, SOURCE_CLEAN := paste0("PMID:", SOURCE_CLEAN)]
+
+
 sum(!grepl(paste0(category_sources, collapse = "|"), LR6db_curated$SOURCE_CAT))
 
 ## Produce Upsetplot of full and curated LR interactions based on their source and database of origin ####
