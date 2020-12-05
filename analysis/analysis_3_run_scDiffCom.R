@@ -1,8 +1,11 @@
-####################################################
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - November 2020
+## Last update - December 2020
+##
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
 ##
 ## Apply scDiffCom to all three datasets.
 ##
@@ -41,23 +44,23 @@ dataset_paths <- c(
 
 ## Load the curated LR interactions ####
 
-LR6db_curated <- scDiffCom::LR6db$LR6db_curated
+LRdb_curated <- scDiffCom::LRdb_mouse$LRdb_curated
 
 ## List of analysis to do over datasets and sex
 
 analysis_list <- list(
   #list(dataset = "calico", type = "default"),
-  #list(dataset = "calico", type = "subtype")#,
+  #list(dataset = "calico", type = "subtype"),
   #list(dataset = "tms_facs", type = "mixed"),
-  #list(dataset = "tms_facs", type = "female"),
-  #list(dataset = "tms_facs", type = "male"),
-  #list(dataset = "tms_facs", type = "sex"),
+  list(dataset = "tms_facs", type = "female"),
+  list(dataset = "tms_facs", type = "male"),
+  list(dataset = "tms_facs", type = "sex"),
   #list(dataset = "tms_droplet", type = "mixed")#,
-  #list(dataset = "tms_droplet", type = "female"),
-  #list(dataset = "tms_droplet", type = "male"),
-  #list(dataset = "tms_droplet", type = "sex"),
-  list(dataset = "tms_facs", type = "overall"),
-  list(dataset = "tms_droplet", type = "overall")
+  list(dataset = "tms_droplet", type = "female"),
+  list(dataset = "tms_droplet", type = "male"),
+  list(dataset = "tms_droplet", type = "sex")
+  #list(dataset = "tms_facs", type = "overall")#,
+  #list(dataset = "tms_droplet", type = "overall")
 )
 
 ## Do the analysis ####
@@ -163,27 +166,26 @@ for(analysis in analysis_list) {
     seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
     dt_res <- scDiffCom::run_interaction_analysis(
       seurat_obj = seurat_tiss,
-      LR_object = LR6db_curated,
-      celltype_column_id = cell_type_id,
-      condition_column_id = condition_id,
+      LRdb_species = "mouse",
+      seurat_celltype_id = cell_type_id,
+      seurat_condition_id = condition_id,
       cond1_name = cond1_name,
       cond2_name = cond2_name,
-      object_name = tiss,
-      assay = "RNA",
-      slot = "data",
+      seurat_assay = "RNA",
+      seurat_slot = "data",
       log_scale = is_log,
-      min_cells = min_cells,
-      pct_threshold = 0.1,
+      threshold_min_cells = min_cells,
+      threshold_pct = 0.1,
+      object_name = tiss,
       permutation_analysis = TRUE,
       iterations = n_iter,
-      cutoff_quantile_score = 0.25,
-      cutoff_pval_specificity = 0.05,
-      cutoff_pval_de = 0.05,
-      cutoff_logfc = log(1.2),
-      return_distr = FALSE,
+      threshold_quantile_score = 0.25,
+      threshold_p_value_specificity = 0.05,
+      threshold_p_value_de = 0.05,
+      threshold_logfc = log(1.2),
+      return_distributions = FALSE,
       seed = 42,
-      verbose = TRUE,
-      sparse = TRUE
+      verbose = TRUE
     )
     message(paste0("Saving results for the ", tiss, "."))
     saveRDS(dt_res, file = paste0(output_dir, "/scdiffcom_", tiss, ".rds"))

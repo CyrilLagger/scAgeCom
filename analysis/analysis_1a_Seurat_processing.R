@@ -2,9 +2,14 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - October 2020
+## Last update - December 2020
 ##
-## Check the scRNA-seq dataset preprocessing.
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
+##
+## Check integrity of TMS and Calico Seurat files.
+## Rename cell-types for scDiffCom analysis.
 ##
 ####################################################
 ##
