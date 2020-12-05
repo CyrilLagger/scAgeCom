@@ -1,8 +1,11 @@
-####################################################
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - November 2020
+## Last update - December 2020
+##
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
 ##
 ## Process scDiffCom results and check filtering
 ## parameters.
