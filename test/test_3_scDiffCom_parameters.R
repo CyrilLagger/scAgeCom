@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - October 2020
+## cyril.lagger@liverpool.ac.uk - December 2020
 ##
 ## Check the behaviour of scDiffCom in functions of
 ## its parameters.
@@ -20,39 +20,36 @@ library(UpSetR)
 library(future)
 
 ## Data path ####
-dir_data_test <- "../data_scAgeCom/test/"
+path_directory_test <- "../data_scAgeCom/test/"
 
 ## Load Seurat objects ####
 
-seurat_objects_t3 <- list(
-  facs_liver = readRDS(paste0(dir_data_test, "seurat_testing_tms_facs_liver.rds")),
-  facs_spleen = readRDS(paste0(dir_data_test, "seurat_testing_tms_facs_spleen.rds")),
-  droplet_spleen = readRDS(paste0(dir_data_test, "seurat_testing_tms_droplet_spleen.rds")),
-  calico_spleen = readRDS(paste0(dir_data_test, "seurat_testing_calico_spleen.rds"))
+seurat_objects_test3 <- list(
+  facs_liver = readRDS(paste0(path_directory_test, "inputs/seurat_testing_tms_facs_liver.rds")),
+  facs_spleen = readRDS(paste0(path_directory_test, "inputs/seurat_testing_tms_facs_spleen.rds")),
+  droplet_spleen = readRDS(paste0(path_directory_test, "inputs/seurat_testing_tms_droplet_spleen.rds")),
+  calico_spleen = readRDS(paste0(path_directory_test, "inputs/seurat_testing_calico_spleen.rds"))
 )
-seurat_objects_t3 <- lapply(
-  seurat_objects_t3,
+seurat_objects_test3 <- lapply(
+  seurat_objects_test3,
   function(obj) {
     obj$age_group <- ifelse(obj$age %in% c('1m', '3m', "young"), 'YOUNG', 'OLD' )
     return(obj)
   }
 )
-seurat_objects_t3 <- lapply(
-  seurat_objects_t3,
+seurat_objects_test3 <- lapply(
+  seurat_objects_test3,
   NormalizeData,
   normalization.method = "LogNormalize",
   assay = "RNA",
   scale.factor = 10000
 )
 
-## Load interactions ####
-LR_t3 <- scDiffCom::LR6db$LR6db_curated
-
 ## Create a list of parameters to test ####
 
 #Note: We want to look at normalization and log-scale.
 
-param_t3 <- list(
+param_test3 <- list(
   SF_log = list(id = "SF_log", assay = "RNA", log_scale = TRUE),
   SF_nlog = list(id = "SF_nlog", assay = "RNA", log_scale = FALSE),
   SCT_log = list(id = "SCT_log", assay = "SCT", log_scale = TRUE),
@@ -64,12 +61,12 @@ param_t3 <- list(
 #Note: We also return the distribution, but this requires quite a lot of memory
 #      So we perform it one seurat object at a time
 
-seurat_object_temp <- seurat_objects_t3$droplet_spleen
-seurat_object_temp <- SCTransform(seurat_object_temp, return.only.var.genes = TRUE)
+
+## Deprecated below
 
 plan(sequential)
 # scdiffcom_t3_temp <- lapply(
-#   param_t3,
+#   param_test3,
 #   function(
 #     param
 #   ) {
@@ -99,15 +96,15 @@ plan(sequential)
 #   }
 # )
 
-saveRDS(scdiffcom_t3_temp, file = paste0(dir_data_test, "t3_data_scDiffCom_allparameters_droplet_spleen.rds"))
+saveRDS(scdiffcom_t3_temp, file = paste0(path_directory_test, "t3_data_scDiffCom_allparameters_droplet_spleen.rds"))
 
 ## Reading the results ####
 
 scdiffcom_t3 <-  list(
-  facs_liver = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_facs_liver.rds")),
-  facs_spleen = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_facs_spleen.rds")),
-  droplet_spleen = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_droplet_spleen.rds")),
-  calico_spleen = readRDS(paste0(dir_data_test, "t3_data_scDiffCom_allparameters_calico_spleen.rds"))
+  facs_liver = readRDS(paste0(path_directory_test, "t3_data_scDiffCom_allparameters_facs_liver.rds")),
+  facs_spleen = readRDS(paste0(path_directory_test, "t3_data_scDiffCom_allparameters_facs_spleen.rds")),
+  droplet_spleen = readRDS(paste0(path_directory_test, "t3_data_scDiffCom_allparameters_droplet_spleen.rds")),
+  calico_spleen = readRDS(paste0(path_directory_test, "t3_data_scDiffCom_allparameters_calico_spleen.rds"))
 )
 
 ## Compare LR scores ####
@@ -365,7 +362,7 @@ g_comp_LR_score_OLD <- cowplot::plot_grid(
   align = "v"
 )
 g_comp_LR_score_OLD
-ggsave(paste0(dir_data_test, "t3_plot_compParam_scores.png"), g_comp_LR_score_OLD, scale = 2)
+ggsave(paste0(path_directory_test, "t3_plot_compParam_scores.png"), g_comp_LR_score_OLD, scale = 2)
 
 #histogram for score distributions only for detected CCI 
 
@@ -393,7 +390,7 @@ g_distr_score_OLD <- cowplot::plot_grid(
   labels = c("SF-log", "SF-nlog", "SCT-log", "SCT-nlog")
 )
 g_distr_score_OLD 
-ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_OLD.png"), g_distr_score_OLD, scale = 2)
+ggsave(paste0(path_directory_test, "t3_plot_comp_distr_scores_OLD.png"), g_distr_score_OLD, scale = 2)
 g_distr_score_YOUNG <- cowplot::plot_grid(
   plotlist = lapply(list("SF_log", "SF_nlog", "SCT_log", "SCT_nlog"), create_histo_score_detected_YOUNG),
   ncol = 2,
@@ -401,7 +398,7 @@ g_distr_score_YOUNG <- cowplot::plot_grid(
   labels = c("SF-log", "SF-nlog", "SCT-log", "SCT-nlog")
 )
 g_distr_score_YOUNG
-ggsave(paste0(dir_data_test, "t3_plot_comp_distr_scores_YOUNG.png"), g_distr_score_YOUNG, scale = 2)
+ggsave(paste0(path_directory_test, "t3_plot_comp_distr_scores_YOUNG.png"), g_distr_score_YOUNG, scale = 2)
 
 
 ## Create a copy of the results but with larger logfc threshold ####
@@ -485,16 +482,16 @@ UpSetR::upset(fromList(CCI_per_param_list_bis), nsets = 12, order.by = "freq", n
 
 
 #look and remove the CCI that are consistent over all parameter cases
-dcast_param_t3 <- dcast(
+dcast_param_test3 <- dcast(
   scdiffcom_t3_dt_filtered[, c("CCI", "param_group", "REGULATION_SIMPLE")],
   formula = CCI ~ param_group,
   value.var = "REGULATION_SIMPLE"
 )
-dcast_param_t3[, is_eq := SF_log == SF_nlog & SF_nlog == SCT_log & SCT_log == SCT_nlog]
+dcast_param_test3[, is_eq := SF_log == SF_nlog & SF_nlog == SCT_log & SCT_log == SCT_nlog]
 
-CCI_conserved <- dcast_param_t3[is_eq == TRUE]$CCI
-CCI_non_conserved <- dcast_param_t3[is_eq == FALSE | is.na(is_eq)]$CCI
-CCI_non_conserved_noNA <- dcast_param_t3[is_eq == FALSE]$CCI
+CCI_conserved <- dcast_param_test3[is_eq == TRUE]$CCI
+CCI_non_conserved <- dcast_param_test3[is_eq == FALSE | is.na(is_eq)]$CCI
+CCI_non_conserved_noNA <- dcast_param_test3[is_eq == FALSE]$CCI
 CCI_per_param_list_2_conserved <- sapply(param_case_list[grepl("two", param_case_list)], function(i) {
   scdiffcom_t3_dt_filtered[param_case == i & CCI %in% CCI_conserved]$CCI
 })
@@ -531,16 +528,16 @@ ora_down_LR_CELLTYPE <- scdiffcom_t3_dt_ORA[Category == "LR_CELLTYPE" & pval_adj
                                         c("Category", "Value", "pval_adjusted_UP", "OR_UP", "param_group")]
 
 
-ora_up_LR_NAME_per_param <- sapply(param_t3, function(i) {
+ora_up_LR_NAME_per_param <- sapply(param_test3, function(i) {
   ora_up_LR_NAME[param_group %in% i]$Value
 })
-ora_down_LR_NAME_per_param <- sapply(param_t3, function(i) {
+ora_down_LR_NAME_per_param <- sapply(param_test3, function(i) {
   ora_down_LR_NAME[param_group %in% i]$Value
 })
-ora_up_LR_CELLTYPE_per_param <- sapply(param_t3, function(i) {
+ora_up_LR_CELLTYPE_per_param <- sapply(param_test3, function(i) {
   ora_up_LR_CELLTYPE[param_group %in% i]$Value
 })
-ora_down_LR_CELLTYPE_per_param <- sapply(param_t3, function(i) {
+ora_down_LR_CELLTYPE_per_param <- sapply(param_test3, function(i) {
   ora_down_LR_CELLTYPE[param_group %in% i]$Value
 })
 UpSetR::upset(fromList(ora_up_LR_NAME_per_param), nsets = 4, order.by = "freq")
