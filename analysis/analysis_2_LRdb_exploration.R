@@ -2,9 +2,13 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - September 2020
+## Last update - December 2020
 ##
-## Investigate the 6 LR databases and do a final
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
+##
+## Investigate the 8 LR databases and do a final
 ## choice regading the curated interations.
 ##
 ####################################################

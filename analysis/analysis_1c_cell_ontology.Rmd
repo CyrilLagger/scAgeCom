@@ -2,6 +2,20 @@
 title: "R Notebook"
 ---
 
+####################################################
+##
+## Project: scAgeCom
+##
+## Last update - December 2020
+##
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
+##
+##
+####################################################
+##
+
 Cell-ontology analysis and cell-type annotation of TMS and Calico datasets.
 
 First we load the csv file that contains all the cell types and the annotations.

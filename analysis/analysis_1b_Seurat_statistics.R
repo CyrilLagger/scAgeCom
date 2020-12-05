@@ -2,7 +2,11 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk - October 2020
+## Last update - December 2020
+##
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
 ##
 ## Provide some statistacal information about tissue,
 ## cell-types, genes, LR-pair and sex.
