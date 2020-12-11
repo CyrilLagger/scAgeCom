@@ -22,17 +22,17 @@ get_TSA_overview <- function(
   renderUI(
     {
       req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-      obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-      req(obj)
-      dt_filtered <- scDiffCom:::get_cci_table_filtered(obj)
-      req(dt_filtered)
+      cci_detected <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+        ID == input$TSA_TISSUE_CHOICE
+      ]
+      req(cci_detected)
       tags$div(
         tags$h3("Summary of the intercellular communication in the", input$TSA_TISSUE_CHOICE),
-        tags$p("Number of cell-types:", dt_filtered[,uniqueN(`Emitter Cell Type`)]),
-        tags$p("Number of detected LR-interactions:", dt_filtered[,uniqueN(`Ligand-Receptor Genes`)]),
-        tags$p("Number of detected CCIs:", nrow(dt_filtered)),
-        tags$p("Number of up-regulated CCIs:", nrow(dt_filtered[REGULATION_SIMPLE == "UP"])),
-        tags$p("Number of down-regulated CCIs:", nrow(dt_filtered[REGULATION_SIMPLE == "DOWN"]))
+        tags$p("Number of cell-types:", cci_detected[,uniqueN(`EMITTER_CELLTYPE`)]),
+        tags$p("Number of detected LR-interactions:", cci_detected[,uniqueN(`LR_GENES`)]),
+        tags$p("Number of detected CCIs:", nrow(cci_detected)),
+        tags$p("Number of up-regulated CCIs:", nrow(cci_detected[REGULATION_SIMPLE == "UP"])),
+        tags$p("Number of down-regulated CCIs:", nrow(cci_detected[REGULATION_SIMPLE == "DOWN"]))
       )
     }
   )
@@ -42,7 +42,7 @@ choose_TSA_tissue <- function(
   input
 ) {
   renderUI({
-    choices <- sort(names(DATASETS_light[[input$TSA_DATASET_CHOICE]]))
+    choices <- sort(unique(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected$ID))
     pickerInput(
       inputId = "TSA_TISSUE_CHOICE",
       label = "Tissue",
@@ -58,12 +58,12 @@ choose_TSA_emitter <- function(
 ) {
   renderUI({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    choices <- sort(unique(scDiffCom:::get_cci_table_filtered(obj)[["Emitter Cell Type"]]))
+    choices <- sort(unique(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ][["EMITTER_CELLTYPE"]]))
     pickerInput(
       inputId = "TSA_EMITTER_CHOICE",
-      label = "Emitter Cell Type",
+      label = "EMITTER_CELLTYPE",
       choices = choices,
       selected = choices,
       options = list(`actions-box` = TRUE),
@@ -77,12 +77,12 @@ choose_TSA_receiver <- function(
 ) {
   renderUI({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    choices <- sort(unique(scDiffCom:::get_cci_table_filtered(obj)[["Receiver Cell Type"]]))
+    choices <- sort(unique(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ][["RECEIVER_CELLTYPE"]]))
     pickerInput(
       inputId = "TSA_RECEIVER_CHOICE",
-      label = "Receiver Cell Type",
+      label = "RECEIVER_CELLTYPE",
       choices = choices,
       selected = choices,
       options = list(`actions-box` = TRUE),
@@ -96,9 +96,9 @@ get_TSA_slider_log2fc <- function(
 ) {
   renderUI({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    max_val <- ceiling(max(scDiffCom:::get_cci_table_filtered(obj)[["LOG2FC"]]))
+    max_val <- ceiling(max(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ][["LOG2FC"]]))
     sliderInput(
       inputId = "TSA_SLIDER_LOG2FC",
       label = "LOG2FC Threshold",
@@ -114,10 +114,8 @@ choose_TSA_ORA_category <- function(
   input
 ) {
   renderUI({
-    req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    choices <- names(scDiffCom:::get_ora_tables(obj))
+    req(input$TSA_DATASET_CHOICE)
+    choices <- names(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@ora_default)
     pickerInput(
       inputId = "TSA_ORA_CATEGORY_CHOICE",
       label = "Category",
@@ -133,16 +131,16 @@ get_TSA_ORA_slider_or <- function(
 ) {
   renderUI({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_ORA_CATEGORY_CHOICE, input$TSA_ORA_TYPE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    ora_table <- scDiffCom:::get_ora_tables(obj)[[input$TSA_ORA_CATEGORY_CHOICE]]
+    ora_table <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@ora_default[[input$TSA_ORA_CATEGORY_CHOICE]][
+      ID == input$TSA_TISSUE_CHOICE
+    ]
     req(ora_table)
     if(input$TSA_ORA_TYPE_CHOICE == "Up") {
-      max_val <- ceiling(max(ora_table[["Odds Ratio Up"]]))
+      max_val <- ceiling(max(ora_table[["OR_UP"]]))
     } else if(input$TSA_ORA_TYPE_CHOICE == "Down") {
-      max_val <- ceiling(max(ora_table[["Odds Ratio Down"]]))
+      max_val <- ceiling(max(ora_table[["OR_DOWN"]]))
     } else if(input$TSA_ORA_TYPE_CHOICE == "Stable") {
-      max_val <- ceiling(max(ora_table[["Odds Ratio Stable"]]))
+      max_val <- ceiling(max(ora_table[["OR_FLAT"]]))
     }
     sliderInput(
       inputId = "TSA_ORA_SLIDER_OR",
@@ -161,25 +159,26 @@ get_TSA_interaction_table <- function(
   DT::renderDT({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
         input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    dt <- scDiffCom:::get_cci_table_filtered(obj)
+    dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ]
     req(dt)
     dt <- dt[
-      `Emitter Cell Type` %in% input$TSA_EMITTER_CHOICE &
-        `Receiver Cell Type` %in% input$TSA_RECEIVER_CHOICE &
-        `Adj. P-Value` <= input$TSA_SLIDER_PVALUE &
+      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
         abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
         ]
     setorder(
       dt,
       -LOG2FC,
-      `Adj. P-Value`
+      `BH_P_VALUE_DE`
     )
     show_DT(
       dt,
-      cols_to_show_DATA,
-      cols_numeric_DATA,
+      c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LOG2FC", "BH_P_VALUE_DE",
+        "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"),
+      c("LOG2FC", "BH_P_VALUE_DE", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"),
       "Table of all detected CCIs"
       )
   })
@@ -191,18 +190,18 @@ plot_TSA_VOLCANO <- function(
   renderPlot({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
         input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    dt <- scDiffCom:::get_cci_table_filtered(obj)
+    dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ]
     req(dt)
     dt <- dt[
-      `Emitter Cell Type` %in% input$TSA_EMITTER_CHOICE &
-        `Receiver Cell Type` %in% input$TSA_RECEIVER_CHOICE &
-        `Adj. P-Value` <= input$TSA_SLIDER_PVALUE &
+      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
         abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
-    dt[, mlog10_pval := -log10(`Adj. P-Value` + 1E-4)]
-    dt <- dt[, c("Ligand-Receptor Genes", "Emitter Cell Type", "Receiver Cell Type",  "LOG2FC", "mlog10_pval", "REGULATION_SIMPLE")]
+    dt[, mlog10_pval := -log10(`BH_P_VALUE_DE` + 1E-4)]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "mlog10_pval", "REGULATION_SIMPLE")]
     show_volcano(dt)
   })
 }
@@ -213,18 +212,18 @@ get_TSA_VOLCANO_text <- function(
   renderPrint({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
         input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    dt <- scDiffCom:::get_cci_table_filtered(obj)
+    dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ]
     req(dt)
     dt <- dt[
-      `Emitter Cell Type` %in% input$TSA_EMITTER_CHOICE &
-        `Receiver Cell Type` %in% input$TSA_RECEIVER_CHOICE &
-        `Adj. P-Value` <= input$TSA_SLIDER_PVALUE &
+      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
         abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
-    dt[, mlog10_pval := -log10(`Adj. P-Value` + 1E-4)]
-    dt <- dt[, c("Ligand-Receptor Genes", "Emitter Cell Type", "Receiver Cell Type",  "LOG2FC", "mlog10_pval", "REGULATION_SIMPLE")]
+    dt[, mlog10_pval := -log10(`BH_P_VALUE_DE` + 1E-4)]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "mlog10_pval", "REGULATION_SIMPLE")]
     brushedPoints(dt, input$TSA_VOLCANO_brush, xvar = "LOG2FC", yvar = "mlog10_pval")
   })
 }
@@ -235,17 +234,16 @@ plot_TSA_SCORES <- function(
   renderPlot({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
         input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    dt <- scDiffCom:::get_cci_table_filtered(obj)
-    req(dt)
+    dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ]
     dt <- dt[
-      `Emitter Cell Type` %in% input$TSA_EMITTER_CHOICE &
-        `Receiver Cell Type` %in% input$TSA_RECEIVER_CHOICE &
-        `Adj. P-Value` <= input$TSA_SLIDER_PVALUE &
+      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
         abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
-    dt <- dt[, c("Ligand-Receptor Genes", "Emitter Cell Type", "Receiver Cell Type",  "LOG2FC", "REGULATION_SIMPLE", "SCORE (YOUNG)", "SCORE (OLD)")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION_SIMPLE", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
     show_scores(dt)
   })
 }
@@ -256,17 +254,17 @@ get_TSA_SCORES_text <- function(
   renderPrint({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
         input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    dt <- scDiffCom:::get_cci_table_filtered(obj)
+    dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+      ID == input$TSA_TISSUE_CHOICE
+      ]
     req(dt)
     dt <- dt[
-      `Emitter Cell Type` %in% input$TSA_EMITTER_CHOICE &
-        `Receiver Cell Type` %in% input$TSA_RECEIVER_CHOICE &
-        `Adj. P-Value` <= input$TSA_SLIDER_PVALUE &
+      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
         abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
-    dt <- dt[, c("Ligand-Receptor Genes", "Emitter Cell Type", "Receiver Cell Type",  "LOG2FC", "REGULATION_SIMPLE", "SCORE (YOUNG)", "SCORE (OLD)")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION_SIMPLE", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
     brushedPoints(dt, input$TSA_SCORES_brush)
   })
 }
@@ -276,28 +274,28 @@ get_TSA_ORA_table <- function(
 ) {
   DT::renderDataTable({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_ORA_CATEGORY_CHOICE, input$TSA_ORA_TYPE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
-    req(obj)
-    dt <- scDiffCom:::get_ora_tables(obj)[[input$TSA_ORA_CATEGORY_CHOICE]]
+    dt <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@ora_default[[input$TSA_ORA_CATEGORY_CHOICE]][
+      ID == input$TSA_TISSUE_CHOICE
+      ]
     req(dt)
     if(input$TSA_ORA_TYPE_CHOICE == "Up") {
-      dt <- dt[`Odds Ratio Up` >= 1, c("Value", "Odds Ratio Up", "Adj. P-Value Up")]
-      dt <- dt[`Adj. P-Value Up` <= input$TSA_ORA_SLIDER_PVALUE &
-                 `Odds Ratio Up` >= input$TSA_ORA_SLIDER_OR]
-      setorder(dt, `Adj. P-Value Up`)
-      cols_numeric <- c("Odds Ratio Up", "Adj. P-Value Up")
+      dt <- dt[`OR_UP` >= 1, c("VALUE", "OR_UP", "BH_P_VALUE_UP")]
+      dt <- dt[`BH_P_VALUE_UP` <= input$TSA_ORA_SLIDER_PVALUE &
+                 `OR_UP` >= input$TSA_ORA_SLIDER_OR]
+      setorder(dt, `BH_P_VALUE_UP`)
+      cols_numeric <- c("OR_UP", "BH_P_VALUE_UP")
     } else if(input$TSA_ORA_TYPE_CHOICE == "Down") {
-      dt <- dt[`Odds Ratio Down` >= 1, c("Value", "Odds Ratio Down", "Adj. P-Value Down")]
-      dt <- dt[`Adj. P-Value Down` <= input$TSA_ORA_SLIDER_PVALUE &
-                 `Odds Ratio Down` >= input$TSA_ORA_SLIDER_OR]
-      setorder(dt, `Adj. P-Value Down`)
-      cols_numeric <- c("Odds Ratio Down", "Adj. P-Value Down")
+      dt <- dt[`OR_DOWN` >= 1, c("VALUE", "OR_DOWN", "BH_P_VALUE_DOWN")]
+      dt <- dt[`BH_P_VALUE_DOWN` <= input$TSA_ORA_SLIDER_PVALUE &
+                 `OR_DOWN` >= input$TSA_ORA_SLIDER_OR]
+      setorder(dt, `BH_P_VALUE_DOWN`)
+      cols_numeric <- c("OR_DOWN", "BH_P_VALUE_DOWN")
     } else if(input$TSA_ORA_TYPE_CHOICE == "Stable") {
-      dt <- dt[`Odds Ratio Stable` >= 1, c("Value", "Odds Ratio Stable", "Adj. P-Value Stable")]
-      dt <- dt[`Adj. P-Value Stable` <= input$TSA_ORA_SLIDER_PVALUE &
-                 `Odds Ratio Stable` >= input$TSA_ORA_SLIDER_OR]
-      setorder(dt, `Adj. P-Value Stable`)
-      cols_numeric <- c("Odds Ratio Stable", "Adj. P-Value Stable")
+      dt <- dt[`OR_FLAT` >= 1, c("VALUE", "OR_FLAT", "BH_P_VALUE_FLAT")]
+      dt <- dt[`BH_P_VALUE_FLAT` <= input$TSA_ORA_SLIDER_PVALUE &
+                 `OR_FLAT` >= input$TSA_ORA_SLIDER_OR]
+      setorder(dt, `BH_P_VALUE_FLAT`)
+      cols_numeric <- c("OR_FLAT", "BH_P_VALUE_FLAT")
     }
     show_DT(
       dt,
@@ -313,32 +311,26 @@ plot_TSA_ORA <- function(
 ) {
   renderPlot({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_ORA_CATEGORY_CHOICE, input$TSA_ORA_TYPE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
+    obj <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]
     req(obj)
     if (input$TSA_ORA_TYPE_CHOICE == "Up") {
-      OR_val <- "Odds Ratio Up"
-      pval_val <- "Adj. P-Value Up"
-      ORA_score_val <- "ORA_score_UP"
+      reg <- "UP"
     } else if (input$TSA_ORA_TYPE_CHOICE == "Down") {
-      OR_val <- "Odds Ratio Down"
-      pval_val <- "Adj. P-Value Down"
-      ORA_score_val <- "ORA_score_DOWN"
+      reg <- "DOWN"
     } else if ( input$TSA_ORA_TYPE_CHOICE == "Stable") {
-      OR_val <- "Odds Ratio Stable"
-      pval_val <- "Adj. P-Value Stable"
-      ORA_score_val <- "ORA_score_FLAT"
+     reg <- "FLAT"
     }
-    p <- scDiffCom:::plot_ora(
+    p <- PlotORA(
       object = obj,
+      subID = input$TSA_TISSUE_CHOICE,
       category = input$TSA_ORA_CATEGORY_CHOICE,
-      OR_val,
-      pval_val,
-      ORA_score_val,
-      max_value = 20,
-      OR_cutoff = input$TSA_ORA_SLIDER_OR,
-      pval_cutoff = min(0.05, input$TSA_ORA_SLIDER_PVALUE)
+      regulation = reg,
+      max_terms_show = 20,
+      OR_threshold = input$TSA_ORA_SLIDER_OR,
+      p_value_threshold = min(0.05, input$TSA_ORA_SLIDER_PVALUE),
+      stringent = FALSE
     )
-    p + 
+    p +
       ggtitle("Over-representation Plot")
   })
 }
@@ -346,39 +338,44 @@ plot_TSA_ORA <- function(
 plot_TSA_network <- function(
   input
 ) {
-  renderPlot({
+  renderVisNetwork({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-    obj <- DATASETS_light[[input$TSA_DATASET_CHOICE]][[input$TSA_TISSUE_CHOICE]]
+    obj <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]
     req(obj)
-    ora_tables <- scDiffCom::get_ora_tables(obj)
-    names(ora_tables) <- c("GO Terms", "Ligand-Receptor Genes", "LR_CELLTYPE", "Cell Families")
-    ora_tables <- lapply(
-      ora_tables,
-      function(ORA_dt) {
-        dt <- copy(ORA_dt)
-        setnames(
-          dt,
-          new = c("OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN",
-                  "OR_FLAT", "pval_adjusted_FLAT"),
-          old = c("Odds Ratio Up", "Adj. P-Value Up", "Odds Ratio Down", "Adj. P-Value Down",
-                  "Odds Ratio Stable", "Adj. P-Value Stable")
-        )
-        return(dt)
-      }
-    )
-    obj <- scDiffCom::set_ora_tables(obj, ora_tables)
-    cci_table_filtered <- copy(scDiffCom:::get_cci_table_filtered(obj))
-    setnames(
-      cci_table_filtered,
-      new = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF", "LR_NAME"),
-      old = c("Emitter Cell Type", "Receiver Cell Type", "Adj. P-Value", "Ligand-Receptor Genes")
-    )
-    obj <- scDiffCom:::set_cci_table_filtered(obj, cci_table_filtered)
-    req(obj)
-    scDiffCom::build_celltype_bipartite_graph(
+    BuildNetwork(
       object = obj,
-      disperse = FALSE,
-      dir = NULL
+      network_type = "bipartite",
+      subobject_name = input$TSA_TISSUE_CHOICE
     )
+    # ora_tables <- scDiffCom::get_ora_tables(obj)
+    # names(ora_tables) <- c("GO Terms", "LR_GENES", "LR_CELLTYPE", "Cell Families")
+    # ora_tables <- lapply(
+    #   ora_tables,
+    #   function(ORA_dt) {
+    #     dt <- copy(ORA_dt)
+    #     setnames(
+    #       dt,
+    #       new = c("OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN",
+    #               "OR_FLAT", "pval_adjusted_FLAT"),
+    #       old = c("OR_UP", "BH_P_VALUE_UP", "OR_DOWN", "BH_P_VALUE_DOWN",
+    #               "OR_FLAT", "BH_P_VALUE_FLAT")
+    #     )
+    #     return(dt)
+    #   }
+    # )
+    # obj <- scDiffCom::set_ora_tables(obj, ora_tables)
+    # cci_table_filtered <- copy(scDiffCom:::get_cci_table_filtered(obj))
+    # setnames(
+    #   cci_table_filtered,
+    #   new = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF", "LR_NAME"),
+    #   old = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "Adj. P-Value", "LR_GENES")
+    # )
+    # obj <- scDiffCom:::set_cci_table_filtered(obj, cci_table_filtered)
+    # req(obj)
+    # scDiffCom::build_celltype_bipartite_graph(
+    #   object = obj,
+    #   disperse = FALSE,
+    #   dir = NULL
+    # )
   })
 }
