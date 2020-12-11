@@ -53,7 +53,7 @@ tab_tissue_specific <- tabPanel(
             column(12,htmlOutput("TSA_OVERVIEW")),
             br(),
             br(),
-            column(12, plotOutput("TSA_NETWORK_PLOT", height = "800px"))
+            column(12, visNetworkOutput("TSA_NETWORK_PLOT", height = "800px"))
           ),
           value = "TSA_OVERVIEW"
         ),

@@ -21,9 +21,9 @@ server_scAgeCom <- function(
   output$TSA_SCORES_TEXTOUTPUT <- get_TSA_SCORES_text(input)
   output$TSA_ORA_TABLE <- get_TSA_ORA_table(input)
   output$TSA_ORA_PLOT <- plot_TSA_ORA(input)
-  source("utils_LR6db.R", local = TRUE)
-  output$LR6db_TABLE <- show_LR6db_table(input)
-  output$LR6db_UPSET_PLOT <- show_LR6db_upset(input)
+  source("utils_LRdb.R", local = TRUE)
+  output$LRdb_TABLE <- show_LRdb_table(input)
+  output$LRdb_UPSET_PLOT <- show_LRdb_upset(input)
   source("utils_combined_analysis.R", local = TRUE)
   output$TCA_TABLE <- get_TCA_table(input)
 }

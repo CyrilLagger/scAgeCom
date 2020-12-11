@@ -32,6 +32,8 @@ LRdb <- list(
   mouse_curated = scDiffCom::LRdb_mouse$LRdb_curated
 )
 
+saveRDS(LRdb$mouse_curated, "shinyApp/data/LRdb_mouse_curated.rds")
+
 ## Add some annotations ####
 LRdb <- lapply(
   LRdb,

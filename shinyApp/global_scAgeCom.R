@@ -8,23 +8,31 @@ library(ggplot2)
 library(ComplexUpset)
 library(scDiffCom)
 library(ggExtra)
+library(visNetwork)
 
 ## Global Data ####
 
-LR6db_curated <- readRDS("data/LR6db_curated.rds")
-cols_to_show_LR6db <- c(
+LRdb_curated <- readRDS("data/LRdb_mouse_curated.rds")
+cols_to_show_LRdb <- c(
   "LIGAND_1", "LIGAND_2",
   "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
   "DATABASE", "SOURCE"
 )
 
-DATASETS_light <- readRDS("data/scdiffcom_objects_shiny.rds")
-cols_to_show_DATA <- c("Ligand-Receptor Genes", "Emitter Cell Type", "Receiver Cell Type",
-                       "LOG2FC", "Adj. P-Value", "REGULATION", "SCORE (YOUNG)", "SCORE (OLD)")
-cols_numeric_DATA <- c("LOG2FC", "Adj. P-Value", "SCORE (YOUNG)", "SCORE (OLD)")
+DATASETS_COMBINED <- readRDS("data/analysis4_DATASETS_COMBINED_log15_light_new_ora.rds")
+DATASETS_COMBINED <- lapply(
+  DATASETS_COMBINED,
+  function(dataset) {
+    dt <- dataset@cci_detected
+    dt[, LOG2FC := LOGFC*log2(exp(1))]
+    dataset@cci_detected <- dt
+    return(dataset)
+  }
+)
+names(DATASETS_COMBINED) <- c("Calico Data", "TMS Droplet Data", "TMS FACS Data")
 
-LR_GENES_summary <- readRDS("data/genes_summary_shiny.rds")
-names(LR_GENES_summary) <- c("TMS FACS Data", "TMS Droplet Data")
+CCI_SUMMARY <- readRDS("data/analysis5_SUMMARY_log15.rds")
+names(CCI_SUMMARY) <- c("Calico Data", "TMS Droplet Data", "TMS FACS Data", "TMS FACS SUB")
 
 ## Global functions ####
 
@@ -79,8 +87,8 @@ show_volcano <- function(
     geom_point() +
     scale_color_identity() +
     geom_hline(yintercept = -log10(0.05)) +
-    geom_vline(xintercept = log2(1.2)) +
-    geom_vline(xintercept = -log2(1.2)) +
+    geom_vline(xintercept = log2(1.5)) +
+    geom_vline(xintercept = -log2(1.5)) +
     xlab(expression(paste(Log[2], "FC"))) +
     ylab(expression(paste(-Log[10], " ", p[BH]))) +
     ggtitle("Volcano Plot of all detected CCIs") +
@@ -100,8 +108,8 @@ show_scores <- function(
   p <- ggplot(
     data,
     aes(
-      x = `SCORE (YOUNG)`,
-      y = `SCORE (OLD)`,
+      x = `CCI_SCORE_YOUNG`,
+      y = `CCI_SCORE_OLD`,
       #color = ifelse(
       #  `Adj. P-Value` <= 0.05 & LOG2FC >= log2(1.2),
       #  "red",
@@ -127,8 +135,8 @@ show_scores <- function(
     scale_x_log10() +
     scale_y_log10() +
     geom_abline(slope = 1, intercept = 0) +
-    xlab("SCORE (YOUNG)") +
-    ylab("SCORE (OLD)") +
+    xlab("CCI_SCORE_YOUNG") +
+    ylab("CCI_SCORE_OLD") +
     ggtitle("Age Scores of all detected CCIs") +
     theme(text=element_text(size=20))
   
