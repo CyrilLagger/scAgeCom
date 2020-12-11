@@ -152,6 +152,7 @@ Heatmap(
   column_names_gp = grid::gpar(fontsize = 6)
 )
 
+
 ## igraph way ####
 
 cci_g <- graph.incidence(abs(cci_pi_matrix_binary_LR), weighted = TRUE)
