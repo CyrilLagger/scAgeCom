@@ -4,6 +4,38 @@ title: "R Notebook"
 
 
 ```{r}
+# Detect changed column names
+new = names(obj@cci_detected)
+old = names(obj_old@cci_detected)
+
+intersection = new[(new %in% old)]
+new_excl = new[!(new %in% old)]
+old_excl = old[!(old %in% new)]
+
+
+head(obj_old@cci_detected[, ..old_excl])
+head(obj@cci_detected[, intersection, with=FALSE])
+
+# LR_SORTED -> encapsulated in `CCI`
+# DIFFERENTIALLY_EXPRESSED -> IS_CCI_DE
+# DIFFERENTIAL_DIRECTION -> DE_DIRECTION
+# REGULATION_SIMPLE -> X
+# CCI_DETECTED_AND_SIGNIFICANT_IN_YOUNG -> ?? IS_CCI_EXPRESSED_YOUNG, IS_CCI_SCORE_YOUNG, IS_CCI_SPECIFIC_YOUNG
+# CCI_DETECTED_AND_SIGNIFICANT_IN_OLD -> ...
+# CCI_DETECTED_YOUNG -> IS_CCI_DETECTED_YOUNG
+# CCI_DETECTED_OLD -> ...
+# EMITTER_NCELLS_YOUNG -> NCELLS_EMITTER_YOUNG
+# EMITTER_NCELLS_OLD -> ...
+# L1_DETECTED_YOUNG -> L1_DETECTION_RATE_YOUNG
+# 
+
+```
+```{r}
+head(obj@cci_detected[, ..new_excl])
+```
+
+
+```{r}
 cci_detected = obj@cci_detected
 head(cci_detected)
 ```
@@ -213,6 +245,7 @@ library(visNetwork)
 cc_graphs = get_cc_subgraphs(g)
 # visNetwork::visIgraph(cc_graphs[[5]]$subgraph)
 
+warnings('Check ids of cc_graphs')
 cc_huge = cc_graphs[[1]]$subgraph
 cc_huge = add_degrees_attr(cc_huge)
 cc_huge = classify_nodes_monolri(cc_huge)
@@ -273,61 +306,13 @@ Lipase H (id=50) - ok
 
 cci_det = cci_detected
 
-# get_tissue_celltypes <- function(cci_detected) {
-#   celltypes = data.table::funion(
-#     cci_detected[, list(name=EMITTER_CELLTYPE)],
-#     cci_detected[, list(name=RECEIVER_CELLTYPE)]
-#   )
-#   return(celltypes)
-# }
-
-# union_narm <- function(l1, l2) {
-#   return(as.list(na.omit(union(l1, l2))))
-# }
-
-
-# build_celltype_communication <- function(object) {
-#   cci_det = object@cci_detected
-#   cond1 = object@parameters$cond1_name
-#   cond2 = object@parameters$cond2_name
-#   
-#   # celltypes = get_tissue_celltypes(cci_det)
-#   
-#   # cci_emitter = cci_det[, list(LIGAND_1 = list(LIGAND_1), LIGAND_2 = list(LIGAND_2)), by=EMITTER_CELLTYPE]
-#   # cci_emitter[, c('LIGANDS_list') := list(
-#   #   map2(cci_emitter[, LIGAND_1], cci_emitter[, LIGAND_2], union_narm)
-#   # )][, LIGANDS_DETECTED_COND1 := ]
-#   
-# }
-
-# is_detected <- function(expression, numcells, fraction_expressing, object=obj) {
-#   stop("Infer detection from CCI_DETECTED")
-#   if (is.na(numcells) | is.na(expression | is.na(fraction_expressing))) {
-#     return(FALSE)
-#   } else if (numcells*fraction_expressing >= object@parameters$threshold_min_cells & expression > 0) {
-#     return(TRUE)
-#   } else {
-#     return(FALSE)
-#   }
-# }
-
 res = purrr::pmap(
   cci_det,
   function(
     EMITTER_CELLTYPE, RECEIVER_CELLTYPE,
-    # EMITTER_NCELLS_YOUNG, RECEIVER_NCELLS_YOUNG,
-    # EMITTER_NCELLS_OLD, RECEIVER_NCELLS_OLD,
     LIGAND_1, LIGAND_2,
     RECEPTOR_1, RECEPTOR_2, RECEPTOR_3,
-    CCI_DETECTED_YOUNG, CCI_DETECTED_OLD,
-    # L1_EXPRESSION_YOUNG, L2_EXPRESSION_YOUNG,
-    # R1_EXPRESSION_YOUNG, R2_EXPRESSION_YOUNG, R3_EXPRESSION_YOUNG,
-    # L1_EXPRESSION_OLD, L2_EXPRESSION_OLD, 
-    # R1_EXPRESSION_OLD, R2_EXPRESSION_OLD, R3_EXPRESSION_OLD,
-    # L1_DETECTED_YOUNG, L2_DETECTED_YOUNG,
-    # R1_DETECTED_YOUNG, R2_DETECTED_YOUNG, R3_DETECTED_YOUNG,
-    # L1_DETECTED_OLD, L2_DETECTED_OLD,
-    # R1_DETECTED_OLD, R2_DETECTED_OLD, R3_DETECTED_OLD,
+    IS_CCI_DETECTED_YOUNG, IS_CCI_DETECTED_OLD,
     ...) {
     
     
@@ -336,50 +321,20 @@ res = purrr::pmap(
     receptors_young = c()
     receptors_old = c()
     
-    if (CCI_DETECTED_YOUNG) {
+    if (IS_CCI_DETECTED_YOUNG) {
       ligands_young = c(ligands_young, LIGAND_1)
       ligands_young = c(ligands_young, LIGAND_2)
       receptors_young = c(receptors_young, RECEPTOR_1)
       receptors_young = c(receptors_young, RECEPTOR_2)
       receptors_young = c(receptors_young, RECEPTOR_3)
     }
-    if (CCI_DETECTED_OLD) {
+    if (IS_CCI_DETECTED_OLD) {
       ligands_old = c(ligands_old, LIGAND_1)
       ligands_old = c(ligands_old, LIGAND_2)
       receptors_old = c(receptors_old, RECEPTOR_1)
       receptors_old = c(receptors_old, RECEPTOR_2)
       receptors_old = c(receptors_old, RECEPTOR_3)
     }
-    # if (is_detected(L1_EXPRESSION_YOUNG, EMITTER_NCELLS_YOUNG, L1_DETECTED_YOUNG)) {
-    #   ligands_young = c(ligands_young, LIGAND_1)
-    # }
-    # if (is_detected(L2_EXPRESSION_YOUNG, EMITTER_NCELLS_YOUNG, L2_DETECTED_YOUNG)) {
-    #   ligands_young = c(ligands_young, LIGAND_2)
-    # }
-    # if (is_detected(R1_EXPRESSION_YOUNG, RECEIVER_NCELLS_YOUNG, R1_DETECTED_YOUNG)) {
-    #   receptors_young = c(receptors_young, RECEPTOR_1)
-    # }
-    # if (is_detected(R2_EXPRESSION_YOUNG, RECEIVER_NCELLS_YOUNG, R2_DETECTED_YOUNG)) {
-    #   receptors_young = c(receptors_young, RECEPTOR_2)
-    # }
-    # if (is_detected(R3_EXPRESSION_YOUNG, RECEIVER_NCELLS_YOUNG, R3_DETECTED_YOUNG)) {
-    #   receptors_young = c(receptors_young, RECEPTOR_3)
-    # }
-    # if (is_detected(L1_EXPRESSION_OLD, EMITTER_NCELLS_OLD, L1_DETECTED_OLD)) {
-    #   ligands_old = c(ligands_old, LIGAND_1)
-    # }
-    # if (is_detected(L2_EXPRESSION_OLD, EMITTER_NCELLS_OLD, L2_DETECTED_OLD)) {
-    #   ligands_old = c(ligands_old, LIGAND_2)
-    # }
-    # if (is_detected(R1_EXPRESSION_OLD, RECEIVER_NCELLS_OLD, R1_DETECTED_OLD)) {
-    #   receptors_old = c(receptors_old, RECEPTOR_1)
-    # }
-    # if (is_detected(R2_EXPRESSION_OLD, RECEIVER_NCELLS_OLD, R2_DETECTED_OLD)) {
-    #   receptors_old = c(receptors_old, RECEPTOR_2)
-    # }
-    # if (is_detected(R3_EXPRESSION_OLD, RECEIVER_NCELLS_OLD, R3_DETECTED_OLD)) {
-    #   receptors_old = c(receptors_old, RECEPTOR_3)
-    # }
     
     res = list(
       EMITTER_CELLTYPE = EMITTER_CELLTYPE,
@@ -451,8 +406,8 @@ cell_counts <- function(cci_detected) {
   counts = cci_det[
     , 
     list(
-      NCELLS_YOUNG = unique(EMITTER_NCELLS_YOUNG),
-      NCELLS_OLD = unique(EMITTER_NCELLS_OLD)
+      NCELLS_YOUNG = unique(NCELLS_EMITTER_YOUNG),
+      NCELLS_OLD = unique(NCELLS_EMITTER_OLD)
       ), 
     by = EMITTER_CELLTYPE
   ]
@@ -547,8 +502,8 @@ upset(data=bool_t_df, intersect=celltypes, min_size=5, wrap=FALSE) + ggtitle(col
 # Celltype pairs graphs
 
 ```{r}
-LRI_by_pair_young = cci_det[CCI_DETECTED_YOUNG == TRUE, list(LRI_YOUNG = list(LR_SORTED)), by=list(EMITTER_CELLTYPE, RECEIVER_CELLTYPE)]
-LRI_by_pair_old = cci_det[CCI_DETECTED_OLD == TRUE, list(LRI_OLD = list(LR_SORTED)), by=list(EMITTER_CELLTYPE, RECEIVER_CELLTYPE)]
+LRI_by_pair_young = cci_det[IS_CCI_DETECTED_YOUNG == TRUE, list(LRI_YOUNG = list(LR_GENES)), by=list(EMITTER_CELLTYPE, RECEIVER_CELLTYPE)]
+LRI_by_pair_old = cci_det[IS_CCI_DETECTED_OLD == TRUE, list(LRI_OLD = list(LR_GENES)), by=list(EMITTER_CELLTYPE, RECEIVER_CELLTYPE)]
 
 LRI_by_pair = merge(LRI_by_pair_young, LRI_by_pair_old, by=c('EMITTER_CELLTYPE', 'RECEIVER_CELLTYPE'), all=FALSE)
 
@@ -599,47 +554,138 @@ upset(data=bool_t_df, intersect=celltype_pairs_sel, min_size=5, wrap=FALSE) + gg
 General CCI change graph
 
 ```{r}
-# Enrich as necessary
-dt_edge = cci_det[DIFFERENTIALLY_EXPRESSED == TRUE, 
+
+get_complete_cci_change_graph <- function(cci_detected) {
+  dt_edge = cci_detected[REGULATION %in% c('UP', 'DOWN'), 
         list(
           EMITTER_CELLTYPE, RECEIVER_CELLTYPE, 
           LR_GENES, LOGFC,
-          DIFFERENTIAL_DIRECTION
+          REGULATION
           )
         ][,
           value := abs(LOGFC)][
             ,
             label := format(round(LOGFC, 2), nsmall=2)][
               ,
-              color := ifelse(DIFFERENTIAL_DIRECTION == 'UP', 'red', 'blue')
+              color := ifelse(REGULATION == 'UP', 'red', 'blue')
             ]
-warning("DIFFERENTIAL_DIRECTION might not be optimal")
-
-# Get general CCI change graph
-cci_change_graph = igraph::graph_from_data_frame(dt_edge, directed = TRUE, vertices = NULL)
-# igraph::V(cci_change_graph)$smooth = TRUE
-
-# Get CCI graphs for a every LRI
-get_cci_change_subgraph <- function(lri, graph) {
-  cci_change_subg = igraph::subgraph.edges(
-    cci_change_graph, 
-    E(cci_change_graph)[E(cci_change_graph)$LR_GENES == lri], 
-    delete.vertices = FALSE
-  )
-  cci_change_subg$LRI = lri
-  return(cci_change_subg)
+  cci_change_graph = igraph::graph_from_data_frame(dt_edge, directed = TRUE, vertices = NULL)
+  return(cci_change_graph)
+}
+LRI_subgraph <- function(cci_detected, LRIs) {
+  SUBG_LIMIT = 5
+  if(length(LRIs) > SUBG_LIMIT) {
+    stop('The number of subgraphs limit for visualization is SUBG_LIMIT')
+  }
+  dt_edge = cci_detected[
+    (REGULATION %in% c('UP', 'DOWN'))
+      & (LR_GENES %in% LRIs),
+        list(
+          EMITTER_CELLTYPE, RECEIVER_CELLTYPE, 
+          LR_GENES, LOGFC,
+          REGULATION
+          )
+        ][,
+          value := abs(LOGFC)][
+            ,
+            # label := format(round(LOGFC, 2), nsmall=2)][
+            label := LR_GENES][
+              ,
+              color := ifelse(REGULATION == 'UP', 'red', 'blue')
+            ]
+  g = igraph::graph_from_data_frame(dt_edge, directed = TRUE, vertices = NULL)
+  g$LRI = LRIs
+  return(g)
+}
+build_interactive_LRI_network <- function(cci_detected, LRIs) {
+  g = LRI_subgraph(cci_detected, LRIs)
+  vis = visIgraph(g) %>%
+    visEdges(font='8px arial green',
+             smooth=list(roundness=1),
+             scaling=list(
+               min=10, max=16,
+               label=list(min=14, max=20))) %>%
+    ( scDiffCom:::get_visnetwork_options() ) %>%
+    ( scDiffCom:::get_visnetwork_interactive() )
+  return(vis)
 }
 
+get_LRI_subgraphs <- function(cci_detected, LRIs = NULL) {
+  if(is.null(LRIs)) {
+    lris = unique(cci_detected[, LR_GENES])
+  } else {
+    lris = LRIs
+  }
+  subgraphs = purrr::map(
+    lris,
+    ~ LRI_subgraph(cci_detected, .x)
+  )
+  if(length(lris)==1) {
+    return(subgraphs[[1]])
+  } else {
+    return(subgraphs)
+  }
+}
+LRI_subgraph_metrics <- function(cci_detected, LRIs=NULL) {
+  subgraphs = get_LRI_subgraphs(cci_detected, LRIs)
+  
+  subg_metrics_l = purrr::map(
+    subgraphs,
+    function(subg) {
+      
+      metrics = list(
+          LRI = subg$LRI,
+          num_edges = length(igraph::E(subg)),
+          num_loops = sum(igraph::which_loop(subg)),
+          num_reciprocal = sum(igraph::which_mutual(subg)) - sum(igraph::which_loop(subg)),
+          motifs_3_total = igraph::count_motifs(subg, size=3),
+        )
+      motifs_3 = as.list(igraph::motifs(subg, size = 3))
+      names(motifs_3) = paste0('Motifs_3_id_', 0:15)
+      
+      return(c(metrics, motifs_3))
+  
+    }
+  )
+
+  subg_metrics_dt = data.table::rbindlist(subg_metrics_l)
+  return(subg_metrics_dt)
+}
+
+get_interesting_LRI_graphs <- function(subg_metrics, 
+                                          cci_detected=NULL,
+                                          isom_class=NULL,
+                                          byNumEdges=FALSE) {
+  if(!xor(is.null(subg_metrics), is.null(cci_detected))) {
+    stop('subg_metrics XOR cci_detected must be provided')
+  }
+  if(!xor(is.null(isom_class), byNumEdges)) {
+    stop('isom_class XOR byNumEdges must be specified')
+  }
+  if(!is.null(cci_detected)) {
+    subg_metrics = LRI_subgraph_metrics(cci_detected)
+  }
+  
+  if(!is.null(isom_class)) {
+    colname = paste0('Motifs_3_id_', isom_class)
+    lris = subg_metrics[get(colname) > 0][order(-get(colname)), LRI]
+    return(lris)
+  } else {
+    lris_sorted = subg_metrics[order(-num_edges), LRI]
+    return(lris_sorted)
+  }
+  
+}
+
+# Get general CCI change graph
+cci_change_graph = get_complete_cci_change_graph(cci_det)
+# igraph::V(cci_change_graph)$smooth = TRUE
+
 # LRI = "Ubb:Ripk1"
-LRI = "Cd84:Cd84"
+LRI = "Gcg:Adrb2"
 
-cci_change_subg = get_cci_change_subgraph(LRI, cci_change_graph)
-# cci_change_subg = igraph::subgraph.edges(
-#   cci_change_graph, 
-#   E(cci_change_graph)[E(cci_change_graph)$LR_GENES == LRI], 
-#   delete.vertices = FALSE
-# )
-
+cci_change_subg = get_LRI_subgraphs(cci_det, LRI)
+cci_change_subg
 visIgraph(cci_change_subg)
 # visIgraph(cci_change_graph)
 
@@ -647,48 +693,7 @@ visIgraph(cci_change_subg)
 # Get every subgraph and compute metrics of interest
 LRIs = unique(igraph::E(cci_change_graph)$LR_GENES)
 
-get_subgraphs <- function(LRIs, graph) {
-  subgraphs = purrr::map(
-    LRIs,
-    get_cci_change_subgraph,
-    graph
-  )
-  return(subgraphs)
-}
-
-subgraphs = get_subgraphs(LRIs, cci_change_graph)
-
-subg_metrics_l = purrr::map(
-  subgraphs,
-  function(subg) {
-    
-    metrics = list(
-        LRI = subg$LRI,
-        num_edges = length(igraph::E(subg)),
-        num_loops = sum(igraph::which_loop(subg)),
-        num_reciprocal = sum(igraph::which_mutual(subg)) - sum(igraph::which_loop(subg)),
-        
-        motifs_3_total = igraph::count_motifs(subg, size=3),
-        
-        # motifs_4_total = igraph::count_motifs(subg, size=4),
-        # motifs_4 = igraph::motifs(subg, size = 4),
-        
-        # Connected components
-        warning('Count cc with size=1 and self-loop as significant cc')
-        num_sign_cc = sum(components(subg, mode='weak')$csize > 1)
-      )
-    
-    motifs_3 = as.list(igraph::motifs(subg, size = 3))
-    names(motifs_3) = paste0('Motifs_3_id_', 0:15)
-    
-    return(c(metrics, motifs_3))
-
-  }
-)
-
-subg_metrics_dt = data.table::rbindlist(subg_metrics_l)
-
-subg_metrics_dt
+subg_metrics_dt = LRI_subgraph_metrics(cci_det)
 
 purrr::map(
   names(subg_metrics_dt)[2:ncol(subg_metrics_dt)],
@@ -710,6 +715,24 @@ map(0:15, ~ plot(graph_from_isomorphism_class(3, .x), main=paste0('isomorphism c
 ```
 
 ```{r}
+subg_metrics_dt
+```
 
+Technical: Association between min(ncells) and |logFC| and p-value
+
+```{r}
+min_cells_young = purrr::map2_dbl(cci_det[, NCELLS_EMITTER_YOUNG], cci_det[, NCELLS_RECEIVER_YOUNG], min)
+min_cells_old = purrr::map2_dbl(cci_det[, NCELLS_EMITTER_OLD], cci_det[, NCELLS_RECEIVER_OLD], min)
+min_cells = purrr::map2_dbl(min_cells_young, min_cells_old, min)
+logFC = cci_det[["LOGFC"]]
+abslogFC = cci_det[["LOGFC_ABS"]]
+p_val = cci_det[["P_VALUE_DE"]]
+
+x = min_cells
+y = p_val
+{
+  plot(x, y)
+  abline(lm(y ~ x), col='red')
+}
 ```
 
