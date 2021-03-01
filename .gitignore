@@ -3,5 +3,5 @@
 .RData
 .Ruserdata
 analysis/intermediate_data
-shinyApp/data/
+shinyApp/data
 
