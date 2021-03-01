@@ -8,6 +8,9 @@ ui_scAgeCom <- fluidPage(
   titlePanel(
     title = "A Murine ATLAS of Age-related Intercellular Communication Changes."
     ),
+  tags$head(
+    tags$style(HTML("hr {border-top: 1px solid #000000;}"))
+  ),
   navbarPage(
     title = "",
     tab_description,
