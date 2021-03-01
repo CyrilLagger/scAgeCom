@@ -1,0 +1,371 @@
+---
+title: "R Notebook"
+---
+
+```{r}
+library(data.table)
+library(purrr)
+library(scDiffCom)
+library(ontologyIndex)
+library(reshape2)
+library(ggplot2)
+library(ggpubr)
+library(ontologyPlot)
+# library(GO.db)
+
+obj = readRDS('../../data_scAgeCom/testing/scDiffCom_test_facs_liver.rds')
+GO = ontologyIndex::get_ontology(file='../../data/go.obo')
+LR_GO = scDiffCom::LRdb_mouse$LRdb_curated_GO
+
+BIOLOGICAL_PROCESS_ROOT = 'GO:0008150'
+MOLECULAR_FUNCTION_ROOT = 'GO:0003674'
+CELLULAR_COMPONENT_ROOT = 'GO:0005575'
+
+BIOLOGICAL_PROCESSES = ontologyIndex::get_descendants(GO, BIOLOGICAL_PROCESS_ROOT)
+MOLECULAR_FUNCTIONS = ontologyIndex::get_descendants(GO, MOLECULAR_FUNCTION_ROOT)
+CELLULAR_COMPONENTS = ontologyIndex::get_descendants(GO, CELLULAR_COMPONENT_ROOT)
+
+get_GO <- function() {
+  return(
+    ontologyIndex::get_ontology(file='../../data/go.obo')
+  )
+}
+```
+
+Utils
+
+```{r}
+# (A)
+build_GO_LRI_binary_indicator_dt <- function() {
+  lr_go = scDiffCom::LRdb_mouse$LRdb_curated_GO
+  lr_go[, 'Indicator' := 1]
+  lr_go[, 'GO_NAME' := NULL]
+  lr_go_wide = data.table::dcast(lr_go, LR_SORTED ~ GO_ID, value.var = 'Indicator')
+  lr_go_wide[is.na(lr_go_wide)] = 0
+  rownames(lr_go_wide) = lr_go_wide[["LR_SORTED"]]
+  lr_go_wide[, LR_SORTED := NULL]
+  return(lr_go_wide)  
+  # head(lr_go_wide)
+  # sum(lr_go_wide[, 2:3641])
+}
+plot_GO_LRI_histogram <- function(lr_go_wide = NULL, by_GO_category = FALSE) {
+  
+  if(is.null(lr_go_wide)) {
+    lr_go_wide = build_GO_LRI_binary_indicator_dt()
+  }
+  
+  hist_from_vector <- function(v, bw=NULL, xlim=NULL, xlab=NULL, title=NULL) {
+      return(
+        ggplot(data.frame(v), aes(v))
+        + geom_histogram(binwidth=bw)
+        + coord_cartesian(xlim=xlim)
+        + xlab(xlab)
+        + ggtitle(label=title)
+      )
+    }
+  
+  Num_LRIs = dim(lr_go_wide)[1]
+  Num_GOs = dim(lr_go_wide)[2]
+  
+  if(!by_GO_category) {
+
+    Num_GOs_per_LR = rowSums(lr_go_wide)
+    Num_LRIs_per_GO = colSums(lr_go_wide)
+    
+    g1 = hist_from_vector(Num_GOs_per_LR,
+                          bw=5,
+                          xlab='#GO per LR',
+                          title=paste('#GOs = ', Num_GOs))
+    g2 = hist_from_vector(Num_LRIs_per_GO,
+                          bw=10, 
+                          xlim=c(0, 500),
+                          xlab='#LRI per GO term',
+                          title=paste('#LRIs = ', Num_LRIs))
+    gg = ggarrange(g1, g2,
+              nrow=1, ncol=2)
+    return(gg)
+  
+  } else {
+    
+    BIOLOGICAL_PROCESSES = ontologyIndex::get_descendants(GO, BIOLOGICAL_PROCESS_ROOT)
+    MOLECULAR_FUNCTIONS = ontologyIndex::get_descendants(GO, MOLECULAR_FUNCTION_ROOT)
+    CELLULAR_COMPONENTS = ontologyIndex::get_descendants(GO, CELLULAR_COMPONENT_ROOT)
+    
+    BPs = colnames(lr_go_wide)[colnames(lr_go_wide) %in% BIOLOGICAL_PROCESSES]
+    MFs = colnames(lr_go_wide)[colnames(lr_go_wide) %in% MOLECULAR_FUNCTIONS]
+    CCs = colnames(lr_go_wide)[colnames(lr_go_wide) %in% CELLULAR_COMPONENTS]
+    
+    Num_BPs = length(BPs)
+    Num_MFs = length(MFs)
+    Num_CCs = length(CCs)
+    
+    Num_BPs_per_LR = rowSums(lr_go_wide[, ..BPs])
+    Num_MFs_per_LR = rowSums(lr_go_wide[, ..MFs])
+    Num_CCs_per_LR = rowSums(lr_go_wide[, ..CCs])
+    Num_LRIs_per_BPs = colSums(lr_go_wide[, ..BPs])
+    Num_LRIs_per_MFs = colSums(lr_go_wide[, ..MFs])
+    Num_LRIs_per_CCs = colSums(lr_go_wide[, ..CCs])
+    
+    g1 = hist_from_vector(Num_BPs_per_LR,
+                          bw=5,
+                          xlab='#BPs per LRI',
+                          title=paste('#BPs = ', Num_BPs))
+    g2 = hist_from_vector(Num_LRIs_per_BPs,
+                          bw=10, 
+                          xlim=c(0, 500),
+                          xlab='#LRI per BP',
+                          title=paste('#LRIs = ', Num_LRIs))
+    g3 = hist_from_vector(Num_MFs_per_LR,
+                          bw=5,
+                          xlab='#MFs per LRI',
+                          title=paste('#MFs = ', Num_MFs))
+    g4 = hist_from_vector(Num_LRIs_per_MFs,
+                          bw=10, 
+                          xlim=c(0, 500),
+                          xlab='#LRI per MF',
+                          title=paste('#LRIs = ', Num_LRIs))
+    g5 = hist_from_vector(Num_CCs_per_LR,
+                          bw=5,
+                          xlab='#CCs per LRI',
+                          title=paste('#CCs = ', Num_CCs))
+    g6 = hist_from_vector(Num_LRIs_per_CCs,
+                          bw=10, 
+                          xlim=c(0, 500),
+                          xlab='#LRI per CC',
+                          title=paste('#LRIs = ', Num_LRIs))
+    gg = ggarrange(
+      g1, g2, g3, g4, g5, g6,
+      nrow=3, ncol=2)
+    return(gg)
+    
+  }
+  
+}
+
+# (B)
+# Will approximate
+get_term_num_ancestors <- function(go, terms) {
+    return(
+        map_int(
+            terms,
+            ~ (length(get_ancestors(go, .x)))
+        ) - 1
+    )
+}
+summarize_GO_terms_landscape <- function(ora_dt, go_id_colname, gene_ontology) {
+  
+  ora_dt_ext = extend_GO_terms_dt(ora_dt, go_id_colname, gene_ontology)
+  
+  freqs = ora_dt_ext[['FREQUENCY']]
+  num_ancestors = ora_dt_ext[['NUM_ANCESTORS']]
+
+  plot_hist <- function(vec, xlab, bw=0.01, zoom=FALSE) {
+      if(!zoom) {
+          return(
+              ggplot(data.frame(vec), aes(vec))
+              + geom_histogram(binwidth=bw)
+              + xlab(xlab)
+              + theme_bw()
+          )
+      } else {
+          return(
+              ggplot(data.frame(vec), aes(vec))
+              + geom_histogram(binwidth=bw)
+              + xlab(xlab)
+              + coord_cartesian(xlim=c(0, 0.05), ylim=c(0, 100))
+              + theme_bw()
+          )
+      }
+  }
+  freq_hist = plot_hist(freqs, 'Term frequency', 0.001, zoom=TRUE)
+  ancest_hist = plot_hist(num_ancestors, 'Num ancestors', 1)
+
+  plot_data = data.table(
+    GO=names(freqs),
+    TERM_FREQ=freqs,
+    NUM_ANCESTORS=num_ancestors
+  )
+  
+  plot_scatter <- function(data, zoom=FALSE) {
+    if (!zoom) {
+        return(
+            ggplot(data, aes(x=NUM_ANCESTORS, y=TERM_FREQ))
+            + geom_jitter()
+            + geom_hline(yintercept=0.01)
+            + geom_hline(yintercept=0.025)
+            + geom_hline(yintercept=0.05)
+            + theme_bw()
+        )
+    }
+    else {
+        return(
+            ggplot(data, aes(x=NUM_ANCESTORS, y=TERM_FREQ))
+            + geom_jitter()
+            + coord_cartesian(xlim=c(0, 20), ylim=c(0, 0.10))
+            + geom_hline(yintercept=0.01)
+            + geom_hline(yintercept=0.025)
+            + geom_hline(yintercept=0.05)
+            + theme_bw()
+        )
+    }
+    
+}
+  unzoom_scatter = plot_scatter(plot_data, zoom=FALSE)
+  zoomed_scatter = plot_scatter(plot_data, zoom=TRUE)
+
+  g = ggarrange(
+    freq_hist, ancest_hist,
+    unzoom_scatter, zoomed_scatter,
+    nrow=2, ncol=2)
+  
+  return(
+    annotate_figure(g)
+  )
+}
+describe_GO_terms_set <- function(gos, gene_ontology) {
+    
+  freqs = get_term_frequencies(gene_ontology, gos)
+  freqs = freqs[ names(freqs) %in% gos ]  # for some reason increases
+  num_ancestors = get_term_num_ancestors(gene_ontology, gos)
+  info_content = get_term_info_content(gene_ontology, gos)
+  info_content = info_content[ names(info_content) %in% gos ]  # for some reason increases
+    
+  # names(freqs) = gos
+  names(num_ancestors) = gos
+  # names(info_content) = gos
+  
+  # NA-fills up to length(gos)
+  length(freqs) <- length(info_content) <- length(num_ancestors) <- length(gos)
+  
+  dt = data.table(
+    GO_TERM = gos,
+    FREQUENCY = freqs,
+    NUM_ANCESTORS = num_ancestors,
+    INFO_CONTENT = info_content
+  )
+  
+  return(dt)
+}
+extend_GO_terms_dt <- function(dt_go, go_id_colname='GO_TERM', gene_ontology=GO) {
+  
+  gos = dt_go[[go_id_colname]]
+  if (length(unique(gos)) != length(gos)) {
+    stop("No duplicated GO terms are allowed")
+  }
+  
+  dt_go_extension = describe_GO_terms_set(gos, gene_ontology)
+  dt_extended = merge(dt_go, dt_go_extension,
+                      by.x = go_id_colname,
+                      by.y = "GO_TERM",
+                      all = FALSE)
+  
+  return(dt_extended)
+}
+
+# (C)
+plot_ORA_histograms <- function(ora_dt) {
+  
+  or_diff = ora_dt[, .(OR_DIFF)]
+  pval_diff = ora_dt[, .(BH_P_VALUE_DIFF)]
+        
+  or_up = ora_dt[, .(OR_UP)]
+  pval_up = ora_dt[, .(BH_P_VALUE_UP)]
+        
+  or_down = ora_dt[, .(OR_DOWN)]
+  pval_down = ora_dt[, .(BH_P_VALUE_DOWN)]
+  
+  g_OR_DIFF = (
+    ggplot(or_diff, aes(OR_DIFF))
+    + geom_histogram(binwidth=1)
+    + geom_vline(aes(xintercept=10, colour='red'))
+    + ggtitle('OR_DIFF')
+  )
+  g_pval_DIFF = (
+    ggplot(pval_diff, aes(BH_P_VALUE_DIFF))
+    + geom_histogram(binwidth=0.01)
+    + geom_vline(aes(xintercept=0.05, colour='red'))
+    + ggtitle('BH_P_VALUE_DIFF')
+  )
+        
+  g_OR_UP = (
+    ggplot(or_up, aes(OR_UP))
+    + geom_histogram(binwidth=1)
+    + geom_vline(aes(xintercept=10, colour='red'))
+    + ggtitle('OR_UP')
+  )
+  g_pval_UP = (
+    ggplot(pval_up, aes(BH_P_VALUE_UP))
+    + geom_histogram(binwidth=0.01)
+    + geom_vline(aes(xintercept=0.05, colour='red'))
+    + ggtitle('BH_P_VALUE_UP')
+  )
+        
+  g_OR_DOWN = (
+    ggplot(or_down, aes(OR_DOWN))
+    + geom_histogram(binwidth=1)
+    + geom_vline(aes(xintercept=10, colour='red'))
+    + ggtitle('OR_DOWN')
+  )
+  g_pval_DOWN = (
+    ggplot(pval_down, aes(BH_P_VALUE_DOWN))
+    + geom_histogram(binwidth=0.01)
+    + geom_vline(aes(xintercept=0.05, colour='red'))
+    + ggtitle('BH_P_VALUE_DOWN')
+  )
+        
+  ggarrange(g_OR_DIFF, g_pval_DIFF,
+            g_OR_UP, g_pval_UP,
+            g_OR_DOWN, g_pval_DOWN,
+            nrow=3, ncol=2)
+}
+
+```
+
+
+
+(A) Histogram of #GO per LRI and #LRI per GO
+
+```{r}
+plot_GO_LRI_histogram(by_GO_category = FALSE)
+plot_GO_LRI_histogram(by_GO_category = TRUE)
+```
+
+(B) Extract num_ancestors and frequency of a GO set
+
+> num_ancestors <= 0
+GO:0008150 GO:0044420 GO:0044422 GO:0044431 GO:0044446 GO:0044456 GO:0044464 GO:0097458 GO:0098589 
+         0          0          0          0          0          0          0          0         -1 
+
+> sort(num_ancestors)[(length(num_ancestors)-10):length(num_ancestors)]
+GO:0050731 GO:0010524 GO:0045773 GO:0006469 GO:0045860 GO:0043409 GO:0071901 GO:0071902 GO:0051281 GO:0043406 GO:0043407
+        30         35         36         38         38         40         40         40         46         54         54 
+
+> sort(num_ancestors)[1:20]
+GO:0098589 GO:0008150 GO:0044420 GO:0044422 GO:0044431 GO:0044446 GO:0044456 GO:0044464 GO:0097458 GO:0003824 GO:0005215 GO:0008152 GO:0009987 
+        -1          0          0          0          0          0          0          0          0          1          1          1          1 
+GO:0022610 GO:0032501 GO:0040007 GO:0040011 GO:0050896 GO:0051179 GO:0001775 
+         1          1          1          1          1          1          2 
+         
+```{r}
+ora_dt = obj@ora_default$GO_TERMS
+ora_dt_select = ora_dt[(OR_UP > 3) & (BH_P_VALUE_UP < 0.05)]
+
+ora_dt_select_extended = extend_GO_terms_dt(ora_dt_select, 'VALUE_BIS', GO)
+summarize_GO_terms_landscape(ora_dt_select, 'VALUE_BIS', GO)
+
+head(ora_dt_select_extended)
+```
+
+(C) OR_{UP, DOWN, DIFF}|pval_{UP, DOWN, DIFF} distributions for an ORA set (not necessarily GO terms, any)
+
+```{r}
+plot_ORA_histograms(obj@ora_default$GO_TERMS)
+plot_ORA_histograms(obj@ora_default$LR_GENES)
+plot_ORA_histograms(obj@ora_default$ER_CELLTYPES)
+```
+
+(D) Correlations among GO terms
+
+```{r}
+
+```
