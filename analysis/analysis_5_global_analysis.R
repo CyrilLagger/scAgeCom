@@ -23,8 +23,7 @@ library(circlize)
 
 ## Read light scDiffComCombined objects ####
 
-DATASETS_COMBINED_log13 <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log13_light.rds")
-DATASETS_COMBINED_log15 <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log15_light.rds")
+DATASETS_COMBINED <- readRDS("../data_scAgeCom/analysis/outputs_data/TMS_scAgeCom_processed_bestORA.rds")
 
 ## Read heavy data for subsetting facs to make it comparable to droplet ####
 
@@ -62,6 +61,9 @@ temp_dt[,GENAGE := ifelse(
   "YES",
   "NO"
 )]
+temp_dt[cell_types_dt, on = "EMITTER_CELLTYPE==scDiffCom.cell.type", EMITTER_CELLTYPE_ABR := i.Abbreviation]
+temp_dt[cell_types_dt, on = "RECEIVER_CELLTYPE==scDiffCom.cell.type", RECEIVER_CELLTYPE_ABR := i.Abbreviation]
+
 facs_subobject@cci_detected <- temp_dt
 
 facs_subobject <- RunORA(
@@ -86,7 +88,12 @@ facs_subobject@cci_raw <- list()
 
 rm(DATASETS_COMBINED_log15_heavy)
 
+saveRDS(facs_subobject, "../data_scAgeCom/analysis/outputs_data/analysis5_DATASET_FACS_SUBSETTED.rds")
+
+facs_subobject <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis5_DATASET_FACS_SUBSETTED.rds")
+
 DATASETS_COMBINED_log15$facs_mixed_subsetted <- facs_subobject
+
 
 ## Create a function that summarize results by category ####
 
@@ -99,13 +106,14 @@ get_summary_cci <- function(
     cci_dt_full[, N_CELLTYPES := max(uniqueN(EMITTER_CELLTYPE), uniqueN(RECEIVER_CELLTYPE)), by = "ID"]
     cci_dt <- cci_dt_full[, c("ID", "N_CELLTYPES", "REGULATION")]
     cols_key <- c("ID", "REGULATION")
-    ora_dt <- object@ora_combined_default$ID
+    ora_dt <- copy(object@ora_combined_default$ID)
     category_name <- category
     col_id <- "N_CCI"
     ora_on <- "ID==VALUE"
     final_col_order <- c(
-      "ID", "N_CELLTYPES", "N_CCI", "AVG_LR_PER_ER", "N_CCI_YOUNG", "N_CCI_OLD", "N_CCI_DOWN_DISAPPEARS", "N_CCI_DOWN",
-      "N_CCI_FLAT", "N_CCI_UP", "N_CCI_UP_APPEARS", "PCT_CCI_STABLE", "ORA_SCORE_UP", "ORA_SCORE_DOWN",
+      "ID", "N_CELLTYPES", "N_CCI", "AVG_LR_PER_ER", "N_CCI_DOWN",
+      "N_CCI_FLAT", "N_CCI_UP", "N_CCI_NON_SIGNIFICANT_CHANGE",
+      "PCT_CCI_STABLE", "ORA_SCORE_UP", "ORA_SCORE_DOWN",
       "ORA_OR_UP", "ORA_OR_DOWN",  "ORA_P_VALUE_UP" , "ORA_P_VALUE_DOWN"
     )
   } else if (category == "ER_CELLTYPES") {
@@ -117,9 +125,9 @@ get_summary_cci <- function(
     col_id <- "N_LR"
     ora_on <- c("ID==ID", "ER_CELLTYPES==VALUE")
     final_col_order <- c(
-      "ER_CELLTYPES", "ID", "N_LR", "N_LR_YOUNG", "N_LR_OLD",
-      "N_LR_DOWN_DISAPPEARS", "N_LR_DOWN", "N_LR_FLAT", "N_LR_UP", "N_LR_UP_APPEARS",
-      "ORA_SCORE_UP", "ORA_SCORE_DOWN", "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
+      "ER_CELLTYPES", "ID", "N_LR", "N_LR_DOWN", "N_LR_FLAT", "N_LR_UP",
+      "N_LR_NON_SIGNIFICANT_CHANGE", "ORA_SCORE_UP", "ORA_SCORE_DOWN",
+      "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
     )
   } else if (category == "ER_CELL_FAMILY") {
     cci_dt <- cci_dt_full[, c("ID", "ER_CELL_FAMILY", "REGULATION")]
@@ -130,9 +138,9 @@ get_summary_cci <- function(
     col_id <- "N_LR"
     ora_on <- c("ID==ID", "ER_CELL_FAMILY==VALUE")
     final_col_order <- c(
-      "ER_CELL_FAMILY", "ID", "N_LR", "N_LR_YOUNG", "N_LR_OLD",
-      "N_LR_DOWN_DISAPPEARS", "N_LR_DOWN", "N_LR_FLAT", "N_LR_UP", "N_LR_UP_APPEARS",
-      "ORA_SCORE_UP", "ORA_SCORE_DOWN", "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
+      "ER_CELL_FAMILY", "ID", "N_LR", "N_LR_DOWN", "N_LR_FLAT", "N_LR_UP",
+      "N_LR_NON_SIGNIFICANT_CHANGE", "ORA_SCORE_UP", "ORA_SCORE_DOWN",
+      "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
     )
   } else if (category == "ER_CELL_FAMILY_GLOBAL") {
     cci_dt <- cci_dt_full[, c("ER_CELL_FAMILY", "REGULATION")]
@@ -142,9 +150,9 @@ get_summary_cci <- function(
     col_id <- "N_LR"
     ora_on <- "ER_CELL_FAMILY==VALUE"
     final_col_order <- c(
-      "ER_CELL_FAMILY", "N_LR", "N_LR_YOUNG", "N_LR_OLD",
-      "N_LR_DOWN_DISAPPEARS", "N_LR_DOWN", "N_LR_FLAT", "N_LR_UP", "N_LR_UP_APPEARS",
-      "ORA_SCORE_UP", "ORA_SCORE_DOWN", "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
+      "ER_CELL_FAMILY", "N_LR", "N_LR_DOWN", "N_LR_FLAT", "N_LR_UP",
+      "N_LR_NON_SIGNIFICANT_CHANGE", "ORA_SCORE_UP", "ORA_SCORE_DOWN",
+      "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
     )
   } else if (category == "LR_GENES") {
     cci_dt <- cci_dt_full[, c("ID", "LR_GENES", "REGULATION")]
@@ -155,11 +163,11 @@ get_summary_cci <- function(
     col_id <- "N_ER"
     ora_on <- c("ID==ID", "LR_GENES==VALUE")
     final_col_order <- c(
-      "LR_GENES", "ID", "N_ER", "N_ER_YOUNG", "N_ER_OLD",
-      "N_ER_DOWN_DISAPPEARS", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP", "N_ER_UP_APPEARS",
-      "ORA_SCORE_UP", "ORA_SCORE_DOWN", "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
+      "LR_GENES", "ID", "N_ER", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP",
+      "N_ER_NON_SIGNIFICANT_CHANGE", "ORA_SCORE_UP", "ORA_SCORE_DOWN",
+      "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
     )
-  } else if (category %in% c("LR_GENES_GLOBAL", "GO_TERMS_GLOBAL")) {
+  } else if (category %in% c("LR_GENES_GLOBAL", "GO_TERMS_GLOBAL", "KEGG_PWS_GLOBAL")) {
     cci_dt <- cci_dt_full[, c("LR_GENES", "REGULATION")]
     cols_key <- c("LR_GENES", "REGULATION")
     ora_dt<- object@ora_combined_default$LR_GENES
@@ -168,9 +176,9 @@ get_summary_cci <- function(
     ora_on <-  "LR_GENES==VALUE"
     final_col_order <- c(
       "LR_GENES",
-      "ORA_SCORE_UP", "ORA_SCORE_DOWN", "N_ID", "N_ID_UP", "N_ID_DOWN", "N_ORA_ID_UP", "N_ORA_ID_DOWN",
-      "N_ER", "N_ER_YOUNG", "N_ER_OLD",
-      "N_ER_DOWN_DISAPPEARS", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP", "N_ER_UP_APPEARS",
+      "ORA_SCORE_UP", "ORA_SCORE_DOWN", "N_ID", "N_ID_UP", "N_ID_DOWN",
+      "N_ORA_ID_UP", "N_ORA_ID_DOWN",
+      "N_ER", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP", "N_ER_NON_SIGNIFICANT_CHANGE",
       "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
     )
   }
@@ -183,12 +191,12 @@ get_summary_cci <- function(
   )
   cci_temp_N <- cci_dt[, .N, by = get(cols_key[[1]])]
   res[cci_temp_N, on = "cols_key==get", (col_id) := i.N]
-  res[, (paste0(col_id, "_YOUNG")) := DOWN + DOWN_DISAPPEARS + FLAT + UP]
-  res[, (paste0(col_id, "_OLD")):= DOWN + FLAT + UP + UP_APPEARS]
+  #res[, (paste0(col_id, "_YOUNG")) := DOWN + DOWN_DISAPPEARS + FLAT + UP]
+  #res[, (paste0(col_id, "_OLD")):= DOWN + FLAT + UP + UP_APPEARS]
   setnames(
     res,
-    old = c("cols_key", colnames(res)[2:6]),
-    new = c(category_name, paste(col_id, colnames(res)[2:6], sep = "_"))
+    old = c("cols_key", colnames(res)[2:5]),
+    new = c(category_name, paste(col_id, colnames(res)[2:5], sep = "_"))
   )
   if (category == "ID") {
     res[cci_dt, on = "ID", N_CELLTYPES := i.N_CELLTYPES]
@@ -203,15 +211,16 @@ get_summary_cci <- function(
   } else if (category == "LR_GENES") {
     res[cci_dt, on = "ID_LR_GENES", `:=` (ID = i.ID, LR_GENES = i.LR_GENES)]
     res[, ID_LR_GENES := NULL]
-  } else if (category %in% c("LR_GENES_GLOBAL", "GO_TERMS_GLOBAL")) {
+  } else if (category %in% c("LR_GENES_GLOBAL", "GO_TERMS_GLOBAL", "KEGG_PWS_GLOBAL")) {
     res[cci_dt_full[, uniqueN(ID), by = "LR_GENES"], on = "LR_GENES", N_ID := i.V1]
-    res[cci_dt_full[REGULATION_SIMPLE == "UP", uniqueN(ID), by = "LR_GENES"], on = "LR_GENES", N_ID_UP := i.V1 ]
-    res[cci_dt_full[REGULATION_SIMPLE == "DOWN", uniqueN(ID), by = "LR_GENES"], on = "LR_GENES", N_ID_DOWN := i.V1 ]
+    res[cci_dt_full[REGULATION == "UP", uniqueN(ID), by = "LR_GENES"], on = "LR_GENES", N_ID_UP := i.V1 ]
+    res[cci_dt_full[REGULATION == "DOWN", uniqueN(ID), by = "LR_GENES"], on = "LR_GENES", N_ID_DOWN := i.V1 ]
     ora_dt_2 <- object@ora_default$LR_GENES
     res[ora_dt_2[OR_UP > 1 & BH_P_VALUE_UP <= 0.05, .N, by = c("VALUE")], on = "LR_GENES==VALUE", N_ORA_ID_UP := i.N]
     res[ora_dt_2[OR_DOWN > 1 & BH_P_VALUE_DOWN <= 0.05, .N, by = c("VALUE")], on = "LR_GENES==VALUE", N_ORA_ID_DOWN := i.N]
     setnafill(res, fill = 0, cols = c("N_ID_UP", "N_ID_DOWN", "N_ORA_ID_UP", "N_ORA_ID_DOWN"))
   }
+
   res[ora_dt, on = ora_on,
       `:=` (ORA_OR_UP = i.OR_UP, ORA_P_VALUE_UP = i.P_VALUE_UP, ORA_SCORE_UP = i.ORA_SCORE_UP,
             ORA_OR_DOWN = i.OR_DOWN, ORA_P_VALUE_DOWN = i.P_VALUE_DOWN, ORA_SCORE_DOWN = i.ORA_SCORE_DOWN) ]
@@ -219,38 +228,47 @@ get_summary_cci <- function(
     x = res,
     neworder = final_col_order
   )
-  if (category == "GO_TERMS_GLOBAL") {
-    LRdb_GO <- LRdb_mouse$LRdb_curated_GO
-    res[cci_dt_full, on = "LR_GENES", LR_SORTED := i.LR_SORTED]
+  if (category %in% c("GO_TERMS_GLOBAL", "KEGG_PWS_GLOBAL")) {
+    if (category == "GO_TERMS_GLOBAL") {
+      LRdb_temp <- LRdb_mouse$LRdb_curated_GO
+      id_name <- "GO_NAME"
+      id_category <- "GO_TERMS"
+    }
+    if (category == "KEGG_PWS_GLOBAL") {
+      LRdb_temp <- LRdb_mouse$LRdb_curated_KEGG
+      id_name <- "KEGG_NAME"
+      id_category <- "KEGG_PWS"
+    }
     res <- merge.data.table(
-      LRdb_GO,
-      res[, c("LR_GENES", "LR_SORTED", "N_ER", "N_ER_YOUNG", "N_ER_OLD",
-              "N_ER_DOWN_DISAPPEARS", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP", "N_ER_UP_APPEARS")],
+      LRdb_temp,
+      res[, c("LR_GENES", "N_ER", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP",
+              "N_ER_NON_SIGNIFICANT_CHANGE")],
       all.x = TRUE,
-      by.x = "LR_SORTED",
-      by.y = "LR_SORTED",
+      by.x = "LR_GENES",
+      by.y = "LR_GENES",
       sort = FALSE
     )
     res <- na.omit(res, cols = "LR_GENES")
-    res <- res[, lapply(.SD, sum), by = c("GO_NAME"), .SDcols = c(
-      "N_ER", "N_ER_YOUNG", "N_ER_OLD",
-      "N_ER_DOWN_DISAPPEARS", "N_ER_DOWN", "N_ER_FLAT",
-      "N_ER_UP", "N_ER_UP_APPEARS"  
+    res[is.na(res)] <- 0
+    res <- res[, lapply(.SD, sum), by = c(id_name), .SDcols = c(
+      "N_ER", "N_ER_DOWN", "N_ER_FLAT",
+      "N_ER_UP", "N_ER_NON_SIGNIFICANT_CHANGE"  
     )]
-    ora_dt_3 <- object@ora_combined_default$GO_TERMS
-    res[ora_dt_3, on = c("GO_NAME==VALUE"),
+    res <- res[N_ER > 0]
+    ora_dt_3 <- object@ora_combined_default[[id_category]]
+    res[ora_dt_3, on = c(paste0(id_name, "==VALUE")),
         `:=` (ORA_OR_UP = i.OR_UP, ORA_P_VALUE_UP = i.P_VALUE_UP, ORA_SCORE_UP = i.ORA_SCORE_UP,
               ORA_OR_DOWN = i.OR_DOWN, ORA_P_VALUE_DOWN = i.P_VALUE_DOWN, ORA_SCORE_DOWN = i.ORA_SCORE_DOWN) ]
-    ora_dt_4 <- object@ora_default$GO_TERMS
-    res[ora_dt_4[OR_UP > 1 & BH_P_VALUE_UP <= 0.05, .N, by = c("VALUE")], on = "GO_NAME==VALUE", N_ORA_ID_UP := i.N]
-    res[ora_dt_4[OR_DOWN > 1 & BH_P_VALUE_DOWN <= 0.05, .N, by = c("VALUE")], on = "GO_NAME==VALUE", N_ORA_ID_DOWN := i.N]
+    ora_dt_4 <- object@ora_default[[id_category]]
+    res[ora_dt_4[OR_UP > 1 & BH_P_VALUE_UP <= 0.05, .N, by = c("VALUE")], on = paste0(id_name, "==VALUE"), N_ORA_ID_UP := i.N]
+    res[ora_dt_4[OR_DOWN > 1 & BH_P_VALUE_DOWN <= 0.05, .N, by = c("VALUE")], on = paste0(id_name, "==VALUE"), N_ORA_ID_DOWN := i.N]
     setnafill(res, fill = 0, cols = c("N_ORA_ID_UP", "N_ORA_ID_DOWN"))
     setcolorder(
       x = res,
-      neworder = c("GO_NAME",
+      neworder = c(id_name,
                    "ORA_SCORE_UP", "ORA_SCORE_DOWN", "N_ORA_ID_UP", "N_ORA_ID_DOWN",
-                   "N_ER", "N_ER_YOUNG", "N_ER_OLD",
-                   "N_ER_DOWN_DISAPPEARS", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP", "N_ER_UP_APPEARS",
+                   "N_ER", "N_ER_DOWN", "N_ER_FLAT", "N_ER_UP",
+                   "N_ER_NON_SIGNIFICANT_CHANGE",
                    "ORA_OR_UP", "ORA_OR_DOWN", "ORA_P_VALUE_UP", "ORA_P_VALUE_DOWN"
       )
     )
@@ -262,16 +280,17 @@ get_summary_cci <- function(
 
 ## Apply summary function on all categories ####
 categories <- c("ID", "ER_CELLTYPES", "ER_CELL_FAMILY", "ER_CELL_FAMILY_GLOBAL", "LR_GENES",
-                "LR_GENES_GLOBAL", "GO_TERMS_GLOBAL")
+                "LR_GENES_GLOBAL", "GO_TERMS_GLOBAL", "KEGG_PWS_GLOBAL")
 
-SUMMARY_log13 <- lapply(
-  DATASETS_COMBINED_log13,
+
+SUMMARY_DATA <- lapply(
+  DATASETS_COMBINED,
   function(dataset) {
     sapply(
       categories,
       function(i) {
         print(i)
-        get_summary_cci(object = dataset, category = i)
+        get_summary_cci(object = dataset$dataset, category = i)
       },
       USE.NAMES = TRUE,
       simplify = FALSE
@@ -279,27 +298,14 @@ SUMMARY_log13 <- lapply(
   }
 )
 
-SUMMARY_log15 <- lapply(
-  DATASETS_COMBINED_log15,
-  function(dataset) {
-    sapply(
-      categories,
-      function(i) {
-        print(i)
-        get_summary_cci(object = dataset, category = i)
-      },
-      USE.NAMES = TRUE,
-      simplify = FALSE
-    )
-  }
-)
 
 ## Save summary information ####
 
-saveRDS(SUMMARY_log13, "../data_scAgeCom/analysis/outputs_data/analysis5_SUMMARY_log13.rds")
-saveRDS(SUMMARY_log15, "../data_scAgeCom/analysis/outputs_data/analysis5_SUMMARY_log15.rds")
+saveRDS(SUMMARY_DATA, "../data_scAgeCom/analysis/outputs_data/analysis5_SUMMARY_DATA.rds")
 
-## Funtion to do Disease Ontology analysis (temporarily here) ####
+test <- readRDS("../data_scAgeCom/analysis/outputs_data/an")
+
+## Function to do Disease Ontology analysis (temporarily here) ####
 get_DO_interactions <- function(
   species,
   LR_db

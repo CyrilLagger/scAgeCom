@@ -1,14 +1,16 @@
 tab_LRdb <- tabPanel(
-  title = "Ligand-Receptor Database",
+  title = "Ligand-Receptor Databases",
   sidebarLayout(
     sidebarPanel(
       conditionalPanel(
         condition = "input.active_LRdb_panel=='LRdb_TABLE'",
         pickerInput(
           inputId = "LRdb_DATABASE",
-          label = "Database",
-          choices = c("CONNECTOMEDB", "CELLCHAT", "CELLPHONEDB", "CELLTALK", "ICELLNET", "NICHENET", "SCSR", "SCTENSOR"),
-          selected = c("CONNECTOMEDB", "CELLCHAT", "CELLPHONEDB", "CELLTALK", "ICELLNET", "NICHENET", "SCSR", "SCTENSOR"),
+          label = "Databases",
+          choices = c("CellChat", "CellPhoneDB", "CellTalkDB", "connectomeDB2020",
+                      "ICELLNET", "NicheNet", "SingleCellSignalR", "scTensor"),
+          selected = c("CellChat", "CellPhoneDB", "CellTalkDB", "connectomeDB2020",
+                       "ICELLNET", "NicheNet", "SingleCellSignalR", "scTensor"),
           options = list(`actions-box` = TRUE),
           multiple = TRUE
         )
@@ -17,8 +19,8 @@ tab_LRdb <- tabPanel(
         condition = "input.active_LRdb_panel=='LRdb_UPSET_PLOT'",
         selectInput(
           inputId = "LRdb_PLOT_CHOICE",
-          label = "Plot type",
-          choices = c("By Database", "By Source")
+          label = "Graph Type",
+          choices = c("By Databases", "By Sources")
         )
       ),
       width = 2
@@ -32,8 +34,8 @@ tab_LRdb <- tabPanel(
           value = "LRdb_TABLE"
           ),
         tabPanel(
-          title = "Upset Plot",
-          plotOutput("LRdb_UPSET_PLOT"),
+          title = "Graph Summary",
+          plotOutput("LRdb_UPSET_PLOT", height = "600px"),
           value = "LRdb_UPSET_PLOT"
           ),
         id = "active_LRdb_panel"

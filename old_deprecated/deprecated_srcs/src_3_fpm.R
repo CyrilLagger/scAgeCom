@@ -1,38 +1,46 @@
-# Frequent itemsets analysis ---------------------------------------------------
-
-#' analyze_FreqItemSets
-#'
-#' @param data 
-#' @param cols 
-#' @param items_to_include 
-#' @param target 
-#' @param support 
-#' @param confidence 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-analyze_FreqItemSets <- function(data, cols, 
-                                 items_to_include = NULL,
-                                 target = "closed frequent itemsets",
-                                 support = 0.05,
-                                 confidence = 0.1) {
-  
+analyze_FreqItemSets <- function(
+  data,
+  cols, 
+  items_to_include = NULL,
+  target = "closed frequent itemsets",
+  support = 0.05,
+  confidence = 0.1
+) {
   transactions = convert_data_to_transactions(data, cols)
-  
-  res = compute_freqitemsets_and_rules(transactions, 
-                                       target,
-                                       support,
-                                       confidence)
-  
+  res = compute_freqitemsets_and_rules(
+    transactions, 
+    target,
+    support,
+    confidence
+  )
   freqsets = res[["freqsets"]]
   rules = res[["rules"]]
-  
   interesting_rules = get_interesting_rules(rules, transactions, cols)
-  
   return(interesting_rules)
 }
+
+
+convert_data_to_transactions <- function(
+  data,
+  cols
+) {
+  COL_DIFFERENTIAL_EXPRESSED = cols$DIFFERENTIAL_EXPRESSED
+  cols_for_items = c(
+    cols$TISSUES, 
+    cols$LIGAND_CELLTYPE,
+    cols$RECEPTOR_CELLTYPE, 
+    cols$L_GENE,
+    cols$R_GENE, 
+    cols$DIFFERENTIAL_EXPRESSED,
+    cols$DIFFERENTIAL_DIRECTION
+  )
+  dt_p = data[, ..cols_for_items]
+  dt_p[, (COL_DIFFERENTIAL_EXPRESSED) := 
+         fifelse(get(COL_DIFFERENTIAL_EXPRESSED), "Sign", "Notsign")]
+  transactions = as(dt_p, "transactions")
+  return(transactions)
+}
+
 
 #' get_interesting_rules
 #'
@@ -136,32 +144,5 @@ compute_freqitemsets_and_rules <- function(transactions,
   return(list(freqsets = freqsets, rules = rules))
 }
 
-#' convert_data_to_transactions
-#'
-#' @param data 
-#' @param cols 
-#'
-#' @return
-#' @export
-#'
-#' @examples
-convert_data_to_transactions <- function(data, cols) {
-  
-  COL_DIFFERENTIAL_EXPRESSED = cols$DIFFERENTIAL_EXPRESSED
-  
-  cols_for_items = c(
-    cols$TISSUES, 
-    cols$LIGAND_CELLTYPE, cols$RECEPTOR_CELLTYPE, 
-    cols$L_GENE, cols$R_GENE, 
-    cols$DIFFERENTIAL_EXPRESSED, cols$DIFFERENTIAL_DIRECTION
-  )
-  
-  dt_p = data[, ..cols_for_items]
-  
-  dt_p[, (COL_DIFFERENTIAL_EXPRESSED) := 
-         fifelse(get(COL_DIFFERENTIAL_EXPRESSED), "Sign", "Notsign")]
-  
-  
-  transactions = as(dt_p, "transactions")
-  return(transactions)
-}
+
+

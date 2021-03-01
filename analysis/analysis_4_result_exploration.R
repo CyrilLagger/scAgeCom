@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - December 2020
+## Last update - February 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
@@ -20,241 +20,374 @@ library(data.table)
 library(ggplot2)
 
 ## Specify the directory with all scDiffCom results ####
-path_input_directory <- "../data_scAgeCom/scdiffcom_results_30_11_2020"
+path_input_directory <- "../data_scAgeCom/scdiffcom_results_22_02_2021"
 path_output_directory <- "../data_scAgeCom/analysis/"
 
 ## Retrieve all the results for each tissue and dataset ####
 RESULT_PATHS <- list.dirs(path_input_directory, recursive = FALSE)
-RESULT_PATHS
+RESULT_PATHS2 <- RESULT_PATHS[c(4,6)]
 
-#focus on mixed datasets for now (postpone sex analysis to later on) 
-RESULT_PATHS <- RESULT_PATHS[c(1, 4, 8)]
 
-DATASETS <- lapply(
-  RESULT_PATHS, 
-  function(path) {
-    tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(path))
-    temp <- lapply(
-      X = tissues,
-      FUN = function(
-        tiss
-      ) {
-        res <- readRDS(paste0(path, "/scdiffcom_", tiss, ".rds"))
-      }
-    )
-    names(temp) <- tissues
-    return(temp)
-  }
-)
+RESULT_NAMES <- c("calico", "droplet_female", "droplet_male", "droplet_mixed", "droplet_sex",
+                     "facs_female", "facs_male", "facs_mixed", "facs_sex")
+RESULT_NAMES2 <- c("droplet_male_w30", "droplet_mixed_w30")
 
-# Set the names manually, be careful to check what you are doing
-RESULT_PATHS
-#names(DATASETS) <- c("calico")
-names(DATASETS) <- c("calico", "droplet_mixed", "facs_mixed")
-#names(DATASETS) <- c("calico", "droplet_female", "droplet_male", "droplet_mixed", "droplet_sex",
-#                     "facs_female", "facs_male", "facs_mixed", "facs_sex")
+## Pipeline for each dataset independently (too heavy to load them all on a laptop) ####
 
-## Combine the results in a scDiffComCombined object ####
-
-DATASETS_COMBINED <- lapply(
-  seq_along(DATASETS),
-  function(i) {
-    Combine_scDiffCom(
-      l = DATASETS[[i]],
-      object_name = names(DATASETS)[[i]],
-      verbose = TRUE
-    )
-  }
-)
-names(DATASETS_COMBINED) <- names(DATASETS)
-
-rm(DATASETS)
-
-## See the parameters ####
-lapply(
-  DATASETS_COMBINED,
-  function(i) {
-    parameters(i)
-  }
-)
-
-## Inspect the behaviour in functions of the logfc threshold ####
-
-LOGFC_behaviour <- lapply(
-  DATASETS_COMBINED,
-  function(data_comb) {
+process_dataset <- function(dataset_path, dataset_name, fc_behaviour) {
+  #retrieve scDiffCom objects
+  tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(dataset_path))
+  dataset <- lapply(
+    X = tissues,
+    FUN = function(
+      tiss
+    ) {
+      res <- readRDS(paste0(dataset_path, "/scdiffcom_", tiss, ".rds"))
+    }
+  )
+  names(dataset) <- tissues
+  #create an scDiffComCombined object
+  dataset_combined <- Combine_scDiffCom(
+    l = dataset,
+    object_name = dataset_name,
+    verbose = TRUE
+  )
+  rm(dataset)
+  #study dataset in function of fc
+  if(fc_behaviour) {
     temp_seq <- seq(1.1, 2, 0.1)
     temp_list <- lapply(
       temp_seq,
       function(thr) {
         temp_obj <- FilterCCI(
-          object = data_comb,
+          object = dataset_combined,
           new_threshold_logfc = log(thr),
           skip_ora = TRUE
         )
         get_cci_detected(temp_obj)[, {
           temp = .N
-          .SD[,.(pct=.N/temp*100),by=REGULATION_SIMPLE]
+          .SD[, .(pct=.N/temp*100), by = REGULATION]
         }, by = ID ]
       }
     )
     names(temp_list) <- as.character(temp_seq)
-    temp_dt <- rbindlist(
-    temp_list,
+    byfc_dt <- rbindlist(
+      temp_list,
+      use.names = TRUE,
+      idcol = "logfc_threshold"
+    )
+    byfc_dt$logfc_threshold <- as.numeric(byfc_dt$logfc_threshold)
+  } else {
+    byfc_dt <- NULL
+  }
+  #keep object with logfc(1.5) and remove cci_raw
+  if(dataset_combined@parameters$threshold_logfc != log(1.5)) {
+    stop("Error")
+  }
+  dataset_combined@cci_raw <- list()
+  gc()
+  # add information
+  cell_types_dt <- setDT(read.csv(paste0(path_output_directory, "inputs_data/scDiffCom_cell_types_clean.csv"), stringsAsFactors = FALSE))
+  genage_mouse <- setDT(read.csv(paste0(path_output_directory, "inputs_data/genage_mouse.tsv"), sep = "\t", header = TRUE))
+  dt <- copy(dataset_combined@cci_detected)
+  dt[cell_types_dt, on = "EMITTER_CELLTYPE==Final_annotation", EMITTER_CELL_FAMILY := i.Family_broad]
+  dt[cell_types_dt, on = "RECEIVER_CELLTYPE==Final_annotation", RECEIVER_CELL_FAMILY := i.Family_broad]
+  dt[cell_types_dt, on = "EMITTER_CELLTYPE==Final_annotation", EMITTER_CELL_ABR := i.Abbreviation]
+  dt[cell_types_dt, on = "RECEIVER_CELLTYPE==Final_annotation", RECEIVER_CELL_ABR := i.Abbreviation]
+  dt[, ER_CELL_FAMILY := paste(EMITTER_CELL_FAMILY, RECEIVER_CELL_FAMILY, sep = "_")]
+  dt[, GENAGE := ifelse(
+    LIGAND_1 %in% genage_mouse$Gene.Symbol | LIGAND_2 %in% genage_mouse$Gene.Symbol |
+      RECEPTOR_1 %in% genage_mouse$Gene.Symbol | RECEPTOR_2 %in% genage_mouse$Gene.Symbol,
+    "YES",
+    "NO"
+  )
+  ]
+  dataset_combined@cci_detected <- dt
+  dataset_combined <- RunORA(
+    object = dataset_combined,
+    categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "KEGG_PWS", "ER_CELL_FAMILY", "GENAGE"),
+    overwrite = FALSE,
+    stringent_or_default = "default",
+    stringent_logfc_threshold = NULL,
+    global = FALSE
+  )
+  dataset_combined <- RunORA(
+    object = dataset_combined,
+    categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "KEGG_PWS", "ID", "ER_CELL_FAMILY", "GENAGE"),
+    overwrite = FALSE,
+    stringent_or_default = "default",
+    stringent_logfc_threshold = NULL,
+    global = TRUE
+  )
+  return(list(dataset = dataset_combined, logfc_behaviour = byfc_dt))
+}
+
+DATASETS_PROCESSED <- lapply(
+  seq_along(RESULT_PATHS),
+  function(i) {
+    process_dataset(RESULT_PATHS[[i]], RESULT_NAMES[[i]], TRUE)
+  }
+)
+names(DATASETS_PROCESSED) <- RESULT_NAMES
+
+DATASETS_PROCESSED2 <- lapply(
+  seq_along(RESULT_PATHS2),
+  function(i) {
+    process_dataset(RESULT_PATHS2[[i]], RESULT_NAMES2[[i]], TRUE)
+  }
+)
+names(DATASETS_PROCESSED2) <- RESULT_NAMES2
+
+## Add extra information such as minimum number of cells in each CCI
+
+DATASETS_PROCESSED2 <- lapply(
+  DATASETS_PROCESSED2,
+  function(i) {
+    dt <- i$dataset@cci_detected
+    dt[, NCELLS_MIN :=
+                pmin(
+                  get(paste0("NCELLS_EMITTER_", i$dataset@parameters$seurat_condition_id$cond1_name)),
+                  get(paste0("NCELLS_EMITTER_", i$dataset@parameters$seurat_condition_id$cond2_name)),
+                  get(paste0("NCELLS_RECEIVER_", i$dataset@parameters$seurat_condition_id$cond1_name)),
+                  get(paste0("NCELLS_RECEIVER_", i$dataset@parameters$seurat_condition_id$cond2_name))
+                )
+              ]
+    i$dataset@cci_detected <- dt
+    return(i)
+  }
+)
+
+## Save datasets ####
+saveRDS(DATASETS_PROCESSED, "../data_scAgeCom/analysis/outputs_data/TMS_scAgeCom_processed.rds")
+saveRDS(DATASETS_PROCESSED2, "../data_scAgeCom/analysis/outputs_data/TMS_scAgeCom_processed_bestORA_w30m.rds")
+#DATASETS_PROCESSED <- readRDS("../data_scAgeCom/analysis/outputs_data/TMS_scAgeCom_processed.rds")
+
+## Visualize general results and behaviour ####
+
+#distribution of regulations by dataset
+
+REGULATION_DISTRIBUTION <- dcast.data.table(
+  rbindlist(
+    lapply(
+      DATASETS_PROCESSED,
+      function(i) {
+        dt <- i$dataset@cci_detected[, .N, by = REGULATION]
+        dt[, PCT := N/sum(N)*100]
+      }
+    ),
     use.names = TRUE,
-    idcol = "logfc_threshold"
-    )
-    temp_dt$logfc_threshold <- as.numeric(temp_dt$logfc_threshold)
-    return(temp_dt)
-  }
+    idcol = "dataset"),
+  formula = dataset ~ REGULATION,
+  value.var = c("N", "PCT")
 )
 
-#save for later use
-saveRDS(LOGFC_behaviour, "../data_scAgeCom/analysis/outputs_data/analysis4_logfc_behaviour.rds")
+#regulation vs NCELLS_MIN
+ggplot(DATASETS_PROCESSED$calico$dataset@cci_detected, aes(REGULATION, NCELLS_MIN)) + geom_boxplot() + scale_y_log10()
+ggplot(DATASETS_PROCESSED$droplet_mixed$dataset@cci_detected, aes(REGULATION, NCELLS_MIN)) + geom_boxplot() + scale_y_log10()
 
-LOGFC_behaviour <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_logfc_behaviour.rds")
 
-# visualize results
-ggplot(LOGFC_behaviour$calico[REGULATION_SIMPLE == "FLAT"], aes(x = logfc_threshold, y = pct, color = ID)) + geom_point()
-ggplot(LOGFC_behaviour$droplet_mixed[REGULATION_SIMPLE == "FLAT"], aes(x = logfc_threshold, y = pct, color = ID)) + geom_point()
-ggplot(LOGFC_behaviour$facs_mixed[REGULATION_SIMPLE == "FLAT"], aes(x = logfc_threshold, y = pct, color = ID)) + geom_point()
-ggplot(LOGFC_behaviour$calico[REGULATION_SIMPLE == "FLAT"], aes(x = logfc_threshold, y = pct, group = logfc_threshold )) + geom_boxplot()
-ggplot(LOGFC_behaviour$droplet_mixed[REGULATION_SIMPLE == "FLAT"], aes(x = logfc_threshold, y = pct, group = logfc_threshold )) + geom_boxplot()
-ggplot(LOGFC_behaviour$facs_mixed[REGULATION_SIMPLE == "FLAT"], aes(x = logfc_threshold, y = pct, group = logfc_threshold )) + geom_boxplot()
+#regulation vs logfc_threshold
 
-## Prepare two analysis results with log(1.3) and log(1.5) ####
+LOGFC_behaviour <- rbindlist(
+  lapply(
+    DATASETS_PROCESSED,
+    function(i) {
+      i$logfc_behaviour
+    }
+  ),
+  idcol = "dataset"
+)
 
-# Filter with new logfc thresholds
-DATASETS_COMBINED_log13 <- lapply(
-  DATASETS_COMBINED,
+ggplot(LOGFC_behaviour, aes(x = as.character(logfc_threshold), y = pct, fill = dataset)) + 
+  geom_boxplot() +
+  facet_wrap(~REGULATION) +
+  xlab("Fold Change Threshold") +
+  ylab("Percentage of CCIs") +
+  theme(text=element_text(size=20)) +
+  ggtitle("Summary over all tissues")
+
+ggplot(LOGFC_behaviour[ID %in% c("Kidney", "Spleen", "Lung")], aes(x = as.character(logfc_threshold), y = pct, fill = dataset)) + 
+  geom_boxplot() +
+  facet_wrap(~REGULATION) +
+  xlab("Fold Change Threshold") +
+  ylab("Percentage of CCIs") +
+  theme(text=element_text(size=20)) +
+  ggtitle("Summary over Kidney, Lung and Spleen")
+
+#regulation vs dataset/sex
+
+GENDER_behaviour <- rbindlist(
+  lapply(
+    DATASETS_PROCESSED,
+    function(i) {
+      dt <- i$dataset@cci_detected[, .N, by = c("REGULATION", "ID")]
+      dt[, PCT := 100*N/sum(N), by = "ID"]
+    }
+  ),
+  idcol = "dataset"
+)
+
+ggplot(GENDER_behaviour, aes(x = as.character(REGULATION), y = PCT, fill = dataset)) + 
+  geom_boxplot() +
+  xlab("Regulation") +
+  ylab("Percentage of CCIs") +
+  theme(text=element_text(size=20)) +
+  ggtitle("Summary over all tissues")
+
+## LOGFC coherence between ligand-receptor ####
+
+coherence_plot <- function(
+  dataset,
+  axis_lim
+) {
+  dt_filt <- copy(dataset@cci_detected)
+  dt_filt[, LOG2FC_L := log2(
+    pmin(
+      get(paste0("L1_EXPRESSION_", dataset@parameters$seurat_condition_id$cond2_name)),
+      get(paste0("L2_EXPRESSION_", dataset@parameters$seurat_condition_id$cond2_name)),
+      na.rm = TRUE
+    )
+    /
+      pmin(
+        get(paste0("L1_EXPRESSION_", dataset@parameters$seurat_condition_id$cond1_name)),
+        get(paste0("L2_EXPRESSION_", dataset@parameters$seurat_condition_id$cond1_name)),
+        na.rm = TRUE
+      )
+  ) ]
+  dt_filt[, LOG2FC_R := log2(
+    pmin(
+      get(paste0("R1_EXPRESSION_", dataset@parameters$seurat_condition_id$cond2_name)),
+      get(paste0("R2_EXPRESSION_", dataset@parameters$seurat_condition_id$cond2_name)),
+      get(paste0("R3_EXPRESSION_", dataset@parameters$seurat_condition_id$cond2_name)),
+      na.rm = TRUE
+    )
+    /
+      pmin(
+        get(paste0("R1_EXPRESSION_", dataset@parameters$seurat_condition_id$cond1_name)),
+        get(paste0("R2_EXPRESSION_", dataset@parameters$seurat_condition_id$cond1_name)),
+        get(paste0("R3_EXPRESSION_", dataset@parameters$seurat_condition_id$cond1_name)),
+        na.rm = TRUE
+      )
+  ) ]
+  dt_filt[, LOG2FC_L := ifelse(is.infinite(LOG2FC_L) & LOG2FC_L > 0, axis_lim,
+                               ifelse(is.infinite(LOG2FC_L) & LOG2FC_L < 0, -axis_lim, LOG2FC_L))]
+  dt_filt[, LOG2FC_R := ifelse(is.infinite(LOG2FC_R) & LOG2FC_R > 0, axis_lim,
+                               ifelse(is.infinite(LOG2FC_R) & LOG2FC_R < 0, -axis_lim, LOG2FC_R))]
+  ggplot(dt_filt, aes(x = LOG2FC_L, y = LOG2FC_R, color = REGULATION)) +
+    geom_point() +
+    geom_vline(xintercept = 0) +
+    geom_hline(yintercept = 0) +
+    xlim(c(-axis_lim-1, axis_lim+1)) +
+    ylim(c(-axis_lim-1,axis_lim+1))
+}
+
+coherence_plot(DATASETS_PROCESSED$calico$dataset, 5)
+coherence_plot(DATASETS_PROCESSED$facs_mixed$dataset, 10)
+coherence_plot(DATASETS_PROCESSED$facs_sex$dataset, 10)
+coherence_plot(DATASETS_PROCESSED$facs_male$dataset, 10)
+coherence_plot(DATASETS_PROCESSED$facs_female$dataset, 10)
+coherence_plot(DATASETS_PROCESSED$droplet_mixed$dataset, 10)
+coherence_plot(DATASETS_PROCESSED$droplet_sex$dataset, 10)
+
+
+
+## Number of cell-types per tissue
+
+NCT_TISSUE <- rbindlist(
+  lapply(
+    DATASETS_PROCESSED,
+    function(i) {
+      i$dataset@cci_detected[, uniqueN(EMITTER_CELLTYPE), by = "ID"]
+    }
+  ),
+  idcol = "dataset"
+)
+
+##Temporaryl rerun ORA ####
+
+DATASETS_PROCESSED2 <- lapply(
+  DATASETS_PROCESSED2,
   function(i) {
-    FilterCCI(
-      object = i,
-      new_threshold_logfc = log(1.3),
-      skip_ora = FALSE,
-      verbose = TRUE
-    )
-  }
-)
-
-rm(DATASETS_COMBINED)
-
-DATASETS_COMBINED_log15 <- lapply(
-  DATASETS_COMBINED_log13,
-  function(i) {
-    FilterCCI(
-      object = i,
-      new_threshold_logfc = log(1.5),
-      skip_ora = FALSE,
-      verbose = TRUE
-    )
-  }
-)
-
-## Add specific terms to cell-types and genes (only to CCI raw) ####
-
-#cell-type families
-cell_types_dt <- setDT(read.csv(paste0(path_output_directory, "inputs_data/scDiffCom_cell_types.csv"), stringsAsFactors = FALSE))
-
-#genage longevity genes
-genage_mouse <- setDT(read.csv(paste0(path_output_directory, "inputs_data/genage_mouse.tsv"), sep = "\t", header = TRUE))
-
-#add the terms to the detected CCIs
-DATASETS_COMBINED_log13 <- lapply(
-  DATASETS_COMBINED_log13,
-  function(dataset) {
-    dt <- dataset@cci_detected
-    dt[cell_types_dt, on = "EMITTER_CELLTYPE==scDiffCom.cell.type", EMITTER_CELL_FAMILY := i.Family...broad]
-    dt[cell_types_dt, on = "RECEIVER_CELLTYPE==scDiffCom.cell.type", RECEIVER_CELL_FAMILY := i.Family...broad]
-    dt[, ER_CELL_FAMILY := paste(EMITTER_CELL_FAMILY, RECEIVER_CELL_FAMILY, sep = "_")]
-    dt[, GENAGE := ifelse(
-      LIGAND_1 %in% genage_mouse$Gene.Symbol | LIGAND_2 %in% genage_mouse$Gene.Symbol |
-        RECEPTOR_1 %in% genage_mouse$Gene.Symbol | RECEPTOR_2 %in% genage_mouse$Gene.Symbol,
-      "YES",
-      "NO"
-    )
-    ]
-    dataset@cci_detected <- dt
-    return(dataset)
-  }
-)
-
-DATASETS_COMBINED_log15 <- lapply(
-  DATASETS_COMBINED_log15,
-  function(dataset) {
-    dt <- dataset@cci_detected
-    dt[cell_types_dt, on = "EMITTER_CELLTYPE==scDiffCom.cell.type", EMITTER_CELL_FAMILY := i.Family...broad]
-    dt[cell_types_dt, on = "RECEIVER_CELLTYPE==scDiffCom.cell.type", RECEIVER_CELL_FAMILY := i.Family...broad]
-    dt[, ER_CELL_FAMILY := paste(EMITTER_CELL_FAMILY, RECEIVER_CELL_FAMILY, sep = "_")]
-    dt[,GENAGE := ifelse(
-      LIGAND_1 %in% genage_mouse$Gene.Symbol | LIGAND_2 %in% genage_mouse$Gene.Symbol |
-        RECEPTOR_1 %in% genage_mouse$Gene.Symbol | RECEPTOR_2 %in% genage_mouse$Gene.Symbol,
-      "YES",
-      "NO"
-    )
-    ]
-    dataset@cci_detected <- dt
-    return(dataset)
-  }
-)
-
-## Redo ORA with new categories ####
-
-DATASETS_COMBINED_log13 <- lapply(
-  DATASETS_COMBINED_log13,
-  function(dataset) {
-    RunORA(
-      object = dataset,
-      categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "ER_CELL_FAMILY", "GENAGE"),
-      overwrite = FALSE,
+    new_object <- RunORA(
+      object = i$dataset,
+      categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "KEGG_PWS", "ER_CELL_FAMILY", "GENAGE"),
+      overwrite = TRUE,
       stringent_or_default = "default",
       stringent_logfc_threshold = NULL,
       global = FALSE
     )
-  }
-)
-
-DATASETS_COMBINED_log13 <- lapply(
-  DATASETS_COMBINED_log13,
-  function(dataset) {
-    RunORA(
-      object = dataset,
-      categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "ID", "ER_CELL_FAMILY", "GENAGE"),
-      overwrite = FALSE,
+    new_object <- RunORA(
+      object = new_object,
+      categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "KEGG_PWS", "ID", "ER_CELL_FAMILY", "GENAGE"),
+      overwrite = TRUE,
       stringent_or_default = "default",
       stringent_logfc_threshold = NULL,
       global = TRUE
     )
+    i$dataset <- new_object
+    return(i)
   }
 )
 
-DATASETS_COMBINED_log15 <- lapply(
-  DATASETS_COMBINED_log15,
-  function(dataset) {
-    RunORA(
-      object = dataset,
-      categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "ER_CELL_FAMILY", "GENAGE"),
-      overwrite = FALSE,
-      stringent_or_default = "default",
-      stringent_logfc_threshold = NULL,
-      global = FALSE
-    )
-  }
+##GET ORA results by rank #####
+
+ORA_RANK_COMP <- rbindlist(
+  lapply(
+    DATASETS_PROCESSED2,
+    function(i) {
+      dt <- copy(i$dataset@ora_default$GO_TERMS[, c("ID", "VALUE", "ORA_SCORE_UP", "ORA_SCORE_DOWN")])
+      dt[, ORA_RANK_UP := rank(-ORA_SCORE_UP, ties.method = "min"), by = "ID"]
+      dt[, ORA_RANK_DOWN := rank(-ORA_SCORE_DOWN, ties.method = "min"), by = "ID"]
+    }
+  ),
+  idcol = "dataset"
 )
 
-DATASETS_COMBINED_log15 <- lapply(
-  DATASETS_COMBINED_log15,
-  function(dataset) {
-    RunORA(
-      object = dataset,
-      categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "ID", "ER_CELL_FAMILY", "GENAGE"),
-      overwrite = FALSE,
-      stringent_or_default = "default",
-      stringent_logfc_threshold = NULL,
-      global = TRUE
-    )
-  }
+ORA_RANK_COMP2 <- ORA_RANK_COMP[ORA_SCORE_UP != 0 | ORA_SCORE_DOWN != 0]
+
+test_lung_up <- dcast.data.table(
+  ORA_RANK_COMP2[ID == "Lung", c("dataset", "VALUE", "ORA_RANK_UP")], 
+  formula = VALUE ~ dataset,
+  value.var = "ORA_RANK_UP"
 )
+
+ggplot(test_lung_up, aes(facs_mixed, facs_male)) + geom_point() +
+  geom_smooth(method = "lm")
+
+ggplot(test_lung_up, aes(droplet_female, droplet_mixed)) + geom_point() +
+  geom_smooth(method = "lm")
+
+##########
+PlotORA(
+  DATASETS_PROCESSED$droplet_female$dataset,
+  subID = "Lung",
+  category = "GO_TERMS",
+  regulation = "DOWN",
+  max_terms_show = 40,
+  global = FALSE
+)
+
+identical(DATASETS_PROCESSED$droplet_mixed$dataset@cci_detected,
+          DATASETS_PROCESSED2$droplet_mixed$dataset@cci_detected)
+
+BuildNetwork(
+  DATASETS_PROCESSED$droplet_mixed$dataset,
+  network_type = "ORA",
+  network_layout = "celltypes",
+  ID = "Spleen"
+)
+
+test_calico <- copy(DATASETS_PROCESSED$calico$dataset)
+
+test_calico <- RunORA(
+  object = test_calico,
+  categories = c("ER_CELLTYPES", "LR_GENES", "GO_TERMS", "KEGG_PWS", "ER_CELL_FAMILY", "GENAGE"),
+  overwrite = TRUE,
+  stringent_or_default = "default",
+  stringent_logfc_threshold = NULL,
+  global = FALSE
+)
+
 
 ## Do stringent ORA with logfc > log(2) ####
 
@@ -314,90 +447,7 @@ DATASETS_COMBINED_log15 <- lapply(
   }
 )
 
-## save the full objects with the raw CCIs ####
-saveRDS(DATASETS_COMBINED_log13, "../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log13.rds")
-saveRDS(DATASETS_COMBINED_log15, "../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log15.rds")
 
-DATASETS_COMBINED_log13 <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log13.rds")
-DATASETS_COMBINED_log15 <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log15.rds")
 
-## Coherence between ligand vs receptor logfc ####
-
-coherence_plot <- function(
-  dataset,
-  axis_lim
-) {
-  dt_filt <- copy(dataset@cci_detected)
-  dt_filt[, LOG2FC_L := log2(
-    pmin(
-      L1_EXPRESSION_OLD,
-      L2_EXPRESSION_OLD,
-      na.rm = TRUE
-    )
-    /
-      pmin(
-        L1_EXPRESSION_YOUNG,
-        L2_EXPRESSION_YOUNG,
-        na.rm = TRUE
-      )
-  ) ]
-  dt_filt[, LOG2FC_R := log2(
-    pmin(
-      R1_EXPRESSION_OLD,
-      R2_EXPRESSION_OLD,
-      R3_EXPRESSION_OLD,
-      na.rm = TRUE
-    )
-    /
-      pmin(
-        R1_EXPRESSION_YOUNG,
-        R2_EXPRESSION_YOUNG,
-        R3_EXPRESSION_YOUNG,
-        na.rm = TRUE
-      )
-  ) ]
-  dt_filt[, LOG2FC_L := ifelse(is.infinite(LOG2FC_L) & LOG2FC_L > 0, axis_lim,
-                               ifelse(is.infinite(LOG2FC_L) & LOG2FC_L < 0, -axis_lim, LOG2FC_L))]
-  dt_filt[, LOG2FC_R := ifelse(is.infinite(LOG2FC_R) & LOG2FC_R > 0, axis_lim,
-                               ifelse(is.infinite(LOG2FC_R) & LOG2FC_R < 0, -axis_lim, LOG2FC_R))]
-  ggplot(dt_filt, aes(x = LOG2FC_L, y = LOG2FC_R, color = REGULATION_SIMPLE)) +
-    geom_point() +
-    geom_vline(xintercept = 0) +
-    geom_hline(yintercept = 0) +
-    xlim(c(-axis_lim-1, axis_lim+1)) +
-    ylim(c(-axis_lim-1,axis_lim+1))
-}
-
-coherence_plot(DATASETS_COMBINED_log15$calico, 5)
-coherence_plot(DATASETS_COMBINED_log15$droplet_mixed, 9)
-coherence_plot(DATASETS_COMBINED_log15$facs_mixed, 12)
-
-## Check re-classified CCIs ####
-
-#to do later on
-#test <- DATASETS_COMBINED_log15$facs_mixed@cci_detected
-#test_raw <- DATASETS_COMBINED_log15$facs_mixed@cci_raw
-#test2 <- test[, .N, by = c("REGULATION", "DIFFERENTIAL_DIRECTION", "DIFFERENTIALLY_EXPRESSED", "CCI_DETECTED_AND_SIGNIFICANT_IN_YOUNG", "CCI_DETECTED_AND_SIGNIFICANT_IN_OLD" )]
-
-## create light objects (removing the raw CCIs), cannot perform filtering on them, but can do ORA ####
-DATASETS_COMBINED_log13 <- lapply(
-  DATASETS_COMBINED_log13,
-  function(i) {
-    i@cci_raw <- list()
-    return(i)
-  }
-)
-
-DATASETS_COMBINED_log15 <- lapply(
-  DATASETS_COMBINED_log15,
-  function(i) {
-    i@cci_raw <- list()
-    return(i)
-  }
-)
-
-## save the ligth objects without the raw CCIs ####
-saveRDS(DATASETS_COMBINED_log13, "../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log13_light.rds")
-saveRDS(DATASETS_COMBINED_log15, "../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log15_light.rds")
 
 
