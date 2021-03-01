@@ -34,6 +34,7 @@ tab_tissue_specific <- tabPanel(
         hr(),
         uiOutput("TSA_EMITTER_CHOICE"),
         uiOutput("TSA_RECEIVER_CHOICE"),
+        uiOutput("TSA_LRI_CHOICE"),
         sliderInput(
           inputId = "TSA_SLIDER_PVALUE",
           label = "P-value Threshold",

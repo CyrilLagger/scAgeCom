@@ -16,6 +16,7 @@ server_scAgeCom <- function(
   output$TSA_CCI_INTRO <- get_TSA_cci_intro(input)
   output$TSA_EMITTER_CHOICE <- choose_TSA_emitter(input)
   output$TSA_RECEIVER_CHOICE <- choose_TSA_receiver(input)
+  output$TSA_LRI_CHOICE <- choose_TSA_lri(input)
   output$TSA_SLIDER_LOG2FC <- get_TSA_slider_log2fc(input)
   output$TSA_CCI_DETAILS <- get_TSA_cci_details(input)
   output$TSA_CCI_TEXTOUTPUT <- get_TSA_cci_text(input)
