@@ -2,4 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+analysis/intermediate_data
 shinyApp/data/
+
