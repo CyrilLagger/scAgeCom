@@ -8,8 +8,8 @@
 ## ursu_eugen@hotmail.com
 ## anais.equey@etu.univ-amu.fr
 ##
-## Perform a global analysis (e.g. on all tissues)
-## on the scDiffCom results.
+## Perform clustering analysis on each tissue
+## and on the global data to find patterns.
 ##
 ####################################################
 ##
@@ -18,129 +18,269 @@
 library(scDiffCom)
 library(data.table)
 library(ggplot2)
-library(ComplexHeatmap)
 library(circlize)
-library(skmeans)
-library(igraph)
-library(signnet)
+library(ComplexHeatmap)
+library(iBBiG)
 library(blockcluster)
 
-## Data loading ####
+#library(blockcluster)
+
+## Load data ####
 DATASETS_COMBINED_log15 <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log15_light.rds")
 
-## Prepare matrix ####
-cci_dt <- DATASETS_COMBINED_log15$facs_mixed@cci_detected
-cci_dt[, ID_ER := paste(ID, ER_CELLTYPES, sep = "_")]
-cci_dt[, PI_VALUE := -log(P_VALUE_DE+1E-4)*LOGFC]
+## Extract detected CCIs #####
 
-cci_pi_matrix_ER <- as.matrix(
-  dcast.data.table(
-    cci_dt[ID == "Aorta", c("ID_ER", "LR_GENES", "PI_VALUE") ],
-    formula = ID_ER ~ LR_GENES,
-    value.var = "PI_VALUE"
-  ),
-  rownames = "ID_ER"
+DATASETS_CCI <- lapply(
+  DATASETS_COMBINED_log15,
+  function(i) {
+    temp_dt <- i@cci_detected
+    temp_dt[, ID_ER := paste(ID, ER_CELLTYPES, sep = "_")]
+    temp_dt[, REGULATION_SCORE := ifelse(
+      REGULATION_SIMPLE == "UP",
+      1,
+      ifelse(
+        REGULATION_SIMPLE == "DOWN",
+        -1,
+        0
+      )
+    )
+    ]
+    #temp_dt[, PI_VALUE := -log(BH_P_VALUE_DE + 1E-4)*LOGFC]
+    temp_dt[, EMITTER_CELL_GENES := paste(EMITTER_CELLTYPE, LIGAND_1, LIGAND_2, sep = "_")]
+    temp_dt[, RECEIVER_CELL_GENES := paste(RECEIVER_CELLTYPE, RECEPTOR_1, RECEPTOR_2, RECEPTOR_3, sep = "_")]
+    return(temp_dt)
+  }
 )
-cci_pi_matrix_ER[is.na(cci_pi_matrix_ER)] <- 0
-cci_pi_matrix_LR <- t(cci_pi_matrix_ER)
 
-## Binary matrix ####
-cci_pi_matrix_binary_LR <- cci_pi_matrix_LR
-cci_pi_matrix_binary_LR[abs(cci_pi_matrix_binary_LR) < -log(0.05)*log(1.5)] <- 0
-cci_pi_matrix_binary_LR[cci_pi_matrix_binary_LR >= -log(0.05)*log(1.5)] <- 1
-cci_pi_matrix_binary_LR[cci_pi_matrix_binary_LR <= log(0.05)*log(1.5)] <- -1
+## Create Cell-types vs Genes matrices globally ####
 
-## Remove rows/cols ####
-table(rowSums(abs(cci_pi_matrix_binary_LR)))
-cci_pi_matrix_binary_LR <- cci_pi_matrix_binary_LR[rowSums(abs(cci_pi_matrix_binary_LR)) >= 2, ]
+DATASETS_MATRIX_CELLS_vs_GENES <- lapply(
+  DATASETS_CCI,
+  function(i) {
+    temp_mat <- as.matrix(
+      dcast.data.table(
+        i[, c("LR_GENES", "ID_ER", "REGULATION_SCORE") ],
+        formula = LR_GENES ~ ID_ER,
+        value.var = "REGULATION_SCORE"
+      ),
+      rownames = "LR_GENES"
+    )
+    temp_mat[is.na(temp_mat)] <- 0
+    temp_mat_up <- temp_mat
+    temp_mat_up[temp_mat_up == -1] <- 0
+    temp_mat_down <- temp_mat
+    temp_mat_down[temp_mat_down == 1] <- 0
+    temp_mat_down[temp_mat_down == -1] <- 1
+    temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, ]
+    temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1]
+    temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, ]
+    temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1]
+    temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, ]
+    temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1]
+    return(
+      list(
+        matrix_up_down = temp_mat,
+        matrix_up = temp_mat_up,
+        matrix_down = temp_mat_down
+      )
+    )
+  }
+)
 
-table(colSums(abs(cci_pi_matrix_binary_LR)))
-cci_pi_matrix_binary_LR <- cci_pi_matrix_binary_LR[, colSums(abs(cci_pi_matrix_binary_LR)) >= 1]
+## Create Cell-types vs Genes matrices for each tissue ####
 
-cci_pi_matrix_LR <- cci_pi_matrix_LR[rownames(cci_pi_matrix_binary_LR), colnames(cci_pi_matrix_binary_LR)]
+DATASETS_MATRIX_CELLS_vs_GENES_PER_ID <- lapply(
+  DATASETS_CCI,
+  function(i) {
+    ids <- sort(unique(i$ID))
+    temp_all <- lapply(
+      ids,
+      function(id) {
+        temp_mat <- as.matrix(
+          dcast.data.table(
+            i[ID == id, c("LR_GENES", "ID_ER", "REGULATION_SCORE") ],
+            formula = LR_GENES ~ ID_ER,
+            value.var = "REGULATION_SCORE"
+          ),
+          rownames = "LR_GENES"
+        )
+        temp_mat[is.na(temp_mat)] <- 0
+        temp_mat_up <- temp_mat
+        temp_mat_up[temp_mat_up == -1] <- 0
+        temp_mat_down <- temp_mat
+        temp_mat_down[temp_mat_down == 1] <- 0
+        temp_mat_down[temp_mat_down == -1] <- 1
+        temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, ]
+        temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1]
+        temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, ]
+        temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1]
+        temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, ]
+        temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1]
+        return(
+          list(
+            matrix_up_down = temp_mat,
+            matrix_up = temp_mat_up,
+            matrix_down = temp_mat_down
+          )
+        )
+      }
+    )
+    names(temp_all) <- ids
+    return(temp_all)
+  }
+)
 
-## Set seed ###
+
+## Create EMITTERS vs RECEIVERS matrices for each tissue ####
+
+DATASETS_MATRIX_EMITTERS_vs_RECEIVERS <- lapply(
+  DATASETS_CCI,
+  function(i) {
+    ids <- sort(unique(i$ID))
+    temp_all <- lapply(
+      ids,
+      function(id) {
+        print(id)
+        temp_mat <- as.matrix(
+          dcast.data.table(
+            i[ID == id, c("RECEIVER_CELL_GENES", "EMITTER_CELL_GENES", "REGULATION_SCORE") ],
+            formula = RECEIVER_CELL_GENES ~ EMITTER_CELL_GENES,
+            value.var = "REGULATION_SCORE"
+          ),
+          rownames = "RECEIVER_CELL_GENES"
+        )
+        temp_mat[is.na(temp_mat)] <- 0
+        temp_mat_up <- temp_mat
+        temp_mat_up[temp_mat_up == -1] <- 0
+        temp_mat_down <- temp_mat
+        temp_mat_down[temp_mat_down == 1] <- 0
+        temp_mat_down[temp_mat_down == -1] <- 1
+        temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, ]
+        temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1]
+        temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, ]
+        temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1]
+        temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, ]
+        temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1]
+        return(
+          list(
+            matrix_up_down = temp_mat,
+            matrix_up = temp_mat_up,
+            matrix_down = temp_mat_down
+          )
+        )
+      }
+    )
+    names(temp_all) <- ids
+    return(temp_all)
+  }
+)
+
+## Set seed ####
 set.seed(42)
 
-## Standard kmeans ####
+## We find modules with iBBiG ####
 
-cci_km_LR <- kmeans(cci_pi_matrix_LR, centers = 15, iter.max = 20, nstart = 25)$cluster
-cci_km_ER <- kmeans(t(cci_pi_matrix_LR), centers = 5, iter.max = 20, nstart = 25)$cluster
-table(cci_km_LR)
-table(cci_km_ER)
-cci_km_bin_LR <- kmeans(cci_pi_matrix_binary_LR, centers = 15, iter.max = 20, nstart = 25)$cluster
-cci_km_bin_ER <- kmeans(t(cci_pi_matrix_binary_LR), centers = 15, iter.max = 20, nstart = 25)$cluster
-table(cci_km_bin_LR)
-table(cci_km_bin_ER)
+#see how to obtain weighed scores
+#see how to remove bad clusters
+#can choose a large number of clusters to start with
+#how to rank stuff in a cluster
 
-Heatmap(
-  matrix = cci_pi_matrix_binary_LR,
-  name = "test",
-  show_row_names = FALSE,
-  show_column_names = FALSE,
-  column_split = cci_km_bin_ER,
-  row_split = cci_km_bin_LR,
-  use_raster = TRUE,
-  show_row_dend = FALSE,
-  show_column_dend = FALSE,
-  cluster_rows = TRUE,
-  cluster_columns = TRUE,
-  cluster_row_slices = TRUE,
-  cluster_column_slices = TRUE,
-  row_names_centered = FALSE,
-  row_names_gp = grid::gpar(fontsize = 4),
-  column_names_gp = grid::gpar(fontsize = 4)
+test_obj <- DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_mixed$SCAT$matrix_down
+
+test <- iBBiG(
+ test_obj,
+  nModules = 20,
+  alpha = 0.5
 )
 
-## Spherical kmeans ####
+sapply(1:20,
+       function(i) {
+         dim( test_obj[RowxNumber(test)[,i], NumberxCol(test)[i,], drop = FALSE])}
+)
 
-cci_skm_LR <- skmeans(cci_pi_matrix_LR, k = 15)$cluster
-cci_skm_ER <- skmeans(t(cci_pi_matrix_LR), k = 5)$cluster
+test
+sort(test@Clusterscores, decreasing = TRUE)
+test@RowScorexNumber
+RowScorexNumber(test)[1:2,]
 
-cci_skm_bin_LR <- skmeans(cci_pi_matrix_binary_LR, k = 15)$cluster
-cci_skm_bin_ER <- skmeans(t(cci_pi_matrix_binary_LR), k = 8)$cluster
-
-
+i <- 1
 Heatmap(
-  matrix = cci_pi_matrix_binary_LR,
-  name = "test",
-  show_row_names = FALSE,
-  show_column_names = FALSE,
-  column_split = cci_skm_bin_ER,
-  row_split = cci_skm_bin_LR,
-  use_raster = TRUE,
-  show_row_dend = FALSE,
-  show_column_dend = FALSE,
-  cluster_rows = TRUE,
-  cluster_columns = TRUE,
-  cluster_row_slices = TRUE,
-  cluster_column_slices = TRUE,
-  row_names_centered = FALSE,
-  row_names_gp = grid::gpar(fontsize = 4),
-  column_names_gp = grid::gpar(fontsize = 4)
+  (test_obj[RowxNumber(test)[,i], NumberxCol(test)[i,], drop = FALSE]),
+  row_names_gp = grid::gpar(fontsize = 8),
+  column_names_gp = grid::gpar(fontsize = 9),
+  col = colorRamp2(c(-1, 0, 1), c("red", "gray", "blue")),
+  height = unit(4, "cm")
 )
 
 
-## blockcluster way ####
+test <- iBBiG(
+  binaryMatrix = DATASETS_MATRIX_EMITTERS_vs_RECEIVERS$facs_mixed$Diaphragm$matrix_up,
+  nModules = 15,
+  alpha = 0.4
+)
 
-cci_blok <- coclusterCategorical(data = cci_pi_matrix_binary_LR, nbcocluster = c(10,6))
-summary(cci_blok)
-plot(cci_blok)
-table(cci_blok@colclass)
-table(cci_blok@rowclass)
+test_subobj <- test_obj[RowxNumber(test)[,i], NumberxCol(test)[i,], drop = FALSE]
+test_subLR <- data.table(LR_GENES = rownames(test_subobj))
+test_subLR[, c("LIGAND", "RECEPTOR") := tstrsplit(LR_GENES, ":", fixed=TRUE)]
+test_subLR2 <- dcast.data.table(test_subLR,
+                                formula = LIGAND ~ RECEPTOR,
+                                fun.aggregate = length)
+test_subLR2 <- as.matrix(test_subLR2, rownames = "LIGAND")
 
-cci_blok@rowclass
+test_subER <- data.table(ER = colnames(test_subobj))
+test_subER[, c("TISSUE", "EM", "RE") := tstrsplit(ER, "_", fixed=TRUE)]
+test_subER2 <- dcast.data.table(test_subER,
+                                formula = EM ~ RE,
+                                fun.aggregate = length)
+test_subER2 <- as.matrix(test_subER2, rownames = "EM")
 
-table(cci_blok@rowclass)
+library(igraph)
+
+LO <- layout_as_bipartite(test_G_LR)
+
+test_G_LR <- graph_from_incidence_matrix(test_subLR2)
+test_G_ER <- graph_from_incidence_matrix(test_subER2)
+
+test_G
+plot(test_G_LR, layout = LO[, 2:1], vertex.size = 6)
+
+is_bipartite(test_G)
+
+
+test2 <- iBBiG::Clusterscores(test)
+iBBiG::summary(test)
+
+
+
+
+sort(table(unlist(sapply(
+  1:15,
+  function(i) {
+    names(RowxNumber(res)[,i][RowxNumber(res)[,i] == TRUE])
+  }
+))), decreasing = TRUE)
+sort(table(unlist(sapply(
+  1:15,
+  function(i) {
+    names(NumberxCol(res)[i,][NumberxCol(res)[i,] == TRUE])
+  }
+))), decreasing = TRUE)
+
+
+names(RowxNumber(res)[,i][RowxNumber(res)[,i] == TRUE])
+
+## We block-organize the heatmap with blockcluster ####
+
+cci_blok_up_1 <- coclusterCategorical(data = DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_mixed$SCAT$matrix_up_down, nbcocluster = c(10,6))
 
 Heatmap(
-  matrix = cci_pi_matrix_binary_LR,
+  matrix =DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_mixed$SCAT$matrix_up_down,
   name = "test",
-  show_row_names = TRUE,
-  show_column_names = TRUE,
-  column_split = cci_blok@colclass,
-  row_split = cci_blok@rowclass,
-  use_raster = TRUE,
+  show_row_names = FALSE,
+  show_column_names = FALSE,
+  column_split = cci_blok_up_1@colclass,
+  row_split = cci_blok_up_1@rowclass,
+  use_raster = FALSE,
   show_row_dend = FALSE,
   show_column_dend = FALSE,
   cluster_rows = TRUE,
@@ -153,29 +293,54 @@ Heatmap(
 )
 
 
-## igraph way ####
-
-cci_g <- graph.incidence(abs(cci_pi_matrix_binary_LR), weighted = TRUE)
-
-test <- E(cci_g)
 
 
-get.incidence(cci_g)
-plot(cci_g, layout=layout_as_bipartite)
+### 
 
+LRdb_kegg <- LRdb_mouse$LRdb_curated_KEGG
 
-skm_bin_LR <- skmeans(cci_pi_matrix_LR, k = 12)
-skm_bin_ER <- skmeans(t(cci_pi_matrix_LR), k = 7)
-table(skm_bin_LR$cluster)
-table(skm_bin_ER$cluster)
+kegg_cholesterol <- LRdb_kegg[KEGG_ID == "path:mmu04150"]
+LRG_kegg_cholesterol <- unique(kegg_cholesterol$LR_GENES)
+LRG_kegg_cholesterol <- LRG_kegg_cholesterol[LRG_kegg_cholesterol %in% 
+                                               rownames(DATASETS_MATRIX_CELLS_vs_GENES$facs_mixed$matrix_up_down)]
+
+cholesterol_matrix <- DATASETS_MATRIX_CELLS_vs_GENES$facs_mixed$matrix_up_down[LRG_kegg_cholesterol, ]
+cholesterol_matrix <- cholesterol_matrix[,colSums(abs(cholesterol_matrix)) > 0]
+cholesterol_matrix <- cholesterol_matrix[rowSums(abs(cholesterol_matrix)) > 0, ]
+
+cholesterol_matrix_up <- cholesterol_matrix
+cholesterol_matrix_up[cholesterol_matrix_up == -1] <- 0
+cholesterol_matrix_up <- cholesterol_matrix_up[, colSums(cholesterol_matrix_up) > 0]
+cholesterol_matrix_up <- cholesterol_matrix_up[rowSums(cholesterol_matrix_up) > 0, ]
+
+cholesterol_matrix_down <- cholesterol_matrix
+cholesterol_matrix_down[cholesterol_matrix_down == 1] <- 0
+cholesterol_matrix_down[cholesterol_matrix_down == -1] <- 1
+cholesterol_matrix_down <- cholesterol_matrix_down[, colSums(cholesterol_matrix_down) > 0]
+cholesterol_matrix_down <- cholesterol_matrix_down[rowSums(cholesterol_matrix_down) > 0, ]
+
+sum(cholesterol_matrix == 1)
+sum(cholesterol_matrix == -1)
+
+Heatmap(cholesterol_matrix)
+Heatmap(
+  cholesterol_matrix_down,
+  col = colorRamp2(c(-1, 0, 1), c("red", "gray", "blue"))
+)
+Heatmap(
+  cholesterol_matrix_up,
+  col = colorRamp2(c(-1, 0, 1), c("blue", "gray", "red"))
+)
+
+test2 <- blockcluster::coclusterCategorical(cholesterol_matrix, nbcocluster = c(5, 6))
 
 Heatmap(
-  matrix = cci_pi_matrix_binary_LR,
-  name = "test",
+  matrix = cholesterol_matrix,
+  name = "test2",
   show_row_names = FALSE,
   show_column_names = FALSE,
-  column_split = skm_bin_ER$cluster,
-  row_split = skm_bin_LR$cluster,
+  column_split = test2@colclass,
+  row_split = test2@rowclass,
   use_raster = FALSE,
   show_row_dend = FALSE,
   show_column_dend = FALSE,
@@ -184,120 +349,56 @@ Heatmap(
   cluster_row_slices = TRUE,
   cluster_column_slices = TRUE,
   row_names_centered = FALSE,
-  row_names_gp = grid::gpar(fontsize = 4),
-  column_names_gp = grid::gpar(fontsize = 4)
+  row_names_gp = grid::gpar(fontsize = 6),
+  column_names_gp = grid::gpar(fontsize = 6)
 )
 
-binary_groups_means <- t(sapply(
-  sort(unique(skm_bin_LR$cluster)),
-  function(i) {
-    sapply(
-      sort(unique(skm_bin_ER$cluster)),
-      function(j) {
-        rows_to_keep <- names(skm_bin_LR$cluster[skm_bin_LR$cluster == i])
-        cols_to_keep <- names(skm_bin_ER$cluster[skm_bin_ER$cluster == j])
-        mean(cci_pi_matrix_binary_LR[rows_to_keep, cols_to_keep])
-      }
-    )
-  }
-))
+colnames(cholesterol_matrix[, test2@colclass == 3 ])
 
-binary_groups_abs_means <- t(sapply(
-  sort(unique(skm_bin_LR$cluster)),
-  function(i) {
-    sapply(
-      sort(unique(skm_bin_ER$cluster)),
-      function(j) {
-        rows_to_keep <- names(skm_bin_LR$cluster[skm_bin_LR$cluster == i])
-        cols_to_keep <- names(skm_bin_ER$cluster[skm_bin_ER$cluster == j])
-        mean(abs(cci_pi_matrix_binary_LR[rows_to_keep, cols_to_keep]))
-      }
-    )
-  }
-))
-
-binary_groups_sd <- t(sapply(
-  sort(unique(skm_bin_LR$cluster)),
-  function(i) {
-    sapply(
-      sort(unique(skm_bin_ER$cluster)),
-      function(j) {
-        rows_to_keep <- names(skm_bin_LR$cluster[skm_bin_LR$cluster == i])
-        cols_to_keep <- names(skm_bin_ER$cluster[skm_bin_ER$cluster == j])
-        sd(cci_pi_matrix_binary_LR[rows_to_keep, cols_to_keep])
-      }
-    )
-  }
-))
-binary_groups_dt <- data.table(
-  avg = as.vector(binary_groups_means),
-  sd = as.vector(binary_groups_sd),
-  avg_abs = as.vector(binary_groups_abs_means)
+cholesterol_ibbig_up <- iBBiG(
+  cholesterol_matrix_up,
+  nModules = 10,
+  alpha = 0.5
 )
-
-ggplot(binary_groups_dt, aes(avg, sd)) + geom_point()
-ggplot(binary_groups_dt, aes(avg_abs, sd)) + geom_point()
-ggplot(binary_groups_dt, aes(avg_abs, avg)) + geom_point()
-
-bin_sd_sorted <- sort(as.vector(binary_groups_sd), decreasing = TRUE)
-
-which(binary_groups_sd == bin_sd_sorted[[8]], arr.ind = TRUE)
-
-hist(binary_groups_sd, breaks = 100)
-
-skm_bin_LR$cluster[skm_bin_LR$cluster == 20]
-skm_bin_ER$cluster[skm_bin_ER$cluster == 20]
-test <- cci_pi_matrix_binary_LR[names(skm_bin_LR$cluster[skm_bin_LR$cluster == 20]), names(skm_bin_ER$cluster[skm_bin_ER$cluster == 10])]
-
+plot(cholesterol_ibbig_up)
+sort(cholesterol_ibbig_up@Clusterscores, decreasing = TRUE)
+i <- 4
 Heatmap(
-  test,
-  row_km = 2,
-  column_km = 2
+  cholesterol_matrix_up[RowxNumber(cholesterol_ibbig_up)[,i], NumberxCol(cholesterol_ibbig_up)[i,], drop = FALSE],
+  row_names_gp = grid::gpar(fontsize = 8),
+  column_names_gp = grid::gpar(fontsize = 9),
+  col = colorRamp2(c(-1, 0, 1), c("blue", "gray", "red")),
+  height = unit(4, "cm")
 )
 
-table(sapply(names(skm_bin_ER$cluster[skm_bin_ER$cluster == 22]),
-       function(i) {
-         unique(cci_dt[ID_ER == i]$ER_CELL_FAMILY)
-       }
+cholesterol_ibbig_down <- iBBiG(
+  cholesterol_matrix_down,
+  nModules = 10,
+  alpha = 0.5
 )
-)
-table(sapply(names(skm_bin_ER$cluster[skm_bin_ER$cluster == 22]),
-             function(i) {
-               unique(cci_dt[ID_ER == i]$ID)
-             }
-)
-)
-
-#biclustering
-
-library(isa2)
-library(biclust)
-thr.row <- 2.7
-thr.col <- 1.4
-set.seed(42) # to get the same results, always
-modules <- isa(test, thr.col = 0.4, thr.row = 0.4)
-modules
-length(modules)
-Bc <- isa.biclust(modules)
-Bc
-
-mymodules <- lapply(seq(ncol(modules$rows)), function(x) {
-  list(rows = which(modules$rows[, x] != 0),
-       columns = which(modules$columns[, x] !=
-                         0))
-})
-
+plot(cholesterol_ibbig_down)
+sort(cholesterol_ibbig_down@Clusterscores, decreasing = TRUE)
+i <- 1
 Heatmap(
-  test[mymodules[[2]]$rows, mymodules[[2]]$columns]
+  cholesterol_matrix_down[RowxNumber(cholesterol_ibbig_down)[,i], NumberxCol(cholesterol_ibbig_down)[i,], drop = FALSE],
+  row_names_gp = grid::gpar(fontsize = 8),
+  column_names_gp = grid::gpar(fontsize = 9),
+  col = colorRamp2(c(0, 1), c("gray", "blue")),
+  height = unit(4, "cm")
 )
 
-bin_fabia <- fabia(test, 2, 0.1, 500)
-summary(bin_fabia)
-show(bin_fabia)
-extractPlot(bin_fabia ,ti="FABIA")
-plot(bin_fabia)
-rb <- extractBic(bin_fabia)
-bin_fabia@avini
-rb$bic[1,]
-plotBicluster(rb,1)
+## sub network by GO or KEGG ####
 
+
+LRdb_kegg <- LRdb_mouse$LRdb_curated_KEGG
+LRdb_go <- LRdb_mouse$LRdb_curated_GO
+
+cci_term <- DATASETS_CCI$facs_mixed[LR_GENES %in% LRdb_kegg[KEGG_ID == "path:mmu04150"]$LR_GENES ]
+cci_term_up <- cci_term[REGULATION_SIMPLE == "UP"]
+cci_term_down <- cci_term[REGULATION_SIMPLE == "DOWN"]
+
+cci_term_up[, .N, by = c("ID", "ER_CELLTYPES")]
+cci_term_down[, .N, by = c("ID", "ER_CELLTYPES")]
+
+cci_term_down[ID == "Aorta", .N, by = "EMITTER_CELLTYPE"]
+cci_term_down[ID == "Aorta", .N, by = "RECEIVER_CELLTYPE"]

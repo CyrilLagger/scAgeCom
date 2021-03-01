@@ -28,7 +28,9 @@ dir_data_analysis <- "../data_scAgeCom/analysis/"
 
 ## Read metadata from the seurat files ####
 
-seurat_md <- readRDS(paste0(dir_data_analysis, "analysis_1_data_seurat_md.rds"))
+#seurat_md <- readRDS(paste0(dir_data_analysis, "analysis_1_data_seurat_md.rds"))
+seurat_md <- readRDS("../data_scAgeCom/analysis/outputs_data/seurat_md.rds")
+
 seurat_md <- lapply(
   seurat_md,
   setDT
@@ -78,14 +80,19 @@ seurat_md$calico[, age_group := ifelse(age == "young", 'YOUNG', 'OLD')]
 
 # add tissue-cell types
 seurat_md <- lapply(seurat_md, function(x) {
-  x$tissue_cell_ontology <- paste(x$tissue, x$cell_ontology_scdiffcom, sep = "_")
-  if("cell_ontology_class" %in% colnames(x)) {
-    x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class)
-  } else {
-    x$tissue_cell_type <- paste(x$tissue, x$cell_type)
-  }
+  x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_final)
   return(x)
 })
+ 
+# seurat_md <- lapply(seurat_md, function(x) {
+#   x$tissue_cell_ontology <- paste(x$tissue, x$cell_ontology_scdiffcom, sep = "_")
+#   if("cell_ontology_class" %in% colnames(x)) {
+#     x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class)
+#   } else {
+#     x$tissue_cell_type <- paste(x$tissue, x$cell_type)
+#   }
+#   return(x)
+# })
 
 seurat_md$calico_subtype <- copy(seurat_md$calico)
 seurat_md$calico_subtype[, tissue_cell_type := paste(tissue, subtype, sep = "_")]
@@ -102,6 +109,106 @@ seurat_md <- lapply(seurat_md, function(x) {
 })
 
 ## Create tables of age vs sex for each cell type ####
+
+md_age_sex_by_tissue <- lapply(
+  seurat_md,
+  function(dataset) {
+    dt <- dcast.data.table(
+      dataset[, .N, by = c("age", "sex", "tissue")],
+      formula = tissue ~ age + sex,
+      value.var = "N"
+    )
+    dt[is.na(dt)] <- 0
+    dt
+  }
+)
+
+md_age_sex_by_celltype <- lapply(
+  seurat_md,
+  function(dataset) {
+    dt <- dcast.data.table(
+      dataset[, .N, by = c("age", "sex", "tissue_cell_type")],
+      formula = tissue_cell_type ~ age + sex,
+      value.var = "N"
+    )
+    dt[is.na(dt)] <- 0
+    dt
+  }
+)
+
+md_agegroup_sex_by_celltype <- lapply(
+  seurat_md[1:2],
+  function(dataset) {
+    dt <- dcast.data.table(
+      dataset[age != "30m", .N, by = c("age_group", "sex", "tissue_cell_type")],
+      formula = tissue_cell_type ~ age_group + sex,
+      value.var = "N"
+    )
+    dt[is.na(dt)] <- 0
+    dt[, OR := OLD_male*YOUNG_female/(YOUNG_male*OLD_female)]
+    dt[, JACCARD := (OLD_male + OLD_female)/((OLD_male + YOUNG_female)+(YOUNG_male + OLD_female)+(OLD_male + OLD_female))]
+    dt
+  }
+)
+
+fwrite(md_agegroup_sex_by_celltype$tms_facs, "../data_scAgeCom/analysis/outputs_data/md_facs_agegroup_sex_by_celltype.csv")
+fwrite(md_agegroup_sex_by_celltype$tms_droplet, "../data_scAgeCom/analysis/outputs_data/md_droplet_agegroup_sex_by_celltype.csv")
+
+
+dt <- dcast.data.table(
+  seurat_md$tms_droplet[, .N, by = c("age_group", "tissue", "tissue_cell_type")],
+  formula = tissue + tissue_cell_type ~ age_group,
+  value.var = "N"
+)
+dt[is.na(dt)] <- 0
+dt[, IS_KEPT := ifelse(OLD >= 5 & YOUNG >= 5, TRUE, FALSE)]
+dt[IS_KEPT == TRUE, .N, by = c("tissue") ]
+
+dt2 <- dcast.data.table(
+  seurat_md$tms_droplet[age != "30m", .N, by = c("age_group", "tissue", "tissue_cell_type")],
+  formula = tissue + tissue_cell_type ~ age_group,
+  value.var = "N"
+)
+dt2[is.na(dt2)] <- 0
+dt2[, IS_KEPT := ifelse(OLD >= 5 & YOUNG >= 5, TRUE, FALSE)]
+dt2[IS_KEPT == TRUE, .N, by = c("tissue") ]
+
+dt3 <- dcast.data.table(
+  seurat_md$tms_droplet[age != "30m" & sex == "male", .N, by = c("age_group", "tissue", "tissue_cell_type")],
+  formula = tissue + tissue_cell_type ~ age_group,
+  value.var = "N"
+)
+dt3[is.na(dt3)] <- 0
+dt3[, IS_KEPT := ifelse(OLD >= 5 & YOUNG >= 5, TRUE, FALSE)]
+dt3[IS_KEPT == TRUE, .N, by = c("tissue") ]
+
+dt3 <- merge.data.table(
+  dt,
+  dt2,
+  by = c("tissue", "tissue_cell_type"),
+  all.x = TRUE,
+  all.y = TRUE
+)
+
+
+test <- seurat_md$tms_facs[, .N, by = c("age", "sex", "tissue")]
+
+ggplot(test, aes(x = age, y = N, color = sex )) + geom_point() +
+  facet_wrap(~tissue)
+
+tables_age_vs_sex <- lapply(
+  seurat_md,
+  function(md) {
+    sapply(
+      unique(md$tissue_cell_type),
+      function(tct) {
+        temp <- md[md$tissue_cell_ontology == tct,]
+        table(temp$age_group, temp$sex)
+      },
+      simplify = FALSE,
+      USE.NAMES = TRUE)
+  }
+)
 
 tables_age_vs_sex <- lapply(
   seurat_md,
@@ -538,3 +645,116 @@ grid.draw(g_spleen)
 ggsave(paste0(dir_data_analysis, "analysis_1_plot_spleen_celltypes.png"),
        plot = g_spleen, scale = 1.5)
 
+# check here if the TMS genes are in ensembl ####
+test <- readRDS("../../data_scAgeCom/test/inputs/seurat_testing_tms_facs_liver.rds")
+genes <- rownames(test)
+
+
+mart <- biomaRt::useMart(
+  "ensembl",
+  dataset = "mmusculus_gene_ensembl"
+)
+
+ensembl <- biomaRt::getBM(
+  attributes = c(
+    "mgi_symbol",
+    "ensembl_gene_id"
+  ),
+  filters = "mgi_symbol",
+  mart = mart,
+  values = genes
+)
+test <- unique(ensembl$mgi_symbol)
+out_genes <- data.table(setdiff(genes, test))
+setdiff(test, genes)
+
+my_genes <- unique(LRdb_mouse$LRdb_curated$LIGAND_1)
+
+setdiff(my_genes, test)
+
+library(KEGGREST)
+listDatabases()
+kegg_orga <- data.table(keggList("organism"))
+kegg_mouse <- kegg_orga[grepl("Mus musculu", kegg_orga$species)]
+kegg_paths <- data.table(
+  "KEGG_ID" = names(keggList("pathway", organism = "hsa")),
+  "KEGG_NAME" = keggList("pathway", organism = "hsa"))
+
+test <- keggGet(kegg_paths[1,]$V1)[[1]]$GENE
+test2 <- test[grepl(";", test)]
+
+retrieve_gene_from_kegg_path <- function(
+  kegg_path_id
+) {
+  temp <- keggGet(kegg_path_id)[[1]]$GENE
+  temp <- temp[grepl(";", temp)]
+  temp <- sort(gsub(";.*", "", temp))
+  data.table(
+    GENE = temp,
+    KEGG_ID = kegg_path_id
+  )
+}
+
+test <- rbindlist(lapply(
+  kegg_paths$V1,
+  retrieve_gene_from_kegg_path
+))
+test <- na.omit(test)
+
+my_genes <- unique(unlist(LRdb_mouse$LRdb_curated[,c("LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3")]))
+my_genes <- my_genes[!is.na(my_genes)]
+
+my_db <- copy(LRdb_mouse$LRdb_curated[,1:6])
+my_db[, c("LIGAND_PW", "RECEPTOR_PW") := list(
+  sapply(
+    1:nrow(.SD),
+    function(i) {
+      temp <- test[GENE %in% c(LIGAND_1[[i]], LIGAND_2[[i]])]
+      temp <- paste0(unique(temp$KEGG_ID), collapse = ";")
+      return(temp)
+    }
+  ),
+  sapply(
+    1:nrow(.SD),
+    function(i) {
+      temp <- test[GENE %in% c(RECEPTOR_1[[i]], RECEPTOR_2[[i]], RECEPTOR_3[[i]])]
+      temp <- paste0(unique(temp$KEGG_ID), collapse = ";")
+      return(temp)
+    }
+  )
+)]
+
+test5 <- rbindlist(
+  apply(
+    my_db,
+    MARGIN = 1,
+    function(row) {
+      LIGAND_PW <- unique(test[
+        GENE %in% c(row[["LIGAND_1"]], row[["LIGAND_2"]])
+        ]$KEGG_ID)
+      RECEPTOR_PW <- unique(test[
+        GENE %in% c(row[["RECEPTOR_1"]], row[["RECEPTOR_2"]], row[["RECEPTOR_3"]])
+        ]$KEGG_ID)
+      res_inter <- intersect(LIGAND_PW, RECEPTOR_PW)
+      if (length(res_inter) > 0) {
+        res_inter <- data.table(
+          LR_GENES = rep(row[["LR_GENES"]], length(res_inter)),
+          KEGG_ID = res_inter
+        )
+      } else {
+        res_inter <- NULL
+      }
+      return(res_inter)
+    }
+  )
+)
+
+my_LR_rest <- unique(test3$LR_GENES)
+my_LR_rest2 <- unique(test4$LR_GENES)
+my_LR_rest3 <- unique(test5$LR_GENES)
+
+testxxx2 <- my_db[(LR_GENES %in% my_LR_rest)]
+
+test2 <- test[GENE %in% my_genes]
+unique(test2$GENE)
+unique(test2$KEGG_ID)

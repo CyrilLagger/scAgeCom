@@ -20,38 +20,45 @@ library(scDiffCom)
 library(UpSetR)
 library(ComplexUpset)
 library(ggplot2)
+library(data.table)
 
 ## Analysis data path ####
 path_directory_analysis <- "../data_scAgeCom/analysis/"
 
 ## Load the LR database ####
 LRdb <- list(
-  human_notcurated = scDiffCom::LRdb_human$LRdb_notCurated,
-  human_curated = scDiffCom::LRdb_human$LRdb_curated,
-  mouse_notcurated = scDiffCom::LRdb_mouse$LRdb_notCurated,
-  mouse_curated = scDiffCom::LRdb_mouse$LRdb_curated
+  human_notcurated = copy(scDiffCom::LRdb_human$LRdb_not_curated),
+  human_curated = copy(scDiffCom::LRdb_human$LRdb_curated),
+  mouse_notcurated = copy(scDiffCom::LRdb_mouse$LRdb_not_curated),
+  mouse_curated = copy(scDiffCom::LRdb_mouse$LRdb_curated)
 )
 
-saveRDS(LRdb$mouse_curated, "shinyApp/data/LRdb_mouse_curated.rds")
-
 ## Add some annotations ####
+
+LRdb_DBS <- sort(unique(unlist(strsplit(LRdb$human_notcurated$DATABASE, ";"))))
+LRdb_DBS
+
+LRdb_sources <- c(
+  "FANTOM5", "HPMR", "HPRD", "PMID",
+  "CellPhoneDB", "KEGG", "IUPHAR", "reactome",
+  "cellsignal.com", "PPI"
+)
+
 LRdb <- lapply(
   LRdb,
   function(i) {
-    LRdb_DATABASES <- unique(unlist(strsplit(i$DATABASE, ";")))
-    i[, IS_COMPLEX := !is.na(LIGAND_2) | !is.na(RECEPTOR_2)]
-    i[, c(LRdb_DATABASES) := lapply(LRdb_DATABASES, function(i) {
+    i[, COMPLEX := !is.na(LIGAND_2) | !is.na(RECEPTOR_2)]
+    i[, c(LRdb_DBS) := lapply(LRdb_DBS, function(i) {
       ifelse(grepl(i, DATABASE), TRUE, FALSE)
+    })]
+    i[, c(LRdb_sources) := lapply(LRdb_sources, function(i) {
+      ifelse(grepl(i, SOURCE), TRUE, FALSE)
     })]
     return(i)
   }
 )
 
-## All databases of reference
-LRdb_DBS <- sort(unique(unlist(strsplit(LRdb$human_notcurated$DATABASE, ";"))))
-LRdb_DBS
-
-#pmid or pmc of the databases (used to determine cross-reference below)
+## pmid or pmc of the databases (used to determine cross-reference below) ####
 LRdb_DBS_pmid <- c("32103204", "30429548", "33147626", "31819264",
                    "26198319", "4525178", "33024107", "7538930",
                    "32196115", "7261168")
@@ -79,8 +86,8 @@ sapply(
 )
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("CELLCHAT", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_notcurated[grepl("CELLCHAT", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("CELLCHAT", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_notcurated[grepl("CELLCHAT", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study CellPhoneDB ####
 
@@ -95,8 +102,8 @@ unique(cpdb_mouse$SOURCE)
 # we don't check for cross-dependency, maybe with FANTOM5?
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("CELLPHONEDB", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_notcurated[grepl("CELLPHONEDB", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("CELLPHONEDB", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_notcurated[grepl("CELLPHONEDB", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study CellTalkDB ####
 
@@ -119,8 +126,8 @@ sapply(
 )
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("CELLTALK", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_notcurated[grepl("CELLTALK", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("CELLTALK", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_notcurated[grepl("CELLTALK", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study NATMI connectomeDB ####
 
@@ -143,8 +150,8 @@ sapply(
 )
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("CONNECTOMEDB", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_notcurated[grepl("CONNECTOMEDB", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("CONNECTOMEDB", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_notcurated[grepl("CONNECTOMEDB", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study ICELLNET ####
 
@@ -167,8 +174,8 @@ sapply(
 )
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("ICELLNET", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_notcurated[grepl("ICELLNET", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("ICELLNET", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_notcurated[grepl("ICELLNET", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study NicheNet ####
 
@@ -183,11 +190,11 @@ unique(nichenet_mouse$SOURCE)
 table(nichenet_mouse$SOURCE)
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("NICHENET", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$human_curated[grepl("NICHENET", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("NICHENET", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$human_curated[grepl("NICHENET", DATABASE)][,.N, by = "COMPLEX"]
 
-LRdb$mouse_notcurated[grepl("ICELLNET", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_curated[grepl("NICHENET", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$mouse_notcurated[grepl("ICELLNET", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_curated[grepl("NICHENET", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study SingleCellSignalR ####
 
@@ -215,11 +222,11 @@ scsr_human[!grepl("PMID|reactome|Ramilowski2015|cellsignal", SOURCE)]
 scsr_mouse[!grepl("PMID|reactome|Ramilowski2015|cellsignal", SOURCE)]
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("SCSR", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$human_curated[grepl("SCSR", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("SCSR", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$human_curated[grepl("SCSR", DATABASE)][,.N, by = "COMPLEX"]
 
-LRdb$mouse_notcurated[grepl("SCSR", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_curated[grepl("SCSR", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$mouse_notcurated[grepl("SCSR", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_curated[grepl("SCSR", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Study scTensor ####
 
@@ -232,29 +239,47 @@ unique(sct_human$SOURCE)
 unique(sct_mouse$SOURCE)
 
 # number of interactions by types
-LRdb$human_notcurated[grepl("SCTENSOR", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$human_curated[grepl("SCTENSOR", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$human_notcurated[grepl("SCTENSOR", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$human_curated[grepl("SCTENSOR", DATABASE)][,.N, by = "COMPLEX"]
 
-LRdb$mouse_notcurated[grepl("SCTENSOR", DATABASE)][,.N, by = "IS_COMPLEX"]
-LRdb$mouse_curated[grepl("SCTENSOR", DATABASE)][,.N, by = "IS_COMPLEX"]
+LRdb$mouse_notcurated[grepl("SCTENSOR", DATABASE)][,.N, by = "COMPLEX"]
+LRdb$mouse_curated[grepl("SCTENSOR", DATABASE)][,.N, by = "COMPLEX"]
 
 ## Plot by Database of origin ####
 
-analysis_2_image_mouse_upset_db <- ComplexUpset::upset(
+analysis_2_figure_mouse_upset_db <- ComplexUpset::upset(
   LRdb$mouse_curated,
   LRdb_DBS,
   base_annotations=list(
     'Intersection size'=intersection_size(
       counts=TRUE,
-      aes=aes(fill=IS_COMPLEX),
+      aes=aes(fill=COMPLEX),
       text = list(position = position_stack(vjust = 0.0)),
       bar_number_threshold = 100
     )
   ),
-  min_size = 20
+  themes=upset_default_themes(text=element_text(size=20)),
+  min_size = 39
 )
-analysis_2_image_mouse_upset_db
+analysis_2_figure_mouse_upset_db
 
+## Plot by Evidence of origin ####
+
+analysis_2_figure_mouse_upset_evid <- ComplexUpset::upset(
+  LRdb$mouse_curated,
+  LRdb_sources,
+  base_annotations=list(
+    'Intersection size'=intersection_size(
+      counts=TRUE,
+      aes=aes(fill=COMPLEX),
+      text = list(position = position_stack(vjust = 0.0)),
+      bar_number_threshold = 100
+    )
+  ),
+  themes=upset_default_themes(text=element_text(size=20)),
+  min_size = 30
+)
+analysis_2_figure_mouse_upset_evid
 
 ## old code ####
 LRdb_mouse_curated[, c(LRdb_SOURCES) := lapply(LRdb_SOURCES, function(i) {
@@ -267,7 +292,7 @@ ComplexUpset::upset(
   base_annotations=list(
     'Intersection size'=intersection_size(
       counts=TRUE,
-      aes=aes(fill=IS_COMPLEX),
+      aes=aes(fill=COMPLEX),
       text = list(position = position_stack(vjust = 0.0)),
       bar_number_threshold = 100
     )
