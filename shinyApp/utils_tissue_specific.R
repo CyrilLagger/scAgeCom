@@ -222,6 +222,27 @@ choose_TSA_receiver <- function(
   })
 }
 
+choose_TSA_lri <- function(
+  input 
+) {
+  renderUI({
+    req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
+    ALL_LRI_LABEL = 'All LRI'
+    choices <-
+      c(ALL_LRI_LABEL,
+        sort(unique(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[ID == input$TSA_TISSUE_CHOICE][["LR_GENES"]]))
+      )
+    selectizeInput(inputId = 'TSA_LRI_CHOICE',
+      label = 'Ligand-Receptor interactions',
+      choices = choices,
+      selected = ALL_LRI_LABEL,
+      multiple = TRUE,
+      options = list(allowEmptyOption = TRUE,
+                     placeholder = 'Type LRIs')
+    )
+  })
+}
+
 get_TSA_slider_log2fc <- function(
   input
 ) {
@@ -274,17 +295,27 @@ get_TSA_interaction_table <- function(
 ) {
   DT::renderDT({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
-        input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
+        input$TSA_LRI_CHOICE, input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
     dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
       ID == input$TSA_TISSUE_CHOICE
       ]
     req(dt)
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
-        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
-        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-        abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+    if ('All LRI' %in% input$TSA_LRI_CHOICE) {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
+    } else {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `LR_GENES` %in% input$TSA_LRI_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+      ]
+    }
     setorder(
       dt,
       -LOG2FC,
@@ -305,17 +336,27 @@ plot_TSA_VOLCANO <- function(
 ) {
   renderPlot({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
-        input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
+        input$TSA_LRI_CHOICE, input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
     dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
       ID == input$TSA_TISSUE_CHOICE
       ]
     req(dt)
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
-        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
-        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-        abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+    if ('All LRI' %in% input$TSA_LRI_CHOICE) {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
+    } else {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `LR_GENES` %in% input$TSA_LRI_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+      ]
+    }
     dt[, mlog10_pval := -log10(`BH_P_VALUE_DE` + 1E-4)]
     dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "mlog10_pval", "REGULATION")]
     show_volcano(dt)
@@ -327,17 +368,27 @@ get_TSA_VOLCANO_text <- function(
 ) {
   renderPrint({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
-        input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
+        input$TSA_LRI_CHOICE, input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
     dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
       ID == input$TSA_TISSUE_CHOICE
       ]
     req(dt)
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
-        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
-        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-        abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+    if ('All LRI' %in% input$TSA_LRI_CHOICE) {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
+    } else {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `LR_GENES` %in% input$TSA_LRI_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+      ]
+    }
     dt[, mlog10_pval := -log10(`BH_P_VALUE_DE` + 1E-4)]
     dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "mlog10_pval", "REGULATION")]
     brushedPoints(dt, input$TSA_VOLCANO_brush, xvar = "LOG2FC", yvar = "mlog10_pval")
@@ -349,16 +400,26 @@ plot_TSA_SCORES <- function(
 ) {
   renderPlot({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
-        input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
+        input$TSA_LRI_CHOICE, input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
     dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
       ID == input$TSA_TISSUE_CHOICE
       ]
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
-        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
-        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-        abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+    if ('All LRI' %in% input$TSA_LRI_CHOICE) {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
+    } else {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `LR_GENES` %in% input$TSA_LRI_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+      ]
+    }
     dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
     show_scores(dt)
   })
@@ -369,17 +430,27 @@ get_TSA_SCORES_text <- function(
 ) {
   renderPrint({
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_EMITTER_CHOICE, input$TSA_RECEIVER_CHOICE,
-        input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
+        input$TSA_LRI_CHOICE, input$TSA_SLIDER_PVALUE, input$TSA_SLIDER_LOG2FC)
     dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
       ID == input$TSA_TISSUE_CHOICE
       ]
     req(dt)
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
-        `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
-        `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-        abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+    if ('All LRI' %in% input$TSA_LRI_CHOICE) {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
       ]
+    } else {
+      dt <- dt[
+        `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
+          `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
+          `LR_GENES` %in% input$TSA_LRI_CHOICE &
+          `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
+          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+      ]
+    }
     dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
     brushedPoints(dt, input$TSA_SCORES_brush)
   })
