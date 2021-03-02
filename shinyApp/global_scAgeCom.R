@@ -20,8 +20,8 @@ LRdb_curated[, SOURCE := sub(";$", "", SOURCE)]
 LRdb_curated[, SOURCE := sub("^;", "", SOURCE)]
 
 #DATASETS_COMBINED <- readRDS("data/analysis4_DATASETS_COMBINED_log15_light.rds")
-DATASETS_COMBINED <- readRDS("data/TMS_scAgeCom_processed.rds")
-DATASETS_COMBINED <- DATASETS_COMBINED[c(1,2,3,4,6,7,8)]
+DATASETS_COMBINED <- readRDS("data/TMS_scAgeCom_processed_testing.rds")
+DATASETS_COMBINED <- DATASETS_COMBINED[c(1,2)]#,3,4,6,7,8)]
 DATASETS_COMBINED <- lapply(DATASETS_COMBINED, function(i) i$dataset)
 DATASETS_COMBINED <- lapply(
   DATASETS_COMBINED,
@@ -30,8 +30,10 @@ DATASETS_COMBINED <- lapply(
     dt[, LOG2FC := LOGFC*log2(exp(1))]
     dt[, LOG2FC := {
       temp <- LOG2FC
-      temp_max <- round(max(temp[is.finite(temp)])) + 1
-      temp_min <- round(min(temp[is.finite(temp)])) - 1
+      temp_max <- ceiling(max(temp[is.finite(temp)]))
+      temp_min <- floor(min(temp[is.finite(temp)]))
+      temp_max <- max(temp_max, -temp_min)
+      temp_min <- min(-temp_max, temp_min)
       ifelse(
         is.infinite(LOG2FC) & LOG2FC > 0,
         temp_max,
@@ -40,15 +42,15 @@ DATASETS_COMBINED <- lapply(
           temp_min,
           LOG2FC
         )
-      )}]
+      )}, by = ID]
     dataset@cci_detected <- dt
     return(dataset)
   }
 )
 #names(DATASETS_COMBINED) <- c("Calico Data", "TMS Droplet Data", "TMS FACS Data")
 names(DATASETS_COMBINED) <- c("Calico Data",
-                              "TMS Droplet Data Female", "TMS Droplet Data Male", "TMS Droplet Data Mixed",
-                              "TMS FACS Data Female", "TMS FACS Data Male", "TMS FACS Data Mixed")
+                              "TMS Droplet Data Female")#, "TMS Droplet Data Male", "TMS Droplet Data Mixed",
+                              #"TMS FACS Data Female", "TMS FACS Data Male", "TMS FACS Data Mixed")
 
 
 CCI_SUMMARY <- readRDS("data/analysis5_SUMMARY_DATA.rds")
@@ -64,15 +66,20 @@ show_DT <- function(
   cols_numeric = NULL,
   table_title = NULL,
   options = NULL,
-  rownames = TRUE
+  rownames = TRUE,
+  callback = NULL
 ) {
   if (is.null(options)) {
     options <- list(pageLength = 10)
   }
+  if (is.null(callback)) {
+    callback <- JS("return table;")
+  }
   res <- DT::datatable(
     data = data[, cols_to_show, with = FALSE],
     options = options,
-    caption = tags$caption(style = 'caption-side: top; text-align: center; color:black; font-size:200% ;',table_title),
+    callback = callback,
+    caption = tags$caption(style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',table_title),
     rownames = rownames
   ) 
   if(!is.null(cols_numeric)) {
@@ -86,12 +93,14 @@ show_DT <- function(
 }
 
 show_volcano <- function(
-  data
+  data,
+  xlims,
+  ylims
 ) {
   p <- ggplot(data, aes(
     x = LOG2FC,
-    y = mlog10_pval,
-    color = REGULATION
+    y = minus_log10_pval,
+    color = `Age Regulation`
   )) +
     geom_point() +
     scale_color_manual(values = c(
@@ -103,28 +112,25 @@ show_volcano <- function(
     geom_vline(xintercept = -log2(1.5)) +
     xlab(expression(paste(Log[2], "FC"))) +
     ylab(expression(paste(-Log[10], " ", p[BH]))) +
-    ggtitle("Interactive Volcano Plot of detected CCI") +
-    theme(text=element_text(size=20)) +
-    theme(legend.title = element_blank()) #+
-    #theme(legend.position = c(0.8, 0.2))
-  #ggMarginal(
-  #  p = p,
-  #  type =  "histogram",
-  #  margins = "x",
-  #  xparams = list(bins = 100)
-  #)
+    xlim(xlims) + ylim(ylims) + 
+    ggtitle("Volcano Plot of detected CCI (interactive)") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(text=element_text(size=20)) #+
+   # theme(legend.title = element_blank())
   return(p)
 }
 
 show_scores <- function(
-  data
+  data,
+  xlims,
+  ylims
 ) {
   p <- ggplot(
     data,
     aes(
-      x = `CCI_SCORE_YOUNG` + 1E-3,
-      y = `CCI_SCORE_OLD` + 1E-3,
-      color = REGULATION
+      x = `Score Young`,
+      y = `Score Old`,
+      color = `Age Regulation`
     )
   ) + 
     geom_point() +
@@ -132,13 +138,45 @@ show_scores <- function(
       "UP" = "red", "DOWN" = "blue",
       "FLAT" = "green",
       "NON_SIGNIFICANT_CHANGE" = "black")) +
-    scale_x_log10() +
-    scale_y_log10() +
+    scale_x_log10(limits = xlims) +
+    scale_y_log10(limits = ylims) +
     geom_abline(slope = 1, intercept = 0) +
-    xlab("Young Score") +
-    ylab("Old Score") +
-    ggtitle("Interactive Score Plot of detected CCIs") +
-    theme(text=element_text(size=20)) +
-    theme(legend.title = element_blank())
+    xlab("Score Young") +
+    ylab("Score Old") +
+    ggtitle("Old vs Young Scores of detected CCIs (interactive)") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(text=element_text(size=20))
+    #theme(legend.title = element_blank())
+  return(p)
+}
+
+
+show_LRIFC <- function(
+  data,
+  xlims,
+  ylims
+) {
+  p <- ggplot(
+    data,
+    aes(
+      x = LOG2FC_L,
+      y = LOG2FC_R,
+      color = `Age Regulation`
+    )
+  ) + 
+    geom_point() +
+    scale_color_manual(values = c(
+      "UP" = "red", "DOWN" = "blue",
+      "FLAT" = "green",
+      "NON_SIGNIFICANT_CHANGE" = "black")) +
+    geom_vline(xintercept = 0) +
+    geom_hline(yintercept = 0) +
+    xlim(xlims) + ylim(ylims) +
+    xlab("Ligand LOG2FC") +
+    ylab("Receptor LOG2FC") +
+    ggtitle("Ligand vs Receptor Fold-Change of detected CCIs (interactive)") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(text=element_text(size=20))
+  #theme(legend.title = element_blank())
   return(p)
 }

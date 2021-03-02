@@ -5,6 +5,7 @@ server_scAgeCom <- function(
   source("utils_description.R")
   output$description_html <- get_description_html(input)
   source("utils_tissue_specific.R", local = TRUE)
+  output$TSA_DATASET_CHOICE <- choose_TSA_dataset(input)
   output$TSA_TISSUE_CHOICE <- choose_TSA_tissue(input)
   output$TSA_TITLE <- get_TSA_title(input)
   # tab overview
@@ -25,10 +26,12 @@ server_scAgeCom <- function(
   output$TSA_VOLCANO_TEXTOUTPUT <- get_TSA_VOLCANO_text(input)
   output$TSA_SCORES_PLOT <- plot_TSA_SCORES(input)
   output$TSA_SCORES_TEXTOUTPUT <- get_TSA_SCORES_text(input)
+  output$TSA_LRIFC_PLOT <- plot_TSA_LRIFC(input)
+  output$TSA_LRIFC_TEXTOUTPUT <- get_TSA_LRIFC_text(input)
   #tab over-representation
   output$TSA_ORA_INTRO <- get_TSA_ora_intro(input)
   output$TSA_ORA_CATEGORY_CHOICE <- choose_TSA_ORA_category(input)
-  output$TSA_ORA_SLIDER_OR <- get_TSA_ORA_slider_or(input)
+  #output$TSA_ORA_SLIDER_OR <- get_TSA_ORA_slider_or(input)
   output$TSA_ORA_DETAILS <- get_TSA_ora_details(input)
   output$TSA_ORA_TABLE <- get_TSA_ORA_table(input)
   output$TSA_ORA_PLOT <- plot_TSA_ORA(input)
