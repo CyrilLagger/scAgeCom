@@ -1,10 +1,12 @@
+
+## TSA overall ####
+
 choose_TSA_dataset <- function(
   input
 ) {
   renderUI({
     pickerInput(
       inputId = "TSA_DATASET_CHOICE",
-      #label = "Dataset",
       choices = names(DATASETS_COMBINED),
       options = list(
         `actions-box` = TRUE
@@ -23,7 +25,6 @@ choose_TSA_tissue <- function(
     choices <- sort(unique(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected$ID))
     pickerInput(
       inputId = "TSA_TISSUE_CHOICE",
-      #label = "Tissue",
       choices = choices,
       options = list(`actions-box` = TRUE),
       multiple = FALSE,
@@ -37,50 +38,10 @@ get_TSA_title <- function(
 ) {
   renderUI(
     {
-      #req(input$TSA_TISSUE_CHOICE, input$TSA_DATASET_CHOICE)
-      #req(input$TSA_DATASET_CHOICE)
-      #color_theme <- "color: rgb(20 120 206)"
-      # tags$p(
-      #   "Analysis of the ",
-      #   span(input$TSA_TISSUE_CHOICE, style = color_theme),
-      #   " from the ",
-      #   span(input$TSA_DATASET_CHOICE, style = color_theme)
-      #   )
-      # tags$p(
-      #   div(style="display: inline-block;", "Please choose a dataset ("),
-      #   div(style="display: inline-block;margin-top: 25px;", uiOutput("TSA_DATASET_CHOICE", inline = TRUE)),
-      #   div(style="display: inline-block;", ") and a tissue (" ),
-      #   div(style="display: inline-block;margin-top: 25px;", uiOutput("TSA_TISSUE_CHOICE", inline = TRUE)),
-      #   div(style="display: inline-block;", ")" )
-      # )
-      # 
       tags$p(
         div(style="display: inline-block;", "Please choose a dataset and a tissue: "),
         div(style="display: inline-block;margin-top: 25px;", uiOutput("TSA_DATASET_CHOICE", inline = TRUE)),
         div(style="display: inline-block;margin-top: 25px;", uiOutput("TSA_TISSUE_CHOICE", inline = TRUE)),
-      )
-      
-    }
-  )
-}
-
-get_TSA_overview_intro <- function(
-  input
-) {
-  renderUI(
-    {
-      req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-      color_theme <- "color: rgb(20 120 206)"
-      tags$div(
-        tags$p(
-          "We give the number of detected cell-cell interactions (CCI) in the ",
-          span(input$TSA_TISSUE_CHOICE, style = color_theme), 
-          ", and how many of them change significantly with age.",
-          "Note that some CCI can appear or disappear with age whereas others can be down- or up-regulated",
-          " but still detected in both young and old samples."
-        ),
-        tags$p("We then present several networks that provide an overview of the intercellular communication in this tissue."),
-        style = "font-size: 1.5em; text-align: justify;"
       )
     }
   )
@@ -109,9 +70,9 @@ get_TSA_overview_table <- function(
       data = dt,
       cols_to_show = new_col_names,
       cols_numeric = NULL,
-      table_title = NULL, # "Cell-Cell Interaction Counts",
-      options = list(dom = "t"),#list(pageLength = 10, lengthChange = FALSE),
-      callback = JS(
+      table_title = NULL,
+      options = list(dom = "t"),
+      callback = htmlwidgets::JS(
         "var tips = [
       'Number of cell-types in the tissue of interest',
       'Number of cell-cell interactions detected in the tissue of interest',
@@ -129,107 +90,7 @@ get_TSA_overview_table <- function(
   })
 }
 
-get_TSA_network_intro <- function(
-  input
-) {
-  renderUI(
-    {
-      req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-      color_theme <- "color: rgb(20 120 206)"
-      tags$div(
-        tags$p(
-          "Please choose between different network types (more info to come about each network).",
-          "You can interact with the networks. When the network type is 'ORA' you can find more information ",
-          "about each egde by hovering it."
-        ),
-        style = "font-size: 1.5em; text-align: justify;"
-      )
-    }
-  )
-}
-
-plot_TSA_network <- function(
-  input
-) {
-  renderVisNetwork({
-    req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, 
-        input$TSA_NETWORK_TYPE_CHOICE, input$TSA_NETWORK_LAYOUT_CHOICE)
-    obj <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]
-    net_type <- input$TSA_NETWORK_TYPE_CHOICE
-    net_lay <- input$TSA_NETWORK_LAYOUT_CHOICE
-    if (net_type == "Young") {
-      net_type2 <- "COUNTS_COND1"
-    } else if (net_type == "Old") {
-      net_type2 <- "COUNTS_COND2"
-    } else if (net_type == "Change") {
-      net_type2 <- "COUNTS_DIFF"
-    } else if (net_type == "ORA") {
-      net_type2 <- "ORA"
-    }
-    if (net_lay == "Circular") {
-      net_lay2 <- "celltypes"
-    } else if (net_lay == "Bipartite") {
-      net_lay2 <- "bipartite"
-    }
-    req(obj)
-    BuildNetwork(
-      object = obj,
-      network_type = net_type2,
-      network_layout = net_lay2,
-      ID = input$TSA_TISSUE_CHOICE
-    )
-    # ora_tables <- scDiffCom::get_ora_tables(obj)
-    # names(ora_tables) <- c("GO Terms", "LR_GENES", "LR_CELLTYPE", "Cell Families")
-    # ora_tables <- lapply(
-    #   ora_tables,
-    #   function(ORA_dt) {
-    #     dt <- copy(ORA_dt)
-    #     setnames(
-    #       dt,
-    #       new = c("OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN",
-    #               "OR_FLAT", "pval_adjusted_FLAT"),
-    #       old = c("OR_UP", "BH_P_VALUE_UP", "OR_DOWN", "BH_P_VALUE_DOWN",
-    #               "OR_FLAT", "BH_P_VALUE_FLAT")
-    #     )
-    #     return(dt)
-    #   }
-    # )
-    # obj <- scDiffCom::set_ora_tables(obj, ora_tables)
-    # cci_table_filtered <- copy(scDiffCom:::get_cci_table_filtered(obj))
-    # setnames(
-    #   cci_table_filtered,
-    #   new = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF", "LR_NAME"),
-    #   old = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "Adj. P-Value", "LR_GENES")
-    # )
-    # obj <- scDiffCom:::set_cci_table_filtered(obj, cci_table_filtered)
-    # req(obj)
-    # scDiffCom::build_celltype_bipartite_graph(
-    #   object = obj,
-    #   disperse = FALSE,
-    #   dir = NULL
-    # )
-  })
-}
-
-get_TSA_cci_intro <- function(
-  input
-) {
-  renderUI(
-    {
-      req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-      color_theme <- "color: rgb(20 120 206)"
-      tags$div(
-        tags$p(
-          "We provide the full table of all detected CCI in this tissue, including relevant scores. ",
-          "In addition, a Volcano Plot highlights how they are distributed with respect to their significance and ",
-          "strength of change with age, whereas a Score Plot indicates their prevalence in both young and old samples. ",
-          "The latter graph can also be useful to observe strong signals that do not change with age."
-        ),
-        style = "font-size: 1.5em; text-align: justify;"
-      )
-    }
-  )
-}
+## TSA CCIs sidebar ####
 
 choose_TSA_emitter <- function(
   input
@@ -279,13 +140,14 @@ choose_TSA_lri <- function(
       c(ALL_LRI_LABEL,
         sort(unique(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[ID == input$TSA_TISSUE_CHOICE][["LR_GENES"]]))
       )
-    selectizeInput(inputId = 'TSA_LRI_CHOICE',
-                   label = 'Filter by Ligand-Receptor Interactions',
-                   choices = choices,
-                   selected = ALL_LRI_LABEL,
-                   multiple = TRUE,
-                   options = list(allowEmptyOption = TRUE,
-                                  placeholder = 'Type LRIs')
+    selectizeInput(
+      inputId = 'TSA_LRI_CHOICE',
+      label = 'Filter by Ligand-Receptor Interactions',
+      choices = choices,
+      selected = ALL_LRI_LABEL,
+      multiple = TRUE,
+      options = list(allowEmptyOption = TRUE,
+                     placeholder = 'Type LRIs')
     )
   })
 }
@@ -297,7 +159,7 @@ get_TSA_slider_log2fc <- function(
     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
     max_val <- ceiling(max(DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
       ID == input$TSA_TISSUE_CHOICE
-    ][["LOG2FC"]]))
+    ][["LOG2FC_ID"]]))
     sliderInput(
       inputId = "TSA_SLIDER_LOG2FC",
       label = "Filter by LOG2FC",
@@ -308,6 +170,48 @@ get_TSA_slider_log2fc <- function(
     )
   })
 }
+
+download_TSA_table <- function(
+  input
+) {
+  dt <- reactive(
+    {
+      dt <-  DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@cci_detected[
+        ID == input$TSA_TISSUE_CHOICE
+      ]
+      setorder(
+        dt,
+        -LOG2FC_ID,
+        `BH_P_VALUE_DE`
+      )
+      cols_to_keep <- c("LRI", "Emitter Cell Type", "Receiver Cell Type", "LOG2FC", "Adj. p-value",
+                        "Age-Regulation", "Score Young", "Score Old")
+      setnames(
+        dt,
+        old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LOG2FC_ID", "BH_P_VALUE_DE",
+                "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"),
+        new = cols_to_keep
+      )
+      dt[, cols_to_keep, with = FALSE]
+    }
+  )
+  downloadHandler(
+    filename = function() {
+      paste0(
+        "cci_table_",
+        tolower(gsub(" ", "_", input$TSA_DATASET_CHOICE, fixed = TRUE)),
+        "_",
+        tolower(gsub(" ", "_", input$TSA_TISSUE_CHOICE, fixed = TRUE)),
+        ".csv"
+        )
+    },
+    content = function(file) {
+      fwrite(dt(), file)
+    }
+  )
+}
+
+## TSA CCIs mainpanel ####
 
 get_TSA_cci_details <- function(
   input
@@ -356,7 +260,7 @@ get_TSA_interaction_table <- function(
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -364,17 +268,17 @@ get_TSA_interaction_table <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
     setorder(
       dt,
-      -LOG2FC,
+      -LOG2FC_ID,
       `BH_P_VALUE_DE`
     )
     setnames(
       dt,
-      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LOG2FC", "BH_P_VALUE_DE",
+      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LOG2FC_ID", "BH_P_VALUE_DE",
               "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"),
       new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "LOG2FC", "Adj. p-value",
               "Age-Regulation", "Score Young", "Score Old")
@@ -399,14 +303,14 @@ plot_TSA_VOLCANO <- function(
       ID == input$TSA_TISSUE_CHOICE
     ]
     req(dt)
-    xlims <- c(min(dt[["LOG2FC"]]), max(dt[["LOG2FC"]]))
+    xlims <- c(min(dt[["LOG2FC_ID"]]), max(dt[["LOG2FC_ID"]]))
     ylims <- c(0, 4)
     if ('All LRI' %in% input$TSA_LRI_CHOICE) {
       dt <- dt[
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -414,15 +318,15 @@ plot_TSA_VOLCANO <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
     dt[, minus_log10_pval := -log10(`BH_P_VALUE_DE` + 1E-4)]
-    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "minus_log10_pval", "REGULATION")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC_ID", "minus_log10_pval", "REGULATION")]
     setnames(
       dt,
-      old = "REGULATION",
-      new = "Age Regulation"
+      old = c("REGULATION", "LOG2FC_ID"),
+      new = c("Age Regulation", "LOG2FC")
     )
     show_volcano(
       data = dt,
@@ -447,7 +351,7 @@ get_TSA_VOLCANO_text <- function(
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -455,15 +359,15 @@ get_TSA_VOLCANO_text <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
     dt[, minus_log10_pval := -log10(`BH_P_VALUE_DE` + 1E-4)]
-    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION", "LOG2FC", "minus_log10_pval")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION", "LOG2FC_ID", "minus_log10_pval")]
     setnames(
       dt, 
-      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION"),
-      new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "Age Regulation")
+      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION", "LOG2FC_ID"),
+      new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "Age Regulation", "LOG2FC")
     )
     brushedPoints(dt, input$TSA_VOLCANO_brush, xvar = "LOG2FC", yvar = "minus_log10_pval")
   })
@@ -490,7 +394,7 @@ plot_TSA_SCORES <- function(
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -498,14 +402,14 @@ plot_TSA_SCORES <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
-    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC_ID", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
     setnames(
       dt,
-      old = c("REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"),
-      new = c("Age Regulation","Score Young", "Score Old")
+      old = c("REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD", "LOG2FC_ID"),
+      new = c("Age Regulation","Score Young", "Score Old", "LOG2FC")
     )
     show_scores(data = dt, xlims = xlims, ylims = ylims)
   })
@@ -530,7 +434,7 @@ get_TSA_SCORES_text <- function(
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -538,14 +442,14 @@ get_TSA_SCORES_text <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
-    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC_ID", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD")]
     setnames(
       dt, 
-      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"),
-      new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "Age Regulation", "Score Young", "Score Old")
+      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD", "LOG2FC_ID"),
+      new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "Age Regulation", "Score Young", "Score Old", "LOG2FC")
     )
     brushedPoints(dt, input$TSA_SCORES_brush)
   })
@@ -590,7 +494,7 @@ plot_TSA_LRIFC <- function(
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -598,14 +502,14 @@ plot_TSA_LRIFC <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
-    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION", "LOG2FC_L", "LOG2FC_R")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC_ID", "REGULATION", "LOG2FC_L", "LOG2FC_R")]
     setnames(
       dt,
-      old = c("REGULATION"),
-      new = c("Age Regulation")
+      old = c("REGULATION", "LOG2FC_ID"),
+      new = c("Age Regulation", "LOG2FC")
     )
     show_LRIFC(data = dt, xlims = xlims, ylims = ylims)
   })
@@ -649,7 +553,7 @@ get_TSA_LRIFC_text <- function(
         `EMITTER_CELLTYPE` %in% input$TSA_EMITTER_CHOICE &
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     } else {
       dt <- dt[
@@ -657,44 +561,20 @@ get_TSA_LRIFC_text <- function(
           `RECEIVER_CELLTYPE` %in% input$TSA_RECEIVER_CHOICE &
           `LR_GENES` %in% input$TSA_LRI_CHOICE &
           `BH_P_VALUE_DE` <= input$TSA_SLIDER_PVALUE &
-          abs(LOG2FC) >= input$TSA_SLIDER_LOG2FC
+          abs(LOG2FC_ID) >= input$TSA_SLIDER_LOG2FC
       ]
     }
-    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC", "REGULATION", "LOG2FC_L", "LOG2FC_R")]
+    dt <- dt[, c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",  "LOG2FC_ID", "REGULATION", "LOG2FC_L", "LOG2FC_R")]
     setnames(
       dt, 
-      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION"),
-      new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "Age Regulation")
+      old = c("LR_GENES", "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION", "LOG2FC_ID"),
+      new = c("LRI", "Emitter Cell Type", "Receiver Cell Type", "Age Regulation", "LOG2FC")
     )
     brushedPoints(dt, input$TSA_LRIFC_brush)
   })
 }
 
-get_TSA_ora_intro <- function(
-  input
-) {
-  renderUI(
-    {
-      req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
-      color_theme <- "color: rgb(20 120 206)"
-      tags$div(
-        tags$p(
-          "We present the result of our over-representation analysis. Terms from various categories can be associated to each CCI, such as  ",
-          "the genes and the cell-types involved in the interactions but also GO terms or cell-type families. For each ",
-          "category, we ask (via a Fisher's exact test) if specific terms are more associated with the up, down or stable CCI ",
-          "rather than the other CCI. The ORA Score is given as log(Odds Ratio) times -log(Adj. P-Value). ",
-          "For instance, if the interacting pair of genes A:B has a large (say) Up ORA Score, it means that it takes more part in ",
-          "up-regulated CCI than what it is expected by chance and is thus a potentially interesting aging-related signal."
-        ),
-        tags$p(
-          "Note that the absence of over-represented terms in a given category does not imply the absence of interesting biological",
-          " process related this category."
-        ),
-        style = "font-size: 1.5em; text-align: justify;"
-      )
-    }
-  )
-}
+## TSA ORA sidebar ####
 
 choose_TSA_ORA_category <- function(
   input
@@ -713,32 +593,7 @@ choose_TSA_ORA_category <- function(
   })
 }
 
-get_TSA_ORA_slider_or <- function(
-  input
-) {
-  renderUI({
-    req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_ORA_CATEGORY_CHOICE, input$TSA_ORA_TYPE_CHOICE)
-    ora_table <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@ora_default[[input$TSA_ORA_CATEGORY_CHOICE]][
-      ID == input$TSA_TISSUE_CHOICE
-    ]
-    req(ora_table)
-    if(input$TSA_ORA_TYPE_CHOICE == "Up") {
-      max_val <- ceiling(max(ora_table[["OR_UP"]]))
-    } else if(input$TSA_ORA_TYPE_CHOICE == "Down") {
-      max_val <- ceiling(max(ora_table[["OR_DOWN"]]))
-    } else if(input$TSA_ORA_TYPE_CHOICE == "Stable") {
-      max_val <- ceiling(max(ora_table[["OR_FLAT"]]))
-    }
-    sliderInput(
-      inputId = "TSA_ORA_SLIDER_OR",
-      label = "Filter by Odds Ratio",
-      min = 1,
-      max = max_val,
-      value = 1,
-      step = 0.01
-    )
-  })
-}
+## TSA ORA mainpanel ####
 
 get_TSA_ora_details <- function(
   input
@@ -746,9 +601,11 @@ get_TSA_ora_details <- function(
   renderUI({
     if (input$TSA_ORA_DETAILS_CHOICE == "ORA Table") {
       DT::dataTableOutput("TSA_ORA_TABLE")
-    } else if (input$TSA_ORA_DETAILS_CHOICE == "ORA Plot") {
+    } else if (input$TSA_ORA_DETAILS_CHOICE == "ORA Score Plot") {
       plotOutput("TSA_ORA_PLOT", height = "800px")
-    }
+    } else if (input$TSA_ORA_DETAILS_CHOICE == "ORA Network") {
+      visNetworkOutput("TSA_ORA_NETWORK_PLOT", height = "800px")
+      }
   })
 }
 
@@ -768,16 +625,10 @@ get_TSA_ORA_table <- function(
     req(dt)
     if(input$TSA_ORA_TYPE_CHOICE == "Up") {
       dt <- dt[`OR_UP` >= 1 & BH_P_VALUE_UP <= 0.05, c("VALUE", "ORA_SCORE_UP", "OR_UP", "BH_P_VALUE_UP")]
-      # dt <- dt[`BH_P_VALUE_UP` <= input$TSA_ORA_SLIDER_PVALUE &
-      #            `OR_UP` >= input$TSA_ORA_SLIDER_OR]
     } else if(input$TSA_ORA_TYPE_CHOICE == "Down") {
       dt <- dt[`OR_DOWN` >= 1 & BH_P_VALUE_DOWN <= 0.05, c("VALUE","ORA_SCORE_DOWN", "OR_DOWN", "BH_P_VALUE_DOWN")]
-      # dt <- dt[`BH_P_VALUE_DOWN` <= input$TSA_ORA_SLIDER_PVALUE &
-      #            `OR_DOWN` >= input$TSA_ORA_SLIDER_OR]
     } else if(input$TSA_ORA_TYPE_CHOICE == "Flat") {
       dt <- dt[`OR_FLAT` >= 1 & BH_P_VALUE_FLAT <= 0.05, c("VALUE","ORA_SCORE_FLAT", "OR_FLAT", "BH_P_VALUE_FLAT")]
-      # dt <- dt[`BH_P_VALUE_FLAT` <= input$TSA_ORA_SLIDER_PVALUE &
-      #            `OR_FLAT` >= input$TSA_ORA_SLIDER_OR]
     }
     setnames(
       dt,
@@ -848,3 +699,206 @@ plot_TSA_ORA <- function(
   })
 }
 
+plot_TSA_ORA_network <- function(
+  input
+) {
+  renderVisNetwork({
+    req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
+    obj <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]
+    abbr <- ABBR[[input$TSA_DATASET_CHOICE]]
+    abbr <- unique(abbr[ORIGINAL_CELLTYPE %in% obj@cci_detected[ID == input$TSA_TISSUE_CHOICE][["EMITTER_CELLTYPE"]]])
+    req(obj)
+    BuildNetwork(
+      object = obj,
+      network_type = "ORA_network",
+      layout_type = "bipartite",
+      ID = input$TSA_TISSUE_CHOICE,
+      abbreviation_table = abbr
+    )
+  })
+}
+
+## TSA internal ####
+
+## TSA deprecated ####
+# get_TSA_overview_intro <- function(
+#   input
+# ) {
+#   renderUI(
+#     {
+#       req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
+#       color_theme <- "color: rgb(20 120 206)"
+#       tags$div(
+#         tags$p(
+#           "We give the number of detected cell-cell interactions (CCI) in the ",
+#           span(input$TSA_TISSUE_CHOICE, style = color_theme), 
+#           ", and how many of them change significantly with age.",
+#           "Note that some CCI can appear or disappear with age whereas others can be down- or up-regulated",
+#           " but still detected in both young and old samples."
+#         ),
+#         tags$p("We then present several networks that provide an overview of the intercellular communication in this tissue."),
+#         style = "font-size: 1.5em; text-align: justify;"
+#       )
+#     }
+#   )
+# }
+# 
+# get_TSA_network_intro <- function(
+#   input
+# ) {
+#   renderUI({
+#     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
+#     color_theme <- "color: rgb(20 120 206)"
+#     tags$div(
+#       tags$p(
+#         "Please choose between different network types (more info to come about each network).",
+#         "You can interact with the networks. When the network type is 'ORA' you can find more information ",
+#         "about each egde by hovering it."
+#       ),
+#       style = "font-size: 1.5em; text-align: justify;"
+#     )
+#   })
+# }
+# 
+# plot_TSA_network <- function(
+#   input
+# ) {
+#   renderVisNetwork({
+#     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, 
+#         input$TSA_NETWORK_TYPE_CHOICE, input$TSA_NETWORK_LAYOUT_CHOICE)
+#     obj <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]
+#     net_type <- input$TSA_NETWORK_TYPE_CHOICE
+#     net_lay <- input$TSA_NETWORK_LAYOUT_CHOICE
+#     if (net_type == "Young") {
+#       net_type2 <- "COUNTS_COND1"
+#     } else if (net_type == "Old") {
+#       net_type2 <- "COUNTS_COND2"
+#     } else if (net_type == "Change") {
+#       net_type2 <- "COUNTS_DIFF"
+#     } else if (net_type == "ORA") {
+#       net_type2 <- "ORA"
+#     }
+#     if (net_lay == "Circular") {
+#       net_lay2 <- "celltypes"
+#     } else if (net_lay == "Bipartite") {
+#       net_lay2 <- "bipartite"
+#     }
+#     req(obj)
+#     BuildNetwork(
+#       object = obj,
+#       network_type = net_type2,
+#       network_layout = net_lay2,
+#       ID = input$TSA_TISSUE_CHOICE
+#     )
+#     # ora_tables <- scDiffCom::get_ora_tables(obj)
+#     # names(ora_tables) <- c("GO Terms", "LR_GENES", "LR_CELLTYPE", "Cell Families")
+#     # ora_tables <- lapply(
+#     #   ora_tables,
+#     #   function(ORA_dt) {
+#     #     dt <- copy(ORA_dt)
+#     #     setnames(
+#     #       dt,
+#     #       new = c("OR_UP", "pval_adjusted_UP", "OR_DOWN", "pval_adjusted_DOWN",
+#     #               "OR_FLAT", "pval_adjusted_FLAT"),
+#     #       old = c("OR_UP", "BH_P_VALUE_UP", "OR_DOWN", "BH_P_VALUE_DOWN",
+#     #               "OR_FLAT", "BH_P_VALUE_FLAT")
+#     #     )
+#     #     return(dt)
+#     #   }
+#     # )
+#     # obj <- scDiffCom::set_ora_tables(obj, ora_tables)
+#     # cci_table_filtered <- copy(scDiffCom:::get_cci_table_filtered(obj))
+#     # setnames(
+#     #   cci_table_filtered,
+#     #   new = c("L_CELLTYPE", "R_CELLTYPE", "BH_PVAL_DIFF", "LR_NAME"),
+#     #   old = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "Adj. P-Value", "LR_GENES")
+#     # )
+#     # obj <- scDiffCom:::set_cci_table_filtered(obj, cci_table_filtered)
+#     # req(obj)
+#     # scDiffCom::build_celltype_bipartite_graph(
+#     #   object = obj,
+#     #   disperse = FALSE,
+#     #   dir = NULL
+#     # )
+#   })
+# }
+# 
+# get_TSA_cci_intro <- function(
+#   input
+# ) {
+#   renderUI(
+#     {
+#       req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
+#       color_theme <- "color: rgb(20 120 206)"
+#       tags$div(
+#         tags$p(
+#           "We provide the full table of all detected CCI in this tissue, including relevant scores. ",
+#           "In addition, a Volcano Plot highlights how they are distributed with respect to their significance and ",
+#           "strength of change with age, whereas a Score Plot indicates their prevalence in both young and old samples. ",
+#           "The latter graph can also be useful to observe strong signals that do not change with age."
+#         ),
+#         style = "font-size: 1.5em; text-align: justify;"
+#       )
+#     }
+#   )
+# }
+# 
+# get_TSA_ora_intro <- function(
+#   input
+# ) {
+#   renderUI(
+#     {
+#       req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE)
+#       color_theme <- "color: rgb(20 120 206)"
+#       tags$div(
+#         tags$p(
+#           "We present the result of our over-representation analysis. Terms from various categories can be associated to each CCI, such as  ",
+#           "the genes and the cell-types involved in the interactions but also GO terms or cell-type families. For each ",
+#           "category, we ask (via a Fisher's exact test) if specific terms are more associated with the up, down or stable CCI ",
+#           "rather than the other CCI. The ORA Score is given as log(Odds Ratio) times -log(Adj. P-Value). ",
+#           "For instance, if the interacting pair of genes A:B has a large (say) Up ORA Score, it means that it takes more part in ",
+#           "up-regulated CCI than what it is expected by chance and is thus a potentially interesting aging-related signal."
+#         ),
+#         tags$p(
+#           "Note that the absence of over-represented terms in a given category does not imply the absence of interesting biological",
+#           " process related this category."
+#         ),
+#         style = "font-size: 1.5em; text-align: justify;"
+#       )
+#     }
+#   )
+# }
+# 
+# get_TSA_ORA_slider_or <- function(
+#   input
+# ) {
+#   renderUI({
+#     req(input$TSA_DATASET_CHOICE, input$TSA_TISSUE_CHOICE, input$TSA_ORA_CATEGORY_CHOICE, input$TSA_ORA_TYPE_CHOICE)
+#     ora_table <- DATASETS_COMBINED[[input$TSA_DATASET_CHOICE]]@ora_default[[input$TSA_ORA_CATEGORY_CHOICE]][
+#       ID == input$TSA_TISSUE_CHOICE
+#     ]
+#     req(ora_table)
+#     if(input$TSA_ORA_TYPE_CHOICE == "Up") {
+#       max_val <- ceiling(max(ora_table[["OR_UP"]]))
+#     } else if(input$TSA_ORA_TYPE_CHOICE == "Down") {
+#       max_val <- ceiling(max(ora_table[["OR_DOWN"]]))
+#     } else if(input$TSA_ORA_TYPE_CHOICE == "Stable") {
+#       max_val <- ceiling(max(ora_table[["OR_FLAT"]]))
+#     }
+#     sliderInput(
+#       inputId = "TSA_ORA_SLIDER_OR",
+#       label = "Filter by Odds Ratio",
+#       min = 1,
+#       max = max_val,
+#       value = 1,
+#       step = 0.01
+#     )
+#   })
+# }
+# 
+# #output$TSA_NETWORK_INTRO <- get_TSA_network_intro(input)
+# #output$TSA_NETWORK_PLOT <- plot_TSA_network(input)
+# # tab detailed interactions
+# #output$TSA_CCI_INTRO <- get_TSA_cci_intro(input)
+# #output$TSA_ORA_INTRO <- get_TSA_ora_intro(input)
+# #output$TSA_ORA_SLIDER_OR <- get_TSA_ORA_slider_or(input)

@@ -1,76 +1,79 @@
 tab_combined_analysis <- tabPanel(
-  title = "Combined Analysis",
-  sidebarLayout(
-    sidebarPanel(
-      selectInput(
-        inputId = "TCA_DATASET_CHOICE",
-        label = "Dataset",
-        choices =  c("TMS FACS Data", "TMS Droplet Data", "Calico Data")#, "TMS FACS Data (Sub)")
-      ),
-      hr(),
-      conditionalPanel(
-        condition = "input.active_TCA_panel == 'TCA_SUMMARY'",
-        selectInput(
-          inputId = "TCA_SUMMARY_TYPE_CHOICE",
-          label = "Type of Information",
-          choices = c("Table", "ORA Plot")
+  title = "Global Analysis",
+  fluidRow(
+    column(width = 6, titlePanel(htmlOutput("TCA_TITLE")), offset = 3),
+    column(width = 6, DT::dataTableOutput("TCA_OVERVIEW_TABLE"), style = "padding-bottom: 50px", offset = 3)
+  ),
+  tabsetPanel(
+    type = "tabs",
+    tabPanel(
+      title = "Cell-Cell Interactions",
+      sidebarLayout(
+        sidebarPanel(
+          width = 3,
+          selectInput(
+            inputId = "TCA_CCI_DETAILS_CHOICE",
+            label = "Choose between Table or Plots",
+            choices = c("CCI Table", "Volcano Plot", "Score Plot", "LRI-FC Plot")
+          ),
+          hr(),
+          downloadButton("TCA_DOWNLOAD_TABLE", "Download Table"),
+          hr(),
+          uiOutput("TCA_TISSUE_CHOICE"),
+          #uiOutput("TCA_EMITTER_CHOICE"),
+          #uiOutput("TCA_RECEIVER_CHOICE"),
+          uiOutput("TCA_LRI_CHOICE")#,
+          # sliderInput(
+          #   inputId = "TCA_SLIDER_PVALUE",
+          #   label = "Filter by Adj. p-value",
+          #   min = 0,
+          #   max = 1,
+          #   value = 1
+          # ),
+          #uiOutput("TCA_SLIDER_LOG2FC")
         ),
-        selectInput(
-          inputId = "TCA_SUMMARY_TABLE_CHOICE",
-          label = "Category",
-          choices = c("KEGG Pathways", "GO Terms", "LR Genes", "Tissues", "Cell-Type Families")
-        ),
-        selectInput(
-          inputId = "TCA_ORA_TYPE_CHOICE",
-          label = "ORA Regulation",
-          choices = c("Up", "Down", "Stable")
+        mainPanel(
+          fluidRow(
+            column(width = 12, uiOutput("TCA_CCI_DETAILS"), style = "padding:50px"),
+            column(width = 12, uiOutput("TCA_CCI_TEXTOUTPUT"))
+            #column(width = 12, htmlOutput("TCA_CCI_INTRO"), style = "padding:50px"),
+          )
         )
       ),
-      conditionalPanel(
-        condition = "input.active_TCA_panel == 'TCA_INTERACTION_ANALYSIS'",
-        selectInput(
-          inputId = "TCA_CCI_DETAILS_CHOICE",
-          label = "Type of Information",
-          choices = c("CCI Table", "Volcano Plot", "Score Plot")
-        ),
-        hr(),
-        uiOutput("TCA_TISSUE_CHOICE"),
-        uiOutput("TCA_REGULATION_CHOICE")
-        #uiOutput("TCA_EMITTER_CHOICE"),
-        #uiOutput("TCA_RECEIVER_CHOICE"),
-        #sliderInput(
-        #  inputId = "TCA_SLIDER_PVALUE",
-        #  label = "P-value Threshold",
-        #  min = 0, 
-        #  max = 1,
-        #  value = 1
-        #),
-        #uiOutput("TCA_SLIDER_LOG2FC")
-      ),
-      width = 3
+      value = "TCA_INTERACTION_ANALYSIS"
     ),
-    mainPanel(
-      titlePanel(htmlOutput("TCA_TITLE")),
-      tabsetPanel(
-        type = "tabs",
-        tabPanel(
-          title = "Summary Tables",
-          fluidRow(
-            column(width = 12, htmlOutput("TCA_SUMMARY_INTRO"), style = "padding:50px"),
-            column(width = 12, uiOutput("TCA_SUMMARY_TYPE"))
+    tabPanel(
+      title = "Common and Global Changes",
+      sidebarLayout(
+        sidebarPanel(
+          width = 3,
+          selectInput(
+            inputId = "TCA_GLOBAL_DETAILS_CHOICE",
+            label = "Type of Information",
+            choices = c("Table", "ORA Plot")
           ),
-          value = "TCA_SUMMARY"
-        ),
-        tabPanel(
-          title = "Detailed Interactions",
-          fluidRow(
-            column(width = 12, htmlOutput("TCA_CCI_INTRO"), style = "padding:50px"),
-            column(width = 12, uiOutput("TCA_CCI_DETAILS")),
-            column(width = 12, uiOutput("TCA_CCI_TEXTOUTPUT"), style = "padding:10px")
+          hr(),
+          selectInput(
+            inputId = "TCA_GLOBAL_TABLE_CHOICE",
+            label = "Category",
+            choices = c("KEGG Pathways", "GO Terms", "LR Genes", "Tissues", "Cell-Type Families")
           ),
-          value = "TCA_INTERACTION_ANALYSIS"
+          selectInput(
+            inputId = "TCA_GLOBAL_ORA_TYPE_CHOICE",
+            label = "ORA Regulation",
+            choices = c("Up", "Down", "Stable")
+          )
+          #downloadButton("TCA_DOWNLOAD_TABLE", "Download Table"),
         ),
-        id = "active_TCA_panel"
-      )
-    )
-  ))
+        mainPanel(
+          fluidRow(
+            #column(width = 12, htmlOutput("TCA_SUMMARY_INTRO"), style = "padding:50px"),
+            column(width = 12, uiOutput("TCA_GLOBAL_DETAILS"), style = "padding:50px")
+          )
+        )
+      ),
+      value = "TCA_GLOBAL_CHANGES"
+    ),
+    id = "active_TCA_panel"
+  )
+)
