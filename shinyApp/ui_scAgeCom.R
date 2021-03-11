@@ -2,7 +2,7 @@
 source("tab_description.R")
 source("tab_tissue_specific.R")
 source("tab_combined_analysis.R")
-source("tab_LRdb.R")
+#source("tab_LRdb.R")
 
 ui_scAgeCom <- fluidPage(
   titlePanel(
@@ -15,8 +15,8 @@ ui_scAgeCom <- fluidPage(
     title = "",
     tab_description,
     tab_tissue_specific,
-    tab_combined_analysis,
-    tab_LRdb
+    tab_combined_analysis#,
+    #tab_LRdb
   )
 )
 
