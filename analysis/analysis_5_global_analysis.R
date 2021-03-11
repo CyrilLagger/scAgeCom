@@ -305,6 +305,45 @@ saveRDS(SUMMARY_DATA, "../data_scAgeCom/analysis/outputs_data/analysis5_SUMMARY_
 
 test <- readRDS("../data_scAgeCom/analysis/outputs_data/an")
 
+
+## Upset of intersection ####
+
+SUMMARY_DATA <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis5_SUMMARY_DATA.rds")
+
+test <- dcast.data.table(
+ DATASETS_COMBINED$droplet_male$dataset@ora_default$GO_TERMS[OR_UP >=1 & BH_P_VALUE_UP <= 0.05, c("ID", "VALUE")],
+  VALUE ~ ID,
+  fun.aggregate = length
+)
+colnames(test) <- paste0(colnames(test), "_male")
+
+
+test2 <- dcast.data.table(
+  DATASETS_COMBINED$droplet_female$dataset@ora_default$GO_TERMS[OR_UP >=1 & BH_P_VALUE_UP <= 0.05, c("ID", "VALUE")],
+  VALUE ~ ID,
+  fun.aggregate = length
+)
+colnames(test2) <- paste0(colnames(test2), "_female")
+
+test3 <- merge.data.table(
+  test,
+  test2,
+  all = TRUE,
+  by.x = "VALUE_male",
+  by.y = "VALUE_female"
+)
+test3[is.na(test3)] <- 0
+
+
+test2 <- test[Lung == 1 & Marrow == 1]
+
+ComplexUpset::upset(
+  data = as.data.frame(test3),
+  intersect = colnames(test3)[-1],
+  min_size = 5
+)
+
+
 ## Function to do Disease Ontology analysis (temporarily here) ####
 get_DO_interactions <- function(
   species,
@@ -481,7 +520,7 @@ hist(test_UP$LOGFC, breaks = 50)
 
 ## Clustering analysis ####
 
-cci_dt <- DATASETS_COMBINED_log15$facs_mixed@cci_detected
+cci_dt <- DATASETS_COMBINED$droplet_male$dataset@cci_detected
 cci_dt[, ID_ER := paste(ID, ER_CELLTYPES, sep = "_")]
 cci_dt[, PI_VALUE := -log(P_VALUE_DE+1E-4)*LOGFC]
 
@@ -496,6 +535,37 @@ cci_pi_matrix_ER <- as.matrix(
 cci_pi_matrix_ER[is.na(cci_pi_matrix_ER)] <- 0
 
 cci_pi_matrix_LR <- t(cci_pi_matrix_ER)
+
+hist(as.vector(cci_pi_matrix_LR), breaks = 100)
+summary(as.vector(cci_pi_matrix_LR))
+
+cci_pi_matrix_LR[is.infinite(cci_pi_matrix_LR) & cci_pi_matrix_LR > 0] <- max(cci_pi_matrix_LR[!is.infinite(cci_pi_matrix_LR)])
+cci_pi_matrix_LR[is.infinite(cci_pi_matrix_LR) & cci_pi_matrix_LR < 0] <- min(cci_pi_matrix_LR[!is.infinite(cci_pi_matrix_LR)])
+
+cci_pi_matrix_ER <- t(cci_pi_matrix_LR)
+
+skm_LR <- skmeans(cci_pi_matrix_LR, k = 20)
+skm_ER <- skmeans(cci_pi_matrix_ER, k = 20)
+
+Heatmap(
+  matrix = cci_pi_matrix_LR,
+  #row_km = 20,
+  #column_km = 10,
+  #col = hm_col,
+  name = "test",
+  show_row_names = FALSE,
+  show_column_names = FALSE,
+  column_split = skm_ER$cluster,
+  row_split = skm_LR$cluster,
+  use_raster = TRUE,
+  show_row_dend = FALSE,
+  show_column_dend = FALSE
+)
+
+cci_pi_matrix_LR[1:2, 1:2]
+
+names(skm_LR$cluster[skm_LR$cluster == 17])
+names(skm_ER$cluster[skm_ER$cluster == 17])
 
 #scaling
 cci_pi_matrix_ER_scaled <- scale(cci_pi_matrix_ER)
@@ -545,6 +615,8 @@ km_LR <- kmeans(cci_pi_matrix_LR,  10)
 km_ER <- kmeans(cci_pi_matrix_ER, 10)
 table(km_LR$cluster)
 table(km_ER$cluster)
+
+cci_pi_matrix_LR[1:5, 1:5]
 
 Heatmap(
   matrix = cci_pi_matrix_LR,
@@ -608,6 +680,10 @@ Heatmap(
   row_names_gp = grid::gpar(fontsize = 4),
   column_names_gp = grid::gpar(fontsize = 4)
 )
+
+
+names(skm_bin_ER$cluster[skm_bin_ER$cluster == 4])
+names(skm_bin_LR$cluster[skm_bin_LR$cluster == 1])
 
 hist(binary_groups_sd, breaks = 70)
 

@@ -26,20 +26,20 @@ library(blockcluster)
 #library(blockcluster)
 
 ## Load data ####
-DATASETS_COMBINED_log15 <- readRDS("../data_scAgeCom/analysis/outputs_data/analysis4_DATASETS_COMBINED_log15_light.rds")
+DATASETS_COMBINED <- readRDS("../data_scAgeCom/analysis/outputs_data/TMS_scAgeCom_processed_bestORA.rds")
 
 ## Extract detected CCIs #####
 
 DATASETS_CCI <- lapply(
-  DATASETS_COMBINED_log15,
+  DATASETS_COMBINED,
   function(i) {
-    temp_dt <- i@cci_detected
+    temp_dt <- i$dataset@cci_detected
     temp_dt[, ID_ER := paste(ID, ER_CELLTYPES, sep = "_")]
     temp_dt[, REGULATION_SCORE := ifelse(
-      REGULATION_SIMPLE == "UP",
+      REGULATION == "UP",
       1,
       ifelse(
-        REGULATION_SIMPLE == "DOWN",
+        REGULATION == "DOWN",
         -1,
         0
       )
@@ -110,12 +110,12 @@ DATASETS_MATRIX_CELLS_vs_GENES_PER_ID <- lapply(
         temp_mat_down <- temp_mat
         temp_mat_down[temp_mat_down == 1] <- 0
         temp_mat_down[temp_mat_down == -1] <- 1
-        temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, ]
-        temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1]
-        temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, ]
-        temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1]
-        temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, ]
-        temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1]
+        temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, , drop = FALSE]
+        temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1, drop = FALSE]
+        temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, , drop = FALSE]
+        temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1, drop = FALSE]
+        temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, , drop = FALSE]
+        temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1, drop = FALSE]
         return(
           list(
             matrix_up_down = temp_mat,
@@ -129,7 +129,6 @@ DATASETS_MATRIX_CELLS_vs_GENES_PER_ID <- lapply(
     return(temp_all)
   }
 )
-
 
 ## Create EMITTERS vs RECEIVERS matrices for each tissue ####
 
@@ -155,12 +154,12 @@ DATASETS_MATRIX_EMITTERS_vs_RECEIVERS <- lapply(
         temp_mat_down <- temp_mat
         temp_mat_down[temp_mat_down == 1] <- 0
         temp_mat_down[temp_mat_down == -1] <- 1
-        temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, ]
-        temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1]
-        temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, ]
-        temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1]
-        temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, ]
-        temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1]
+        temp_mat <- temp_mat[rowSums(abs(temp_mat)) >= 1, , drop = FALSE]
+        temp_mat <- temp_mat[, colSums(abs(temp_mat)) >= 1, drop = FALSE]
+        temp_mat_up <- temp_mat_up[rowSums(temp_mat_up) >= 1, , drop = FALSE]
+        temp_mat_up <- temp_mat_up[, colSums(temp_mat_up) >= 1, drop = FALSE]
+        temp_mat_down <- temp_mat_down[rowSums(temp_mat_down) >= 1, , drop = FALSE]
+        temp_mat_down <- temp_mat_down[, colSums(temp_mat_down) >= 1, drop = FALSE]
         return(
           list(
             matrix_up_down = temp_mat,
@@ -185,7 +184,7 @@ set.seed(42)
 #can choose a large number of clusters to start with
 #how to rank stuff in a cluster
 
-test_obj <- DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_mixed$SCAT$matrix_down
+test_obj <- DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_female$SCAT$matrix_down
 
 test <- iBBiG(
  test_obj,
@@ -203,7 +202,7 @@ sort(test@Clusterscores, decreasing = TRUE)
 test@RowScorexNumber
 RowScorexNumber(test)[1:2,]
 
-i <- 1
+i <- 2
 Heatmap(
   (test_obj[RowxNumber(test)[,i], NumberxCol(test)[i,], drop = FALSE]),
   row_names_gp = grid::gpar(fontsize = 8),
@@ -271,7 +270,7 @@ names(RowxNumber(res)[,i][RowxNumber(res)[,i] == TRUE])
 
 ## We block-organize the heatmap with blockcluster ####
 
-cci_blok_up_1 <- coclusterCategorical(data = DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_mixed$SCAT$matrix_up_down, nbcocluster = c(10,6))
+cci_blok_up_1 <- coclusterCategorical(data = DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_female$SCAT$matrix_up_down, nbcocluster = c(10,6))
 
 Heatmap(
   matrix =DATASETS_MATRIX_CELLS_vs_GENES_PER_ID$facs_mixed$SCAT$matrix_up_down,
