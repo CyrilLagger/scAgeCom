@@ -1,5 +1,287 @@
 
 
+## Part on the server logfc per cell-type in function of sex ####
+
+#actually it could be done from the raw data directly
+
+library(Seurat)
+library(scDiffCom)
+library(data.table)
+
+
+seurat_facs <- readRDS("seurat_final_tms_facs.rds")
+seurat_facs$tissue_celltype <- paste(seurat_facs$tissue, seurat_facs$cell_ontology_final, sep = "_")
+all_tissue_celltype <- sort(unique(seurat_facs$tissue_celltype))
+LRI_genes <- sort(unique(unlist(LRI_mouse$LRI_curated[, 2:6])))
+LRI_genes <- LRI_genes[!is.na(LRI_genes)]
+LRI_genes <- LRI_genes[LRI_genes %in% rownames(seurat_facs)]
+seurat_facs_sub <- subset(seurat_facs, features = LRI_genes)
+seurat_facs_sub$age_group <- ifelse(
+  seurat_facs_sub$age == "3m",
+  "YOUNG",
+  "OLD"
+)
+seurat_data <- expm1(GetAssayData(seurat_facs_sub, assay = "RNA", slot = "data"))
+logfc_celltype_facs <- rbindlist(
+  sapply(
+    all_tissue_celltype,
+    function(ct) {
+      cells_tokeep_young_male <- colnames(seurat_data)[
+        seurat_facs_sub$tissue_celltype == ct &
+          seurat_facs_sub$age_group == "YOUNG" &
+          seurat_facs_sub$sex == "male"
+      ]
+      cells_tokeep_young_female <- colnames(seurat_data)[
+        seurat_facs_sub$tissue_celltype == ct &
+          seurat_facs_sub$age_group == "YOUNG" &
+          seurat_facs_sub$sex == "female"
+      ]
+      cells_tokeep_old_male <- colnames(seurat_data)[
+        seurat_facs_sub$tissue_celltype == ct &
+          seurat_facs_sub$age_group == "OLD" &
+          seurat_facs_sub$sex == "male"
+      ]
+      cells_tokeep_old_female <- colnames(seurat_data)[
+        seurat_facs_sub$tissue_celltype == ct &
+          seurat_facs_sub$age_group == "OLD" &
+          seurat_facs_sub$sex == "female"
+      ]
+      if (length(cells_tokeep_old_male) < 5 | length(cells_tokeep_young_male) < 5) {
+        res_male <- NULL
+      } else {
+        mat_young_male <- seurat_data[, cells_tokeep_young_male]
+        mat_old_male <- seurat_data[, cells_tokeep_old_male]
+        dr_young_male <- rowMeans(mat_young_male > 0)
+        dr_old_male <- rowMeans(mat_old_male > 0)
+        logfc_male <- log(rowMeans(mat_old_male)/rowMeans(mat_young_male))
+        logfc_male[dr_young_male < 0.1 & dr_old_male < 0.1] <- 0
+        res_male <- data.table(
+          GENE = names(logfc_male),
+          LOGFC = logfc_male,
+          GENDER = "male")
+      }
+      if (length(cells_tokeep_old_female) < 5 | length(cells_tokeep_young_female) < 5) {
+        res_female <- NULL
+      } else {
+        mat_young_female <- seurat_data[, cells_tokeep_young_female]
+        mat_old_female <- seurat_data[, cells_tokeep_old_female]
+        dr_young_female <- rowMeans(mat_young_female > 0)
+        dr_old_female <- rowMeans(mat_old_female > 0)
+        logfc_female <- log(rowMeans(mat_old_female)/rowMeans(mat_young_female))
+        logfc_female[dr_young_female < 0.1 & dr_old_female < 0.1] <- 0
+        res_female <- data.table(
+          GENE = names(logfc_female),
+          LOGFC = logfc_female,
+          GENDER = "female")
+      }
+      return(rbind(res_male, res_female))
+    },
+    USE.NAMES = TRUE,
+    simplify = FALSE
+  ),
+  idcol = "CELL_TYPE"
+)
+
+seurat_droplet <- readRDS("seurat_final_tms_droplet.rds")
+seurat_droplet$tissue_celltype <- paste(seurat_droplet$tissue, seurat_droplet$cell_ontology_final, sep = "_")
+all_tissue_celltype <- sort(unique(seurat_droplet$tissue_celltype))
+LRI_genes <- sort(unique(unlist(LRI_mouse$LRI_curated[, 2:6])))
+LRI_genes <- LRI_genes[!is.na(LRI_genes)]
+LRI_genes <- LRI_genes[LRI_genes %in% rownames(seurat_droplet)]
+seurat_droplet_sub <- subset(seurat_droplet, features = LRI_genes)
+seurat_droplet_sub$age_group <- ifelse(
+  seurat_droplet_sub$age == "3m",
+  "YOUNG",
+  ifelse (
+    seurat_droplet_sub$age %in% c("18m", "21m", "24m"),
+    "OLD",
+    "OTHER"
+  )
+)
+seurat_data <- expm1(GetAssayData(seurat_droplet_sub, assay = "RNA", slot = "data"))
+
+logfc_celltype_droplet <- rbindlist(
+  sapply(
+    all_tissue_celltype,
+    function(ct) {
+      cells_tokeep_young_male <- colnames(seurat_data)[
+        seurat_droplet_sub$tissue_celltype == ct &
+          seurat_droplet_sub$age_group == "YOUNG" &
+          seurat_droplet_sub$sex == "male"
+      ]
+      cells_tokeep_young_female <- colnames(seurat_data)[
+        seurat_droplet_sub$tissue_celltype == ct &
+          seurat_droplet_sub$age_group == "YOUNG" &
+          seurat_droplet_sub$sex == "female"
+      ]
+      cells_tokeep_old_male <- colnames(seurat_data)[
+        seurat_droplet_sub$tissue_celltype == ct &
+          seurat_droplet_sub$age_group == "OLD" &
+          seurat_droplet_sub$sex == "male"
+      ]
+      cells_tokeep_old_female <- colnames(seurat_data)[
+        seurat_droplet_sub$tissue_celltype == ct &
+          seurat_droplet_sub$age_group == "OLD" &
+          seurat_droplet_sub$sex == "female"
+      ]
+      if (length(cells_tokeep_old_male) < 5 | length(cells_tokeep_young_male) < 5) {
+        res_male <- NULL
+      } else {
+        mat_young_male <- seurat_data[, cells_tokeep_young_male]
+        mat_old_male <- seurat_data[, cells_tokeep_old_male]
+        dr_young_male <- rowMeans(mat_young_male > 0)
+        dr_old_male <- rowMeans(mat_old_male > 0)
+        logfc_male <- log(rowMeans(mat_old_male)/rowMeans(mat_young_male))
+        logfc_male[dr_young_male < 0.1 & dr_old_male < 0.1] <- 0
+        res_male <- data.table(
+          GENE = names(logfc_male),
+          LOGFC = logfc_male,
+          GENDER = "male")
+      }
+      if (length(cells_tokeep_old_female) < 5 | length(cells_tokeep_young_female) < 5) {
+        res_female <- NULL
+      } else {
+        mat_young_female <- seurat_data[, cells_tokeep_young_female]
+        mat_old_female <- seurat_data[, cells_tokeep_old_female]
+        dr_young_female <- rowMeans(mat_young_female > 0)
+        dr_old_female <- rowMeans(mat_old_female > 0)
+        logfc_female <- log(rowMeans(mat_old_female)/rowMeans(mat_young_female))
+        logfc_female[dr_young_female < 0.1 & dr_old_female < 0.1] <- 0
+        res_female <- data.table(
+          GENE = names(logfc_female),
+          LOGFC = logfc_female,
+          GENDER = "female")
+      }
+      return(rbind(res_male, res_female))
+    },
+    USE.NAMES = TRUE,
+    simplify = FALSE
+  ),
+  idcol = "CELL_TYPE"
+)
+
+
+## read genes logfc computed on the server ####
+
+logfc_celltype_facs <- readRDS("../data_scAgeCom/analysis/outputs_data/tms_facs_logfc_LRIGenes_by_celltypes.rds")
+logfc_celltype_droplet <- readRDS("../data_scAgeCom/analysis/outputs_data/tms_droplet_logfc_LRIGenes_by_celltypes.rds")
+
+logfc_ct_facs <- dcast.data.table(
+  logfc_celltype_facs,
+  GENE + CELL_TYPE ~ GENDER,
+  value.var = "LOGFC"
+)
+logfc_ct_facs[is.na(logfc_ct_facs)] <- 0
+logfc_ct_facs_detected <- logfc_ct_facs[female !=0 | male != 0]
+logfc_ct_facs_detected2 <- logfc_ct_facs[female !=0 & male != 0]
+logfc_ct_facs_detected3 <- logfc_ct_facs_detected2[is.finite(male) & is.finite(female)]
+
+logfc_ct_droplet <- dcast.data.table(
+  logfc_celltype_droplet,
+  GENE + CELL_TYPE ~ GENDER,
+  value.var = "LOGFC"
+)
+logfc_ct_droplet[is.na(logfc_ct_droplet)] <- 0
+logfc_ct_droplet_detected <- logfc_ct_droplet[female !=0 | male != 0]
+logfc_ct_droplet_detected2 <- logfc_ct_droplet[female !=0 & male != 0]
+logfc_ct_droplet_detected3 <- logfc_ct_droplet_detected2[is.finite(male) & is.finite(female)]
+
+cor(logfc_ct_facs_detected3$female, logfc_ct_facs_detected3$male, method = "pearson")
+table(logfc_ct_facs_detected2$male < - log(1.5), logfc_ct_facs_detected2$female > log(1.5))
+ggplot(logfc_ct_facs_detected2, aes(male, female)) + geom_point() +
+  geom_smooth(method = "lm") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+ggplot(logfc_ct_facs_detected2[grepl("App", GENE)], aes(male, female)) + geom_point() +
+  geom_smooth(method = "lm") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+
+cor(logfc_ct_droplet_detected3$female, logfc_ct_droplet_detected3$male, method = "pearson")
+table(logfc_ct_droplet_detected2$male > 0, logfc_ct_droplet_detected2$female < 0)
+ggplot(logfc_ct_droplet_detected2, aes(male, female)) + geom_point() +
+  geom_smooth(method = "lm") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+ggplot(logfc_ct_droplet_detected2[grepl("App", GENE)], aes(male, female)) + geom_point() +
+  geom_smooth(method = "lm") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+
+## Look at LRI genes fc based on detected CCI only #####
+
+DATASETS_PROCESSED_GENDER <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_results_processed.rds")
+
+get_genes_logfc <- function(
+  cci_dt
+) {
+  L1 <- unique(cci_dt[, c("ID", "EMITTER_CELLTYPE", "LIGAND_1", "L1_EXPRESSION_YOUNG", "L1_EXPRESSION_OLD")])
+  L1 <- na.omit(L1)
+  L1[, TISSUE_CELLTYPE := paste(ID, EMITTER_CELLTYPE, sep = "_")]
+  L1[, GENE := LIGAND_1]
+  L1[, LOGFC := log(L1_EXPRESSION_OLD/L1_EXPRESSION_YOUNG)]
+  L1 <- L1[, c("TISSUE_CELLTYPE", "GENE", "LOGFC")]
+  
+  L2 <- unique(cci_dt[, c("ID", "EMITTER_CELLTYPE", "LIGAND_2", "L2_EXPRESSION_YOUNG", "L2_EXPRESSION_OLD")])
+  L2 <- na.omit(L2)
+  L2[, TISSUE_CELLTYPE := paste(ID, EMITTER_CELLTYPE, sep = "_")]
+  L2[, GENE := LIGAND_2]
+  L2[, LOGFC := log(L2_EXPRESSION_OLD/L2_EXPRESSION_YOUNG)]
+  L2 <- L2[, c("TISSUE_CELLTYPE", "GENE", "LOGFC")]
+  
+  R1 <- unique(cci_dt[, c("ID", "RECEIVER_CELLTYPE", "RECEPTOR_1", "R1_EXPRESSION_YOUNG", "R1_EXPRESSION_OLD")])
+  R1 <- na.omit(R1)
+  R1[, TISSUE_CELLTYPE := paste(ID, RECEIVER_CELLTYPE, sep = "_")]
+  R1[, GENE := RECEPTOR_1]
+  R1[, LOGFC := log(R1_EXPRESSION_OLD/R1_EXPRESSION_YOUNG)]
+  R1 <- R1[, c("TISSUE_CELLTYPE", "GENE", "LOGFC")]
+  
+  R2 <- unique(cci_dt[, c("ID", "RECEIVER_CELLTYPE", "RECEPTOR_2", "R2_EXPRESSION_YOUNG", "R2_EXPRESSION_OLD")])
+  R2 <- na.omit(R2)
+  R2[, TISSUE_CELLTYPE := paste(ID, RECEIVER_CELLTYPE, sep = "_")]
+  R2[, GENE := RECEPTOR_2]
+  R2[, LOGFC := log(R2_EXPRESSION_OLD/R2_EXPRESSION_YOUNG)]
+  R2 <- R2[, c("TISSUE_CELLTYPE", "GENE", "LOGFC")]
+  
+  R3 <- unique(cci_dt[, c("ID", "RECEIVER_CELLTYPE", "RECEPTOR_3", "R3_EXPRESSION_YOUNG", "R3_EXPRESSION_OLD")])
+  R3 <- na.omit(R3)
+  R3[, TISSUE_CELLTYPE := paste(ID, RECEIVER_CELLTYPE, sep = "_")]
+  R3[, GENE := RECEPTOR_3]
+  R3[, LOGFC := log(R3_EXPRESSION_OLD/R3_EXPRESSION_YOUNG)]
+  R3 <- R3[, c("TISSUE_CELLTYPE", "GENE", "LOGFC")]
+  
+  dt <- unique(rbind(L1, L2, R1, R2, R3))
+  
+}
+
+fc_df <- get_genes_logfc(DATASETS_PROCESSED_GENDER$droplet_female$dataset@cci_detected)
+fc_dm <- get_genes_logfc(DATASETS_PROCESSED_GENDER$droplet_male$dataset@cci_detected)
+fc_d <- merge.data.table(
+  fc_df,
+  fc_dm,
+  all.x = TRUE,
+  all.y = TRUE,
+  by = c("TISSUE_CELLTYPE", "GENE"),
+  suffixes = c("_female", "_male")
+)
+fc_d <- na.omit(fc_d)
+ggplot(fc_d, aes(LOGFC_male, LOGFC_female)) + geom_point() +
+  geom_smooth(method = "lm") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+cor(
+  fc_d[is.finite(LOGFC_female) & is.finite(LOGFC_male)]$LOGFC_female,
+  fc_d[is.finite(LOGFC_female) & is.finite(LOGFC_male)]$LOGFC_male
+)
+
+fc_ff <- get_genes_logfc(DATASETS_PROCESSED_GENDER$facs_female$dataset@cci_detected)
+fc_fm <- get_genes_logfc(DATASETS_PROCESSED_GENDER$facs_male$dataset@cci_detected)
+fc_f <- merge.data.table(
+  fc_ff,
+  fc_fm,
+  all.x = TRUE,
+  all.y = TRUE,
+  by = c("TISSUE_CELLTYPE", "GENE"),
+  suffixes = c("_female", "_male")
+)
+fc_f <- na.omit(fc_f)
+ggplot(fc_f, aes(LOGFC_male, LOGFC_female)) + geom_point() +
+  geom_smooth(method = "lm") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+cor(
+  fc_f[is.finite(LOGFC_female) & is.finite(LOGFC_male)]$LOGFC_female,
+  fc_f[is.finite(LOGFC_female) & is.finite(LOGFC_male)]$LOGFC_male
+)
+
 ## Load the processed datasets ####
 
 DATASETS_PROCESSED <- c(
@@ -24,6 +306,8 @@ seurat_md$calico_kidney <- NULL
 seurat_md$calico_lung <- NULL
 seurat_md$calico_spleen <- NULL
 seurat_md$calico[, sex := "male"]
+
+seurat_md$tms_droplet <- seurat_md$tms_droplet[age != "1m"]
 
 lapply(
   seurat_md, 

@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - December 2020
+## Last update - March 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
@@ -23,9 +23,6 @@ library(grid)
 library(gtable)
 library(ontoProc)
 
-## Analysis data path ####
-dir_data_analysis <- "../data_scAgeCom/analysis/"
-
 ## Read metadata from the seurat files ####
 
 #seurat_md <- readRDS(paste0(dir_data_analysis, "analysis_1_data_seurat_md.rds"))
@@ -42,12 +39,12 @@ cl_names <- cl$name
 
 all_scdiffcom_ontology <- unique(unlist(lapply(
   seurat_md,
-  function(i) i$cell_ontology_scdiffcom
+  function(i) i$cell_ontology_final
 )))
 
 all_scdiffcom_ontology %in% cl_names
 all_scdiffcom_ontology[!all_scdiffcom_ontology %in% cl_names]
-#the eventual remaining non-cl cases are not going to appear in scDiffCom results because of low cell counts
+# there is some difference because of undetermined cell-types
 
 ## Add and modify metadata ####
 
@@ -55,10 +52,6 @@ all_scdiffcom_ontology[!all_scdiffcom_ontology %in% cl_names]
 seurat_md$calico_kidney[, tissue :=  "Kidney"]
 seurat_md$calico_lung[, tissue := "Lung"]
 seurat_md$calico_spleen[, tissue := "Spleen"]
-
-seurat_md$calico_kidney[, cell_ontology_id :=  NA]
-seurat_md$calico_lung[, cell_ontology_id := NA]
-seurat_md$calico_spleen[, cell_ontology_id := NA]
 
 seurat_md$calico <- rbindlist(
   l = list(seurat_md$calico_kidney, seurat_md$calico_lung, seurat_md$calico_spleen)
@@ -72,10 +65,18 @@ seurat_md$calico[, sex := "male"]
 # add age groups
 anyNA(seurat_md$tms_facs$age)
 unique(seurat_md$tms_facs$age)
-seurat_md$tms_facs[, age_group := ifelse(age %in% c('1m', '3m'), 'YOUNG', 'OLD')]
+seurat_md$tms_facs[, age_group := ifelse(age %in% c('3m'), 'YOUNG', 'OLD')]
 anyNA(seurat_md$tms_droplet$age)
 unique(seurat_md$tms_droplet$age)
-seurat_md$tms_droplet[, age_group := ifelse(age %in% c('1m', '3m'), 'YOUNG', 'OLD')]
+seurat_md$tms_droplet[, age_group := ifelse(
+  age %in% c('3m'),
+  'YOUNG',
+  ifelse(
+    age %in% c("1m", "30m"),
+    "OTHER",
+    "OLD"
+  )
+)]
 seurat_md$calico[, age_group := ifelse(age == "young", 'YOUNG', 'OLD')]
 
 # add tissue-cell types
@@ -84,19 +85,6 @@ seurat_md <- lapply(seurat_md, function(x) {
   return(x)
 })
  
-# seurat_md <- lapply(seurat_md, function(x) {
-#   x$tissue_cell_ontology <- paste(x$tissue, x$cell_ontology_scdiffcom, sep = "_")
-#   if("cell_ontology_class" %in% colnames(x)) {
-#     x$tissue_cell_type <- paste(x$tissue, x$cell_ontology_class)
-#   } else {
-#     x$tissue_cell_type <- paste(x$tissue, x$cell_type)
-#   }
-#   return(x)
-# })
-
-seurat_md$calico_subtype <- copy(seurat_md$calico)
-seurat_md$calico_subtype[, tissue_cell_type := paste(tissue, subtype, sep = "_")]
-
 # change some categories to character
 
 seurat_md <- lapply(seurat_md, function(x) {
@@ -146,7 +134,6 @@ md_agegroup_sex_by_celltype <- lapply(
     )
     dt[is.na(dt)] <- 0
     dt[, OR := OLD_male*YOUNG_female/(YOUNG_male*OLD_female)]
-    dt[, JACCARD := (OLD_male + OLD_female)/((OLD_male + YOUNG_female)+(YOUNG_male + OLD_female)+(OLD_male + OLD_female))]
     dt
   }
 )
@@ -154,6 +141,8 @@ md_agegroup_sex_by_celltype <- lapply(
 fwrite(md_agegroup_sex_by_celltype$tms_facs, "../data_scAgeCom/analysis/outputs_data/md_facs_agegroup_sex_by_celltype.csv")
 fwrite(md_agegroup_sex_by_celltype$tms_droplet, "../data_scAgeCom/analysis/outputs_data/md_droplet_agegroup_sex_by_celltype.csv")
 
+
+## deprecated or to be updated below ####
 
 dt <- dcast.data.table(
   seurat_md$tms_droplet[, .N, by = c("age_group", "tissue", "tissue_cell_type")],
@@ -645,7 +634,7 @@ grid.draw(g_spleen)
 ggsave(paste0(dir_data_analysis, "analysis_1_plot_spleen_celltypes.png"),
        plot = g_spleen, scale = 1.5)
 
-# check here if the TMS genes are in ensembl ####
+## check here if the TMS genes are in ensembl ####
 test <- readRDS("../../data_scAgeCom/test/inputs/seurat_testing_tms_facs_liver.rds")
 genes <- rownames(test)
 
