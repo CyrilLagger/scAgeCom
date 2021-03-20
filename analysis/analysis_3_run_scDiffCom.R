@@ -1,7 +1,7 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - December 2020
+## Last update - March 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
@@ -17,13 +17,10 @@
 library(Seurat)
 library(scDiffCom)
 library(future)
-library(progressr)
 
-future::plan(multiprocess)
-options(future.globals.maxSize = 64 * 1000 ^ 3)
-options(progressr.enable = TRUE)
+options(future.globals.maxSize = 10000 * 1024 ^ 2)
 
-## Set up fixed parameters that should not change ####
+## Common parameters ####
 
 normalization <- "size_factor"
 min_cells <- 5
@@ -35,30 +32,31 @@ run_test <- FALSE
 ## Path where the Seurat files are stored ####
 
 dataset_paths <- c(
-  tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_tms_facs.rds",
-  tms_droplet = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_tms_droplet.rds",
-  calico_kidney = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_kidney.rds",
-  calico_lung = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_lung.rds",
-  calico_spleen = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_scdiffcom_calico_spleen.rds"
+  tms_facs = "/home/nis/lcyril/work/lcyril_data/scRNA_seq/seurat_processed/seurat_final_tms_facs.rds",
+  tms_droplet = "/home/nis/lcyril/work/lcyril_data/scRNA_seq/seurat_processed/seurat_final_tms_droplet.rds",
+  calico_kidney = "/home/nis/lcyril/work/lcyril_data/scRNA_seq/seurat_processed/seurat_final_calico_kidney.rds",
+  calico_lung = "/home/nis/lcyril/work/lcyril_data/scRNA_seq/seurat_processed/seurat_final_calico_lung.rds",
+  calico_spleen = "/home/nis/lcyril/work/lcyril_data/scRNA_seq/seurat_processed/seurat_final_calico_spleen.rds"
 )
 
 ## Load the curated LR interactions ####
 
-LRdb_curated <- scDiffCom::LRdb_mouse$LRdb_curated
+LRI_curated <- scDiffCom::LRI_mouse$LRI_curated
 
-## List of analysis to do over datasets and sex
+## List of analysis to do over datasets and sex ####
 
 analysis_list <- list(
-  #list(dataset = "calico", type = "default"),
-  #list(dataset = "calico", type = "subtype"),
-  #list(dataset = "tms_facs", type = "mixed"),
+  list(dataset = "calico", type = "default"),
   list(dataset = "tms_facs", type = "female"),
   list(dataset = "tms_facs", type = "male"),
-  list(dataset = "tms_facs", type = "sex"),
-  #list(dataset = "tms_droplet", type = "mixed")#,
   list(dataset = "tms_droplet", type = "female"),
-  list(dataset = "tms_droplet", type = "male"),
-  list(dataset = "tms_droplet", type = "sex")
+  list(dataset = "tms_droplet", type = "male")#,
+  #list(dataset = "tms_facs", type = "mixed"),
+  #list(dataset = "tms_facs", type = "female"),
+  #list(dataset = "tms_facs", type = "male"),
+  #list(dataset = "tms_facs", type = "sex"),
+  #list(dataset = "tms_droplet", type = "mixed"),
+  #list(dataset = "tms_droplet", type = "sex")
   #list(dataset = "tms_facs", type = "overall")#,
   #list(dataset = "tms_droplet", type = "overall")
 )
@@ -66,11 +64,13 @@ analysis_list <- list(
 ## Do the analysis ####
 
 for(analysis in analysis_list) {
-  message(paste0("Start analysis of ", analysis$dataset, "_", analysis$type))
+  message(paste0("Starting the analysis of ", analysis$dataset, "_", analysis$type))
   if(!run_test) {
-    output_dir <- paste0(dir_data_output, "/scdiffcom_",
-                         analysis$dataset, "_", analysis$type, "_",
-                         normalization, "_log", is_log, "_", n_iter, "iter")
+    output_dir <- paste0(
+      dir_data_output, "/scdiffcom_",
+      analysis$dataset, "_", analysis$type, "_",
+      normalization, "_log", is_log, "_", n_iter, "iter"
+    )
   } else {
     output_dir <- paste0(dir_data_output, "/scdiffcom_test_run")
   }
@@ -81,7 +81,13 @@ for(analysis in analysis_list) {
   message("Read seurat object.")
   if(analysis$dataset %in% c("tms_facs", "tms_droplet")) {
     seurat_obj <- readRDS(dataset_paths[[analysis$dataset]])
-    seurat_obj$age_group <- ifelse(seurat_obj$age %in% c('1m', '3m'), 'YOUNG', 'OLD')
+    if (analysis$dataset == "tms_droplet") {
+      seurat_obj <- subset(seurat_obj, subset = age %in% c("3m", "18m", "21m", "24m"))
+    }
+    if (any(!unique(seurat_obj$age) %in% c("3m", "18m", "21m", "24m"))) {
+      stop("Error somewhere with the ages")
+    }
+    seurat_obj$age_group <- ifelse(seurat_obj$age %in% c('3m'), 'YOUNG', 'OLD')
     if(analysis$type == "female") {
       seurat_obj <- subset(seurat_obj, subset = sex == "female")
     }
@@ -94,13 +100,19 @@ for(analysis in analysis_list) {
       group_filter <- "age_group"
     }
     if(analysis$type == "overall") {
-      seurat_obj$tissue_cell_ontology_scdiffcom <- paste(seurat_obj$tissue, seurat_obj$cell_ontology_scdiffcom, sep = "_")
+      seurat_obj$tissue_cell_ontology_scdiffcom <- paste(
+        seurat_obj$tissue,
+        seurat_obj$cell_ontology_scdiffcom,
+        sep = "_")
       tissue_list <- "overall"
       n_tissue <- 1
     } else {
       md_temp <- seurat_obj@meta.data
       tokeep <- apply(
-        table(as.character(md_temp$tissue), as.character(md_temp[[group_filter]])) >= min_cells,
+        table(
+          as.character(md_temp$tissue),
+          as.character(md_temp[[group_filter]])
+          ) >= min_cells,
         MARGIN = 1,
         FUN = all
       )
@@ -139,56 +151,68 @@ for(analysis in analysis_list) {
         message("Subset Seurat object")
         cells_tiss <- colnames(seurat_obj)[which(seurat_obj$tissue == tiss)]
         seurat_tiss <- subset(seurat_obj, cells = cells_tiss)
-        cell_type_id <- "cell_ontology_scdiffcom"
+        cell_type_id <- "cell_ontology_final"
       }
       if(analysis$type == "sex") {
-        condition_id <- "sex"
-        cond1_name <- "female"
-        cond2_name <- "male"
+        condition_id <- list(
+          column_name = "sex",
+          cond1_name = "female",
+          cond2_name = "male"
+        )
       } else {
-        condition_id <- "age_group"
-        cond1_name <- "YOUNG"
-        cond2_name <- "OLD"
+        condition_id <- list(
+          column_name = "age_group",
+          cond1_name = "YOUNG",
+          cond2_name = "OLD"
+        )
       }
     } else if(analysis$dataset == "calico") {
       seurat_tiss <- seurat_list[[tiss]]
-      condition_id <- "age_group"
-      cond1_name <- "YOUNG"
-      cond2_name <- "OLD"
+      condition_id <- list(
+        column_name = "age_group",
+        cond1_name = "YOUNG",
+        cond2_name = "OLD"
+      )
       if(analysis$type == "subtype") {
         cell_type_id <- "subtype"
       } else {
-        cell_type_id <- "cell_ontology_scdiffcom"
+        cell_type_id <- "cell_ontology_final"
       }
     }
     DefaultAssay(seurat_tiss) <- "RNA"
-    message("Size-factor normalization:")
-    seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
-    dt_res <- scDiffCom::run_interaction_analysis(
-      seurat_obj = seurat_tiss,
-      LRdb_species = "mouse",
-      seurat_celltype_id = cell_type_id,
-      seurat_condition_id = condition_id,
-      cond1_name = cond1_name,
-      cond2_name = cond2_name,
-      seurat_assay = "RNA",
-      seurat_slot = "data",
-      log_scale = is_log,
-      threshold_min_cells = min_cells,
-      threshold_pct = 0.1,
-      object_name = tiss,
-      permutation_analysis = TRUE,
-      iterations = n_iter,
-      threshold_quantile_score = 0.25,
-      threshold_p_value_specificity = 0.05,
-      threshold_p_value_de = 0.05,
-      threshold_logfc = log(1.2),
-      return_distributions = FALSE,
-      seed = 42,
-      verbose = TRUE
-    )
-    message(paste0("Saving results for the ", tiss, "."))
-    saveRDS(dt_res, file = paste0(output_dir, "/scdiffcom_", tiss, ".rds"))
+    n_ct <- length(unique(seurat_tiss[[cell_type_id]]))
+    
+    if (n_ct > 1) {
+      message("Size-factor normalization:")
+      seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
+      future::plan(multicore, workers = 27)
+      dt_res <- scDiffCom::run_interaction_analysis(
+        seurat_object = seurat_tiss,
+        LRI_species = "mouse",
+        seurat_celltype_id = cell_type_id,
+        seurat_condition_id = condition_id,
+        iterations = n_iter, 
+        scdiffcom_object_name = tiss,      
+        seurat_assay = "RNA",
+        seurat_slot = "data",
+        log_scale = is_log,
+        score_type = "geometric_mean",
+        threshold_min_cells = min_cells,
+        threshold_pct = 0.1,
+        threshold_quantile_score = 0.2,
+        threshold_p_value_specificity = 0.05,
+        threshold_p_value_de = 0.05,
+        threshold_logfc = log(1.5),
+        return_distributions = FALSE,
+        seed = 42,
+        verbose = TRUE
+      )
+      message(paste0("Saving results for the ", tiss, "."))
+      saveRDS(dt_res, file = paste0(output_dir, "/scdiffcom_", tiss, ".rds"))
+    } else {
+      message("Not enough cell types, not performing the analysis.")
+    }
+    future::plan(sequential)
   }
 }
 

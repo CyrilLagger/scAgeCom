@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - December 2020
+## Last update - March 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
@@ -14,14 +14,15 @@
 ####################################################
 ##
 
-# Note: works on the server only due to large file-size
+# Note: works on the server only 
+# (loading all Seurat objects requires > 7GB of RAM)
 
 ## Libraries ####
 
 library(Seurat)
 library(data.table)
 
-## Paths of the Seurat objects ####
+## Paths of the orginal Seurat objects ####
 
 seurat_path <- c(
   tms_facs = "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_tms_facs.rds",
@@ -32,9 +33,10 @@ seurat_path <- c(
 )
 
 ## Analysis data path ####
+
 dir_data_analysis <- "../data_scAgeCom/analysis/"
 
-## Load the Seurat objects (several GBs) #####
+## Load the Seurat objects #####
 
 seurat_objects <- list(
   tms_facs = readRDS(seurat_path[["tms_facs"]]),
@@ -44,7 +46,7 @@ seurat_objects <- list(
   calico_spleen = readRDS(seurat_path[["calico_spleen"]])
 )
 
-## Check basic contents of Seurat objects ####
+## Double check basic contents of Seurat objects ####
 
 # Available assays: "RNA"
 lapply(seurat_objects, function(x) {
@@ -61,7 +63,7 @@ lapply(seurat_objects, function(x) {
   colnames(x@meta.data)
 })
 
-## Check QC ####
+## Double check QC has been done properly ####
 
 # Number of unique genes per cell
 unique_genes <- lapply(seurat_objects, function(x) {
@@ -82,29 +84,51 @@ min_total_count_per_cell <- lapply(total_counts, min)
 min_total_count_per_cell
 
 # Compare counts to previously stored values (some difference due to early filtering)
-mapply(function(x,y) {identical(x$n_genes,y)}, seurat_objects, unique_genes, SIMPLIFY = FALSE)
+mapply(
+  function(x,y)
+  {identical(x$n_genes,y)},
+  seurat_objects, unique_genes,
+  SIMPLIFY = FALSE
+)
 identical(seurat_objects$tms_droplet$n_genes, unique_genes$tms_droplet)
 droplet_n_genes_diff <- seurat_objects$tms_droplet$n_genes - unique_genes$tms_droplet
 droplet_n_genes_diff[droplet_n_genes_diff != 0]
 
-## Add new cell-type naming convention (only do it once, then save the new Seurat objects) ####
-celltype_conversion <- read.csv(paste0(dir_data_analysis, "scDiffCom_cell_types_clean.csv"), stringsAsFactors = FALSE)
-celltype_conversion <- celltype_conversion[, c("Tissue", "Original_annotation", "Final_annotation", "Family_broad", "Abbreviation")]
-colnames(celltype_conversion) <- c("tissue", "cell_ontology_class", "cell_ontology_final", "cell_family", "cell_abbreviation")
+## Update cell type names ####
+
+celltype_conversion <- read.csv(
+  paste0(
+    dir_data_analysis,
+    "scDiffCom_cell_types_clean.csv"
+  ),
+  stringsAsFactors = FALSE
+)
+celltype_conversion <- celltype_conversion[
+  ,
+  c("Tissue", "Original_annotation",
+    "Final_annotation", "Family_broad", "Abbreviation")]
+colnames(celltype_conversion) <- c(
+  "tissue", "cell_ontology_class",
+  "cell_ontology_final", "cell_family", "cell_abbreviation"
+  )
 setDT(celltype_conversion)
 celltype_conversion <- unique(celltype_conversion)
 celltype_check <- celltype_conversion[, c("tissue", "cell_ontology_class")]
 any(duplicated(celltype_check))
 
 
-#
+#FACS
 md_tms_facs <- copy(seurat_objects$tms_facs[[]])
-md_tms_facs$cell_ontology_class <- as.character(md_tms_facs$cell_ontology_class)
+md_tms_facs$cell_ontology_class <- as.character(
+  md_tms_facs$cell_ontology_class
+  )
 setDT(md_tms_facs)
 md_tms_facs[
   celltype_conversion,
   on = c("tissue", "cell_ontology_class"),
-  names(celltype_conversion)[3:5] := mget(paste0("i.", names(celltype_conversion)[3:5]))
+  names(celltype_conversion)[3:5] := mget(
+    paste0("i.", names(celltype_conversion)[3:5])
+    )
   ]
 sort(table(md_tms_facs$cell_ontology_final), decreasing = TRUE)
 sort(unique(md_tms_facs$cell_ontology_final))
@@ -115,19 +139,25 @@ md_tms_facs[, cell_ontology_final := ifelse(is.na(cell_ontology_final),
 sort(table(md_tms_facs$cell_ontology_final), decreasing = TRUE)
 sort(unique(md_tms_facs$cell_ontology_final))
 anyNA(md_tms_facs$cell_ontology_final)
-identical(as.character(md_tms_facs$cell_ontology_class), as.character(seurat_objects$tms_facs$cell_ontology_class))
+identical(as.character(md_tms_facs$cell_ontology_class), as.character(
+  seurat_objects$tms_facs$cell_ontology_class
+  ))
 seurat_objects$tms_facs$cell_ontology_final <- md_tms_facs$cell_ontology_final
 seurat_objects$tms_facs$cell_family <- md_tms_facs$cell_family
 seurat_objects$tms_facs$cell_abbreviation <- md_tms_facs$cell_abbreviation
 
-#
+#Droplet
 md_tms_droplet <- copy(seurat_objects$tms_droplet[[]])
-md_tms_droplet$cell_ontology_class <- as.character(md_tms_droplet$cell_ontology_class)
+md_tms_droplet$cell_ontology_class <- as.character(
+  md_tms_droplet$cell_ontology_class
+  )
 setDT(md_tms_droplet)
 md_tms_droplet[
   celltype_conversion,
   on = c("tissue", "cell_ontology_class"),
-  names(celltype_conversion)[3:5] := mget(paste0("i.", names(celltype_conversion)[3:5]))
+  names(celltype_conversion)[3:5] := mget(
+    paste0("i.", names(celltype_conversion)[3:5])
+    )
   ]
 
 sort(table(md_tms_droplet$cell_ontology_final), decreasing = TRUE)
@@ -139,20 +169,24 @@ md_tms_droplet[, cell_ontology_final := ifelse(is.na(cell_ontology_final),
 sort(table(md_tms_droplet$cell_ontology_final), decreasing = TRUE)
 sort(unique(md_tms_droplet$cell_ontology_final))
 anyNA(md_tms_droplet$cell_ontology_final)
-identical(as.character(md_tms_droplet$cell_ontology_class), as.character(seurat_objects$tms_droplet$cell_ontology_class))
+identical(as.character(md_tms_droplet$cell_ontology_class), as.character(
+  seurat_objects$tms_droplet$cell_ontology_class
+  ))
 seurat_objects$tms_droplet$cell_ontology_final <- md_tms_droplet$cell_ontology_final
 seurat_objects$tms_droplet$cell_family <- md_tms_droplet$cell_family
 seurat_objects$tms_droplet$cell_abbreviation <- md_tms_droplet$cell_abbreviation
 
 
-#
+#calico kidney
 md_calico_kidney <- copy(seurat_objects$calico_kidney[[]])
 md_calico_kidney$cell_type <- as.character(md_calico_kidney$cell_type)
 setDT(md_calico_kidney)
 md_calico_kidney[
   celltype_conversion[tissue == "Kidney"],
   on = c("cell_type==cell_ontology_class"),
-  names(celltype_conversion)[3:5] := mget(paste0("i.", names(celltype_conversion)[3:5]))
+  names(celltype_conversion)[3:5] := mget(
+    paste0("i.", names(celltype_conversion)[3:5])
+    )
 ]
 sort(table(md_calico_kidney$cell_ontology_final), decreasing = TRUE)
 sort(unique(md_calico_kidney$cell_ontology_final))
@@ -175,7 +209,7 @@ seurat_objects$calico_kidney$cell_ontology_final <- md_calico_kidney$cell_ontolo
 seurat_objects$calico_kidney$cell_family <- md_calico_kidney$cell_family
 seurat_objects$calico_kidney$cell_abbreviation <- md_calico_kidney$cell_abbreviation
 
-#
+# calico lung
 md_calico_lung <- copy(seurat_objects$calico_lung[[]])
 md_calico_lung$cell_type <- as.character(md_calico_lung$cell_type)
 setDT(md_calico_lung)
@@ -206,7 +240,7 @@ seurat_objects$calico_lung$cell_ontology_final <- md_calico_lung$cell_ontology_f
 seurat_objects$calico_lung$cell_family <- md_calico_lung$cell_family
 seurat_objects$calico_lung$cell_abbreviation <- md_calico_lung$cell_abbreviation
 
-#
+# calico spleen
 md_calico_spleen <- copy(seurat_objects$calico_spleen[[]])
 md_calico_spleen$cell_type <- as.character(md_calico_spleen$cell_type)
 setDT(md_calico_spleen)
@@ -238,7 +272,7 @@ seurat_objects$calico_spleen$cell_family <- md_calico_spleen$cell_family
 seurat_objects$calico_spleen$cell_abbreviation <- md_calico_spleen$cell_abbreviation
 
 
-##
+## save new Seurat objects (path needs to be updated) ####
 saveRDS(seurat_objects$tms_facs,
         "/home/nis/zabidi/work/lcyril_data/scRNA_seq/seurat_processed/seurat_final_tms_facs.rds")
 saveRDS(seurat_objects$tms_droplet,
