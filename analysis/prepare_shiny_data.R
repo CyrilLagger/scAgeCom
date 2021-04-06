@@ -4,8 +4,11 @@
 library(scDiffCom)
 library(htmltools)
 library(data.table)
+library(latex2exp)
+library(ggplot2)
+library(plotly)
 
-## Loading and cleaning LRI databases ####
+## Loading and cleaning mouse LRI ####
 
 LRI_mouse_curated <- copy(scDiffCom::LRI_mouse$LRI_curated)
 LRI_mouse_curated[, SOURCE := gsub("SCT:SingleCellSignalR|SCT:CellPhoneDB|SCT:DLRP", "", SOURCE)]
@@ -43,6 +46,46 @@ LRI_mouse_curated[, c(LRI_DATABASES) := lapply(LRI_DATABASES, function(i) {
   ifelse(grepl(i, `Database of Origin`), TRUE, FALSE)
 })]
 
+## Loading and cleaning human LRI ####
+
+LRI_human_curated <- copy(scDiffCom::LRI_human$LRI_curated)
+LRI_human_curated[, SOURCE := gsub("SCT:SingleCellSignalR|SCT:CellPhoneDB|SCT:DLRP", "", SOURCE)]
+LRI_human_curated[, SOURCE := gsub(";;", ";", SOURCE)]
+LRI_human_curated[, SOURCE := sub(";$", "", SOURCE)]
+LRI_human_curated[, SOURCE := sub("^;", "", SOURCE)]
+LRI_cols_to_keep <- c(
+  "LIGAND_1", "LIGAND_2",
+  "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
+  "DATABASE", "SOURCE"
+)
+LRI_human_curated <- LRI_human_curated[, LRI_cols_to_keep, with = FALSE]
+setnames(
+  LRI_human_curated,
+  old = LRI_cols_to_keep,
+  new = c(
+    "Ligand (1)", "Ligand (2)",
+    "Receptor (1)", "Receptor (2)", "Receptor (3)",
+    "Database of Origin", "Retrieved Sources"
+  )
+)
+
+LRI_DATABASES <- sort(
+  unique(
+    unlist(
+      strsplit(
+        LRI_human_curated$`Database of Origin`,
+        ";")
+    )
+  )
+)
+
+LRI_human_curated[, COMPLEX := !is.na(`Ligand (2)`) | !is.na(`Receptor (2)`)]
+LRI_human_curated[, c(LRI_DATABASES) := lapply(LRI_DATABASES, function(i) {
+  ifelse(grepl(i, `Database of Origin`), TRUE, FALSE)
+})]
+
+## LRI functions ####
+
 plot_lri_upset <- function(
   LRI_table,
   groups
@@ -64,7 +107,49 @@ plot_lri_upset <- function(
   return(p)
 }
 
-## Defining new names for Shiny ####
+build_LRI_display <- function(
+  LRI_table,
+  LRI_database
+) {
+  dt <- LRI_table[
+    apply(
+      sapply(
+        LRI_database,
+        function(i) {
+          grepl(i, `Database of Origin`)
+        }
+      ),
+      MARGIN = 1,
+      any
+    )
+  ]
+  DT::datatable(
+    data = dt[, 1:7],
+    options = list(
+      pageLength = 10,
+      columnDefs = list(
+        list(
+          targets = c(6,7),
+          render = htmlwidgets::JS(
+            "function(data, type, row, meta) {",
+            "return type === 'display' && data.length > 20 ?",
+            "'<span title=\"' + data + '\">' + data.substr(0, 20) + '...</span>' : data;",
+            "}")
+        )
+      )
+    ),
+    caption = tags$caption(
+      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
+      "Table of Ligand-Receptor Interactions"
+    )
+  )
+}
+
+## Loading scDiffCom objects ####
+
+DATASETS_COMBINED <- readRDS(
+  "../data_scAgeCom/analysis/outputs_data/scagecom_results_processed.rds"
+)
 
 shiny_dataset_names <- c(
   "Calico2019",
@@ -74,74 +159,130 @@ shiny_dataset_names <- c(
   "TMS FACS (male)"
 )
 
-## Loading and cleaning scDiffCom objects ####
-
-DATASETS_COMBINED <- readRDS("../data_scAgeCom/analysis/outputs_data/scagecom_results_processed.rds")
-
-DATASETS_COMBINED <- lapply(
-  DATASETS_COMBINED,
-  function(dataset) {
-    dt <- dataset@cci_table_detected
-    dt[, LOG2FC_BASE := LOGFC*log2(exp(1))]
-    dt[, LOG2FC_ID := {
-      temp <- LOG2FC_BASE
-      temp_max <- ceiling(max(temp[is.finite(temp)]))
-      temp_min <- floor(min(temp[is.finite(temp)]))
-      temp_max <- max(temp_max, -temp_min)
-      temp_min <- min(-temp_max, temp_min)
-      ifelse(
-        is.infinite(LOG2FC_BASE) & LOG2FC_BASE > 0,
-        temp_max,
-        ifelse(
-          is.infinite(LOG2FC_BASE) & LOG2FC_BASE < 0,
-          temp_min,
-          LOG2FC_BASE
-        )
-      )}, by = ID]
-    dt[, LOG2FC_ALL := {
-      temp <- LOG2FC_BASE
-      temp_max <- ceiling(max(temp[is.finite(temp)]))
-      temp_min <- floor(min(temp[is.finite(temp)]))
-      temp_max <- max(temp_max, -temp_min)
-      temp_min <- min(-temp_max, temp_min)
-      ifelse(
-        is.infinite(LOG2FC_BASE) & LOG2FC_BASE > 0,
-        temp_max,
-        ifelse(
-          is.infinite(LOG2FC_BASE) & LOG2FC_BASE < 0,
-          temp_min,
-          LOG2FC_BASE
-        )
-      )}]
-    dataset@cci_table_detected <- dt
-    return(dataset)
-  }
-)
-
 names(DATASETS_COMBINED)
 names(DATASETS_COMBINED) <- shiny_dataset_names
+names(DATASETS_COMBINED)
 
-## Utilities for CCI tables ####
+## Create a single CCI table  with only informative columns ####
 
-cols_to_show_cci_table <- c(
-  "LRI",
-  "Emitter Cell Type",
-  "Receiver Cell Type",
-  "LOG2FC",
-  "Adj. p-value",
-  "Age-Regulation",
-  "Score Young",
-  "Score Old"
+CCI_table <- rbindlist(
+  lapply(
+    DATASETS_COMBINED,
+    GetTableCCI,
+    type = "detected",
+    simplified = FALSE
+  ),
+  idcol = "DATASET"
 )
 
-cols_numeric_cci_table <- c(
-  "LOG2FC",
-  "Adj. p-value",
-  "Score Young",
-  "Score Old"
-)
+# Add and round LOG2FC
+CCI_table[, LOG2FC_BASE := LOGFC*log2(exp(1))]
+CCI_table[, LOG2FC_ID := {
+  temp <- LOG2FC_BASE
+  temp_max <- ceiling(max(temp[is.finite(temp)]))
+  temp_min <- floor(min(temp[is.finite(temp)]))
+  temp_max <- max(temp_max, -temp_min)
+  temp_min <- min(-temp_max, temp_min)
+  ifelse(
+    is.infinite(LOG2FC_BASE) & LOG2FC_BASE > 0,
+    temp_max,
+    ifelse(
+      is.infinite(LOG2FC_BASE) & LOG2FC_BASE < 0,
+      temp_min,
+      LOG2FC_BASE
+    )
+  )}, by = c("ID", "DATASET")]
+CCI_table[
+  ,
+  LOG2FC_ALL := {
+    temp <- LOG2FC_BASE
+    temp_max <- ceiling(max(temp[is.finite(temp)]))
+    temp_min <- floor(min(temp[is.finite(temp)]))
+    temp_max <- max(temp_max, -temp_min)
+    temp_min <- min(-temp_max, temp_min)
+    ifelse(
+      is.infinite(LOG2FC_BASE) & LOG2FC_BASE > 0,
+      temp_max,
+      ifelse(
+        is.infinite(LOG2FC_BASE) & LOG2FC_BASE < 0,
+        temp_min,
+        LOG2FC_BASE
+      )
+    )}
+]
 
-cols_old_cci_table <- c(
+# Add ligand (resp. receptor) logfc
+
+CCI_table[
+  ,
+  LOG2FC_L := log2(
+    pmin(L1_EXPRESSION_OLD, L2_EXPRESSION_OLD, na.rm = TRUE)
+    /
+      pmin(L1_EXPRESSION_YOUNG, L2_EXPRESSION_YOUNG, na.rm = TRUE)
+  )
+]
+CCI_table[
+  ,
+  LOG2FC_R := log2(
+    pmin(R1_EXPRESSION_OLD, R2_EXPRESSION_OLD, R3_EXPRESSION_OLD, na.rm = TRUE)
+    /
+      pmin(R1_EXPRESSION_YOUNG, R2_EXPRESSION_YOUNG, R3_EXPRESSION_YOUNG, na.rm = TRUE)
+  )
+]
+CCI_table[
+  ,
+  LOG2FC_L := {
+    max_L <- max(.SD[is.finite(LOG2FC_L)][["LOG2FC_L"]])
+    min_L <- min(.SD[is.finite(LOG2FC_L)][["LOG2FC_L"]])
+    max_L <- max(max_L, -min_L)
+    min_L <- min(-max_L, min_L)
+    ifelse(
+      is.infinite(LOG2FC_L) & LOG2FC_L > 0,
+      max_L,
+      ifelse(
+        is.infinite(LOG2FC_L) & LOG2FC_L < 0,
+        min_L,
+        LOG2FC_L
+      )
+    )
+  },
+  by = c("ID", "DATASET")
+]
+CCI_table[
+  ,
+  LOG2FC_R := {
+    max_R <- ceiling(max(.SD[is.finite(LOG2FC_R)][["LOG2FC_R"]]))
+    min_R <- floor(min(.SD[is.finite(LOG2FC_R)][["LOG2FC_R"]]))
+    max_R <- max(max_R, -min_R)
+    min_R <- min(-max_R, min_R)
+    ifelse(
+      is.infinite(LOG2FC_R) & LOG2FC_R > 0,
+      max_R,
+      ifelse(
+        is.infinite(LOG2FC_R) & LOG2FC_R < 0,
+        min_R,
+        LOG2FC_R
+      )
+    )
+  },
+  by = c("ID", "DATASET")
+]
+
+# Round numeric 
+CCI_table[, CCI_SCORE_YOUNG := signif(CCI_SCORE_YOUNG, 4)]
+CCI_table[, CCI_SCORE_OLD := signif(CCI_SCORE_OLD, 4)]
+CCI_table[, LOG2FC_ID := signif(LOG2FC_ID, 3)]
+CCI_table[, BH_P_VALUE_DE := signif(BH_P_VALUE_DE, 3)]
+CCI_table[, LOG2FC_L := signif(LOG2FC_L, 3)]
+CCI_table[, LOG2FC_R := signif(LOG2FC_R, 3)]
+
+# only keep relevant columns 
+
+colnames(CCI_table)
+
+CCI_cols_informative <- c(
+  "DATASET",
+  "ID",
   "LRI",
   "EMITTER_CELLTYPE",
   "RECEIVER_CELLTYPE",
@@ -149,63 +290,595 @@ cols_old_cci_table <- c(
   "BH_P_VALUE_DE",
   "REGULATION",
   "CCI_SCORE_YOUNG",
-  "CCI_SCORE_OLD"
+  "CCI_SCORE_OLD",
+  "LOG2FC_L",
+  "LOG2FC_R",
+  "NCELLS_EMITTER_YOUNG",
+  "NCELLS_EMITTER_OLD",
+  "NCELLS_RECEIVER_YOUNG",
+  "NCELLS_RECEIVER_OLD",
+  "IS_CCI_EXPRESSED_YOUNG",
+  "IS_CCI_EXPRESSED_OLD"
 )
 
+CCI_cols_informative_user <- c(
+  "Dataset",
+  "Tissue",
+  "Ligand-Receptor Interaction",
+  "Emitter Cell Type",
+  "Receiver Cell Type",
+  "Log2 FC",
+  "Adj. P-value",
+  "Age Regulation",
+  "Young CCI Score",
+  "Old CCI Score",
+  "Ligand Log2 FC",
+  "Receptor Log2 FC",
+  "NCELLS_EMITTER_YOUNG",
+  "NCELLS_EMITTER_OLD",
+  "NCELLS_RECEIVER_YOUNG",
+  "NCELLS_RECEIVER_OLD",
+  "IS_CCI_EXPRESSED_YOUNG",
+  "IS_CCI_EXPRESSED_OLD"
+)
+
+CCI_table <- CCI_table[, CCI_cols_informative, with = FALSE]
+setnames(
+  CCI_table,
+  old = CCI_cols_informative,
+  new = CCI_cols_informative_user
+)
+setkey(CCI_table)
+
+setorder(
+  CCI_table,
+  -`Log2 FC`,
+  `Adj. P-value`,
+  -`Old CCI Score`,
+  -`Young CCI Score`
+)
+
+## Display CCI Details for Shiny ####
+
 subset_cci_table <- function(
-  cci_table,
+  CCI_table,
+  dataset_choice,
   tissue_choice,
-  emitter_choice,
-  receiver_choice,
-  lri_choice,
-  pvalue_choice,
-  log2fc_choice,
-  do_order
+  emitter_choice = NULL,
+  receiver_choice = NULL,
+  LRI_choice = NULL,
+  filter
 ) {
-  dt <-  cci_table[ID == tissue_choice]
-  if ('All LRI' %in% lri_choice) {
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% emitter_choice &
-        `RECEIVER_CELLTYPE` %in% receiver_choice &
-        `BH_P_VALUE_DE` <= pvalue_choice &
-        abs(LOG2FC_ID) >= log2fc_choice
-    ]
+  if (filter) {
+    if ('All LRIs' %in% LRI_choice) {
+      dt <- CCI_table[
+        Dataset == dataset_choice &
+          Tissue == tissue_choice &
+          `Emitter Cell Type` %in% emitter_choice &
+          `Receiver Cell Type` %in% receiver_choice
+      ]
+    } else {
+      dt <- CCI_table[
+        Dataset == dataset_choice &
+          Tissue == tissue_choice &
+          `Emitter Cell Type` %in% emitter_choice &
+          `Receiver Cell Type` %in% receiver_choice &
+          `Ligand-Receptor Interaction` %in% LRI_choice
+      ]
+    }
   } else {
-    dt <- dt[
-      `EMITTER_CELLTYPE` %in% emitter_choice &
-        `RECEIVER_CELLTYPE` %in% receiver_choice &
-        `LRI` %in% lri_choice &
-        `BH_P_VALUE_DE` <= pvalue_choice &
-        abs(LOG2FC_ID) >= log2fc_choice
+    dt <- CCI_table[
+      Dataset == dataset_choice &
+        Tissue == tissue_choice
     ]
   }
-  if (do_order) {
-    setorder(
-      dt,
-      -LOG2FC_ID,
-      BH_P_VALUE_DE,
-      -CCI_SCORE_OLD,
-      -CCI_SCORE_YOUNG
+  dt
+}
+
+build_CCI_display <- function(
+  CCI_table
+) {
+  dt <- CCI_table[
+    ,
+    -c(1,2,13,14,15,16,17,18)
+  ]
+  CCI_DT <- DT::datatable(
+    data = dt[, -c(9, 10)],
+    options =list(
+      pageLength = 10
+    ),
+    caption = tags$caption(
+      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
+      "Table of Cell-Cell Interactions"
+    ),
+    rownames = rownames,
+    extensions = c("Buttons")
+  )
+  vline <- function(x = 0, color = "black") {
+    list(
+      type = "line", 
+      y0 = 0, 
+      y1 = 1, 
+      yref = "paper",
+      x0 = x, 
+      x1 = x, 
+      line = list(color = color)
     )
   }
-  return(dt)
-}
-
-fix_cci_table_names <- function(
-  cci_table,
-  old_cols,
-  new_cols
-) {
-  setnames(
-    cci_table,
-    old = old_cols,
-    new = new_cols
+  hline <- function(y = 0, color = "black") {
+    list(
+      type = "line", 
+      x0 = 0, 
+      x1 = 1, 
+      xref = "paper",
+      y0 = y, 
+      y1 = y, 
+      line = list(color = color)
+    )
+  }
+  dt$`Age Regulation` <- factor(
+    dt$`Age Regulation`,
+    levels = c("UP", "DOWN", "FLAT", "NSC")
   )
-  setcolorder(cci_table, new_cols)
-  cci_table <- cci_table[, new_cols, with = FALSE]
-  return(cci_table)
+  m <- list(
+    l = 100,
+    r = 100,
+    b = 100,
+    t = 100,
+    pad = 8
+  )
+  CCI_VOLCANO_PLOT <- plotly::plot_ly(
+    data = dt,
+    type = "scatter",
+    mode = "markers",
+    x = ~`Log2 FC`,
+    y = ~-log10(`Adj. P-value`),
+    text = ~paste(
+      "LRI: ",
+      `Ligand-Receptor Interaction`, 
+      '$<br>Emitter:',
+      `Emitter Cell Type`,
+      '$<br>Receiver:',
+      `Receiver Cell Type`
+    ),
+    color = ~`Age Regulation`,
+    colors = setNames(
+      c("red", "blue", "green", "gray"),
+      c("UP", "DOWN", "FLAT", "NSC")
+    )#,
+    #width = 900,
+    #height = 500
+  ) %>% plotly::layout(
+    title = "Interactive Volcano Plot",
+    font = list(size = 20),
+    xaxis = list(
+      title = "Log2(FC)",
+      titlefont = list(size = 18)
+      ),
+    yaxis = list(
+      title = "-Log10(Adj. p-value)",
+      titlefont = list(size = 18)
+    ),
+    shapes = list(
+      vline(log2(1.5)),
+      vline(-log2(1.5)),
+      hline(-log10(0.05))
+    ),
+    legend = list(
+      x = 100,
+      y = 0.5
+      ),
+    margin = m
+  )  %>% toWebGL()
+  CCI_SCORE_PLOT <- plotly::plot_ly(
+    data = dt,
+    type = "scatter",
+    mode = "markers",
+    x = ~log10(`Young CCI Score`),
+    y = ~log10(`Old CCI Score`),
+    text = ~paste(
+      "LRI: ",
+      `Ligand-Receptor Interaction`, 
+      '$<br>Emitter:',
+      `Emitter Cell Type`,
+      '$<br>Receiver:',
+      `Receiver Cell Type`
+    ),
+    color = ~`Age Regulation`,
+    colors = setNames(
+      c("red", "blue", "green", "gray"),
+      c("UP", "DOWN", "FLAT", "NSC")
+    )
+  ) %>% plotly::layout(
+    title = "Interactive Score Plot",
+    font = list(size = 20),
+    xaxis = list(
+      title = "Log10(Young CCI Score)",
+      titlefont = list(size = 18)
+    ),
+    yaxis = list(
+      title = "Log10(Old CCI Score)",
+      titlefont = list(size = 18)
+    ),
+    legend = list(
+      x = 100,
+      y = 0.5
+    ),
+    margin = m
+  ) %>% toWebGL()
+  CCI_LRFC_PLOT <- plotly::plot_ly(
+    data = dt,
+    type = "scatter",
+    mode = "markers",
+    x = ~`Ligand Log2 FC`,
+    y = ~`Receptor Log2 FC`,
+    text = ~paste(
+      "LRI: ",
+      `Ligand-Receptor Interaction`, 
+      '$<br>Emitter:',
+      `Emitter Cell Type`,
+      '$<br>Receiver:',
+      `Receiver Cell Type`
+    ),
+    color = ~`Age Regulation`,
+    colors = setNames(
+      c("red", "blue", "green", "gray"),
+      c("UP", "DOWN", "FLAT", "NSC")
+    )
+  )  %>% plotly::layout(
+    title = "Interactive LRFC Plot",
+    font = list(size = 20),
+    xaxis = list(
+      title = "Ligand Log2(FC)",
+      titlefont = list(size = 18)
+    ),
+    yaxis = list(
+      title = "Receptor Log2(FC)",
+      titlefont = list(size = 18)
+    ),
+    legend = list(
+      x = 100,
+      y = 0.5
+    ),
+    margin = m
+  )  %>% toWebGL()
+  CCI_PLOTS <- subplot(
+    CCI_VOLCANO_PLOT,
+    CCI_SCORE_PLOT,
+    CCI_LRFC_PLOT,
+    nrows = 3,
+    titleX = TRUE,
+    titleY = TRUE
+  )
+  list(
+    CCI_DT = CCI_DT,
+    CCI_VOLCANO_PLOT = CCI_VOLCANO_PLOT,
+    CCI_SCORE_PLOT = CCI_SCORE_PLOT,
+    CCI_LRFC_PLOT = CCI_LRFC_PLOT
+  )
 }
 
+# build_CCI_display(
+#   CCI_table = subset_cci_table(
+#     CCI_table,
+#     dataset_choice = shiny_dataset_names[[5]],
+#     tissue_choice = "Liver",
+#     filter = FALSE
+#   )
+# )$CCI_LRFC_PLOT
+
+# microbenchmark::microbenchmark(
+#   a = build_CCI_display(
+#     CCI_table = subset_cci_table(
+#       CCI_table,
+#       dataset_choice = shiny_dataset_names[[5]],
+#       tissue_choice = "Lung",
+#       filter = FALSE
+#     )
+#   ),
+#   times = 10
+# )
+
+## Create a single ORA table with only informative columns ####
+
+ORA_table <- lapply(
+  DATASETS_COMBINED,
+  GetTableORA,
+  categories = "all",
+  simplified = FALSE
+)
+
+ORA_table <- rbindlist(
+  lapply(
+    ORA_table,
+    function(dataset) {
+      rbindlist(
+        dataset,
+        fill = TRUE,
+        idcol = "ORA_CATEGORY"
+      )
+    }
+  ),
+  idcol = "DATASET"
+)
+
+# Add cell types for ERI
+
+ORA_table[
+  ORA_CATEGORY == "ER_CELLTYPES",
+  c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE") := list(
+  sub("_.*", "", VALUE),
+  sub(".*_", "", VALUE)
+)]
+
+# only keep relevant columns 
+
+colnames(ORA_table)
+
+ORA_cols_informative <- c(
+  "DATASET",
+  "ORA_CATEGORY",
+  "ID",
+  "VALUE",
+  "VALUE_BIS",
+  "OR_UP",
+  "BH_P_VALUE_UP",
+  "ORA_SCORE_UP",
+  "OR_DOWN",
+  "BH_P_VALUE_DOWN",
+  "ORA_SCORE_DOWN",
+  "OR_FLAT",
+  "BH_P_VALUE_FLAT",
+  "ORA_SCORE_FLAT",
+  "OR_DIFF",
+  "BH_P_VALUE_DIFF",
+  "ORA_SCORE_DIFF",
+  "ASPECT",
+  "LEVEL",
+  "EMITTER_CELLTYPE",
+  "RECEIVER_CELLTYPE"
+)
+
+ORA_cols_informative_user <- c(
+  "Dataset",
+  "ORA_CATEGORY",
+  "Tissue",
+  "VALUE",
+  "VALUE_BIS",
+  "OR_UP",
+  "BH_P_VALUE_UP",
+  "ORA_SCORE_UP",
+  "OR_DOWN",
+  "BH_P_VALUE_DOWN",
+  "ORA_SCORE_DOWN",
+  "OR_FLAT",
+  "BH_P_VALUE_FLAT",
+  "ORA_SCORE_FLAT",
+  "OR_DIFF",
+  "BH_P_VALUE_DIFF",
+  "ORA_SCORE_DIFF",
+  "ASPECT",
+  "GO Level",
+  "EMITTER_CELLTYPE",
+  "RECEIVER_CELLTYPE"
+)
+
+ORA_table <- ORA_table[, ORA_cols_informative, with = FALSE]
+setnames(
+  ORA_table,
+  old = ORA_cols_informative,
+  new = ORA_cols_informative_user
+)
+setkey(ORA_table)
+
+# Round numeric 
+ORA_table[, ORA_SCORE_UP := signif(ORA_SCORE_UP, 3)]
+ORA_table[, ORA_SCORE_DOWN := signif(ORA_SCORE_DOWN, 3)]
+ORA_table[, ORA_SCORE_FLAT := signif(ORA_SCORE_FLAT, 3)]
+ORA_table[, OR_UP := signif(OR_UP, 3)]
+ORA_table[, OR_DOWN := signif(OR_DOWN, 3)]
+ORA_table[, OR_FLAT := signif(OR_FLAT, 3)]
+ORA_table[, BH_P_VALUE_UP := signif(BH_P_VALUE_UP, 3)]
+ORA_table[, BH_P_VALUE_DOWN := signif(BH_P_VALUE_DOWN, 3)]
+ORA_table[, BH_P_VALUE_FLAT := signif(BH_P_VALUE_FLAT, 3)]
+
+
+##
+
+ALL_ORA_CATEGORIES <- c(
+  "LRIs",
+  "Cell Types",
+  "GO Terms",
+  "KEGG Pathways",
+  "Cell Families"
+)
+
+ALL_ORA_TYPES <- c(
+  "UP", 
+  "DOWN",
+  "FLAT"
+)
+
+ALL_ORA_GO_ASPECTS <- c(
+  "Biological Process",
+  "Molecular Function",
+  "Cellular Component"
+)
+
+subset_ORA_table <- function(
+  ORA_table,
+  dataset_choice,
+  tissue_choice
+) {
+  dt <- ORA_table[
+    Dataset == dataset_choice &
+      Tissue == tissue_choice
+  ]
+  category_keep <- c(
+    "KEGG_PWS",
+    "GO_TERMS",
+    "LRI",
+    "ER_CELLTYPES",
+    "ER_CELLFAMILIES"
+    )
+  dt <- dt[ORA_CATEGORY %in% category_keep]
+  dt[data.table(
+    category_old = category_keep,
+    category_new = c(
+      "KEGG Pathways",
+      "GO Terms",
+      "LRIs",
+      "Cell Types",
+      "Cell Families"
+    )
+  ),
+  on = c("ORA_CATEGORY==category_old"),
+  ORA_CATEGORY := i.category_new
+  ]
+  dt[
+    data.table(
+      old_aspect = c(
+        "biological_process",
+        "cellular_component",
+        "molecular_function"
+      ),
+      new_aspect = c(
+        "Biological Process",
+        "Cellular Component",
+        "Molecular Function"
+      )
+    ),
+    on = "ASPECT==old_aspect",
+    ASPECT := i.new_aspect
+  ]
+  dt
+}
+
+build_ORA_display <- function(
+  ORA_table,
+  category_choice,
+  go_aspect_choice,
+  type_choice
+) {
+  dt <- ORA_table[ORA_CATEGORY == category_choice]
+  if (category_choice == "GO Terms") {
+    dt <- dt[ASPECT == go_aspect_choice]
+    level_str <- "GO Level"
+    options = list(
+      #columnDefs = list(list(targets = c(1,2,), searchable = FALSE)),
+      pageLength = 10
+    )
+    filter <- "top"
+  } else {
+    level_str <- NULL
+    options <-list(pageLength = 10)
+    filter <- "none"
+  }
+  if(type_choice == "UP") {
+    cols_to_keep <- c(
+      "VALUE",
+      "ORA_SCORE_UP",
+      "OR_UP",
+      "BH_P_VALUE_UP",
+      level_str
+    )
+    dt <- dt[
+      OR_UP >= 1 & BH_P_VALUE_UP <= 0.05,
+      cols_to_keep,
+      with = FALSE
+    ]
+  } else if(type_choice == "DOWN") {
+    cols_to_keep <- c(
+      "VALUE",
+      "ORA_SCORE_DOWN",
+      "OR_DOWN",
+      "BH_P_VALUE_DOWN",
+      level_str
+      )
+    dt <- dt[
+      `OR_DOWN` >= 1 & BH_P_VALUE_DOWN <= 0.05,
+      cols_to_keep,
+      with = FALSE
+      ]
+  } else if(type_choice == "FLAT") {
+    cols_to_keep <- c(
+      "VALUE",
+      "ORA_SCORE_FLAT",
+      "OR_FLAT",
+      "BH_P_VALUE_FLAT",
+      level_str
+      )
+    dt <- dt[
+      `OR_FLAT` >= 1 & BH_P_VALUE_FLAT <= 0.05,
+      cols_to_keep,
+      with = FALSE]
+  }
+  if (category_choice == "GO Terms") {
+    dt[, `GO Level` := as.factor(`GO Level`)]
+  }
+  setnames(
+    dt,
+    old = colnames(dt),
+    new = c(
+      category_choice,
+      "ORA Score",
+      "Odds Ratio",
+      "Adj. p-value",
+      level_str
+      )
+  )
+  setorder(dt, -`ORA Score`)
+  DT::datatable(
+    data = dt,
+    options = options,
+    caption = tags$caption(
+      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
+      paste0(
+        category_choice,
+        " over-represented among ",
+        type_choice,
+        "-regulated CCIs"
+      )
+    ),
+    rownames = FALSE,
+    filter = filter
+  )
+}
+
+build_ORA_visnetwork <- function(
+  CCI_table,
+  ORA_table,
+  tissue_choice,
+  dataset_choice
+) {
+  CCI_dt <- copy(CCI_table)
+  setnames(
+    CCI_dt,
+    old = c("Emitter Cell Type", "Receiver Cell Type"),
+    new = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE")
+  )
+  ora_table_ER <- ORA_table[
+    Dataset == dataset_choice &
+      Tissue == tissue_choice &
+      ORA_CATEGORY == "ER_CELLTYPES"
+  ]
+  scDiffCom:::interactive_from_igraph(
+    cci_table_detected = CCI_dt[
+      Dataset == dataset_choice &
+        Tissue == tissue_choice
+    ],
+    conds = c("YOUNG", "OLD"),
+    ora_table_ER = ora_table_ER,
+    ora_table_LR = ORA_table[
+      Dataset == dataset_choice &
+        Tissue == tissue_choice &
+        ORA_CATEGORY == "LRI"
+    ],
+    network_type = "ORA_network",
+    layout_type = "bipartite",
+    object_name = tissue_choice
+  )
+}
 
 ## Loading and cleaning tissue cci counts ####
 
@@ -243,6 +916,35 @@ setcolorder(
   )
 )
 
+build_tissue_counts_display <- function(
+  tissue_counts_summary
+) {
+  dt <- tissue_counts_summary[, -c(8)]
+  DT::datatable(
+    data = dt,
+    options =list(
+      pageLength = 10,
+      dom = "t"
+    ),
+    rownames = FALSE,
+    callback = htmlwidgets::JS(
+      "var tips = [
+        'Selected Tissue',
+        'Dataset on which the interaction analysis has been performed',
+        'Number of cell-types in the tissue of interest',
+        'Number of cell-cell interactions detected in the tissue of interest',
+        'Number of stable CCIs with age',
+        'Number of down-regulated CCIs with age',
+        'Number of up-regulated CCIs with age'
+        ],
+        header = table.columns().header();
+        for (var i = 0; i < tips.length; i++) {
+        $(header[i]).attr('title', tips[i]);
+        }"
+    )
+  )
+}
+
 ## All tissues of interest ####
 
 ALL_TISSUES <- sort(unique(unlist(lapply(
@@ -264,6 +966,22 @@ ABBR_CELLTYPE <- lapply(
     dt
   }
 )
+
+ALL_CELLTYPES <- CCI_table[
+  ,
+  list(
+    CELLTYPE = unique(`Emitter Cell Type`)
+    ),
+  by = c("Dataset", "Tissue")
+]
+
+ALL_LRIs <- CCI_table[
+  ,
+  list(
+    LRI = unique(`Ligand-Receptor Interaction`)
+  ),
+  by = c("Dataset", "Tissue")
+]
 
 ## ORA dataset - tissue relationship ####
 
@@ -342,7 +1060,7 @@ ORA_KEYWORD_COUNTS[
 ]
 
 ORA_KEYWORD_SUMMARY_UNIQUE <- ORA_KEYWORD_SUMMARY[
-    GENDER %in% c("male", "female") &
+  GENDER %in% c("male", "female") &
     DATASET %in% c("facs", "droplet", "calico")]
 ORA_KEYWORD_SUMMARY_UNIQUE[, DATASET := paste(DATASET, GENDER, sep = "_")]
 ORA_KEYWORD_SUMMARY_UNIQUE[
@@ -360,128 +1078,37 @@ ORA_KEYWORD_SUMMARY_UNIQUE[
   DATASET := i.new
 ]
 
-## Utility functions ####
+ALL_GLOBAL_CATEGORIES <- c(
+  "LRI",
+  "GO Terms",
+  "KEGG Pathways",
+  "ERI Family"
+)
 
-show_DT <- function(
-  data,
-  cols_to_show,
-  cols_numeric = NULL,
-  table_title = NULL,
-  options = NULL,
-  rownames = TRUE,
-  callback = NULL
+build_GLOBAL_display <- function(
+  ORA_KEYWORD_COUNTS,
+  global_category,
+  global_type
 ) {
-  if (is.null(options)) {
-    options <- list(
+  dt <- ORA_KEYWORD_COUNTS[
+    TYPE == global_category &
+      REGULATION == global_type
+  ][order(-`Overall (union)`)]
+  setnames(dt, old = "VALUE", new = global_category)
+  DT::datatable(
+    data = dt[, -c(1,3)],
+    options =list(
       pageLength = 10
+    ),
+    caption = tags$caption(
+      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
+      paste0(
+        "Summary over-representation for ",
+        global_type,
+        " by tissue and dataset."
+        )
     )
-  }
-  if (is.null(callback)) {
-    callback <- htmlwidgets::JS("return table;")
-  }
-  res <- DT::datatable(
-    data = data[, cols_to_show, with = FALSE],
-    options = options,
-    callback = callback,
-    caption = tags$caption(style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',table_title),
-    rownames = rownames,
-    extensions = c("Buttons")
   )
-  if(!is.null(cols_numeric)) {
-    res <- DT::formatSignif(
-      table = res,
-      columns = cols_numeric,
-      digits = 3
-    )
-  }
-  return(res)
-}
-
-show_volcano <- function(
-  data,
-  xlims,
-  ylims
-) {
-  p <- ggplot(data, aes(
-    x = LOG2FC,
-    y = minus_log10_pval,
-    color = `Age-Regulation`
-  )) +
-    geom_point() +
-    scale_color_manual(values = c(
-      "UP" = "red", "DOWN" = "blue",
-      "FLAT" = "green",
-      "NON_SIGNIFICANT_CHANGE" = "gray")) +
-    geom_hline(yintercept = -log10(0.05)) +
-    geom_vline(xintercept = log2(1.5)) +
-    geom_vline(xintercept = -log2(1.5)) +
-    xlab(expression(paste(Log[2], "FC"))) +
-    ylab(expression(paste(-Log[10], " ", p[BH]))) +
-    xlim(xlims) + ylim(ylims) +
-    ggtitle("Volcano Plot of detected CCI (interactive)") +
-    theme(plot.title = element_text(hjust = 0.5)) +
-    theme(text=element_text(size=20))
-  return(p)
-}
-
-show_scores <- function(
-  data,
-  xlims,
-  ylims
-) {
-  p <- ggplot(
-    data,
-    aes(
-      x = `Score Young`,
-      y = `Score Old`,
-      color = `Age-Regulation`
-    )
-  ) +
-    geom_point() +
-    scale_color_manual(values = c(
-      "UP" = "red", "DOWN" = "blue",
-      "FLAT" = "green",
-      "NON_SIGNIFICANT_CHANGE" = "gray")) +
-    scale_x_log10(limits = xlims) +
-    scale_y_log10(limits = ylims) +
-    geom_abline(slope = 1, intercept = 0) +
-    xlab("Score Young") +
-    ylab("Score Old") +
-    ggtitle("Old vs Young Scores of detected CCIs (interactive)") +
-    theme(plot.title = element_text(hjust = 0.5)) +
-    theme(text=element_text(size=20))
-  #theme(legend.title = element_blank())
-  return(p)
-}
-
-show_LRIFC <- function(
-  data,
-  xlims,
-  ylims
-) {
-  p <- ggplot(
-    data,
-    aes(
-      x = LOG2FC_L,
-      y = LOG2FC_R,
-      color = `Age-Regulation`
-    )
-  ) +
-    geom_point() +
-    scale_color_manual(values = c(
-      "UP" = "red", "DOWN" = "blue",
-      "FLAT" = "green",
-      "NON_SIGNIFICANT_CHANGE" = "gray")) +
-    geom_vline(xintercept = 0) +
-    geom_hline(yintercept = 0) +
-    xlim(xlims) + ylim(ylims) +
-    xlab("Ligand LOG2FC") +
-    ylab("Receptor LOG2FC") +
-    ggtitle("Ligand vs Receptor Fold-Change of detected CCIs (interactive)") +
-    theme(plot.title = element_text(hjust = 0.5)) +
-    theme(text=element_text(size=20))
-  #theme(legend.title = element_blank())
-  return(p)
 }
 
 plot_keyword_tissue_vs_dataset <- function(
@@ -497,7 +1124,7 @@ plot_keyword_tissue_vs_dataset <- function(
   dt <- dcast.data.table(
     ora_keyword_summary_unique[
       TYPE == category &
-      VALUE == keyword],
+        VALUE == keyword],
     ID ~ DATASET,
     value.var = "REGULATION",
     fun.aggregate = paste0,
@@ -538,9 +1165,17 @@ plot_keyword_tissue_vs_dataset <- function(
     "NO_DATA",
     REGULATION
   )]
-  p <- ggplot(res, aes(DATASET, TISSUE)) +
+  setnames(
+    res,
+    old = c("DATASET", "TISSUE", "REGULATION"),
+    new = c("Dataset", "Tissue", "Regulation")
+  )
+  res <- res[HAS_DATA == TRUE]
+  p <- ggplot(res) +
     geom_tile(aes(
-      fill = REGULATION,
+      Dataset,
+      Tissue,
+      fill = Regulation,
       width = 0.9,
       height = 0.9),
       colour = "black") +
@@ -552,29 +1187,25 @@ plot_keyword_tissue_vs_dataset <- function(
       "NOT_OR" = "gray", 
       "NO_DATA" = "transparent")) +
     ggtitle(paste0("Over-representation of ", keyword)) +
-    scale_y_discrete(limits = sort(unique(res$TISSUE), decreasing = TRUE)) +
+    scale_x_discrete(limits = c(
+      "TMS FACS (male)",
+      "TMS FACS (female)" ,
+      "TMS Droplet (male)",
+      "TMS Droplet (female)",
+      "Calico2019"
+    )) +
+    scale_y_discrete(limits = sort(unique(res$Tissue), decreasing = TRUE)) +
     theme(plot.title = element_text(hjust = 0.5)) +
     theme(text=element_text(size = 20)) +
     theme(axis.text=element_text(size = 18)) +
     xlab("Dataset") +
     ylab("Tissue")
-  return(p)
+  p <- plotly::ggplotly(
+    p,
+    source = "TCA_PLOT_KEYWORD_SUMMARY",
+    tooltip = c("Dataset", "Tissue", "Regulation")
+  )  %>% toWebGL()
 }
-
-plot_keyword_tissue_vs_dataset(
-  ORA_KEYWORD_SUMMARY_UNIQUE,
-  ORA_KEYWORD_TEMPLATE,
-  "GO Terms",
-  "extracellular matrix organization"
-)
-
-plot_keyword_tissue_vs_dataset(
-  ORA_KEYWORD_SUMMARY_UNIQUE,
-  ORA_KEYWORD_TEMPLATE,
-  "LRI",
-  "App:Lrp10"
-)
-
 
 ## Layout config ####
 
@@ -598,7 +1229,7 @@ shiny_layout <- list(
 
 shiny_text <- list(
   main_title = paste(
-    "A Murine ATLAS of Age-related Intercellular Communication Changes."
+    "A Murine ATLAS of Age-related Changes in Intercellular Communication (Alpha Version)."
   ),
   intro_title = paste(
     "Welcome to scAgeCom!"
@@ -792,25 +1423,32 @@ shiny_html_content <- list(
 
 scAgeCom_shiny_data <- list(
   LRI_mouse_curated = LRI_mouse_curated,
+  LRI_human_curated = LRI_human_curated,
   LRI_DATABASES = LRI_DATABASES,
   plot_lri_upset = plot_lri_upset,
+  build_LRI_display = build_LRI_display,
   ALL_TISSUES = ALL_TISSUES,
-  DATASETS_COMBINED = DATASETS_COMBINED,
+  ALL_CELLTYPES = ALL_CELLTYPES,
+  ALL_LRIs = ALL_LRIs,
+  CCI_table = CCI_table,
   subset_cci_table = subset_cci_table,
-  fix_cci_table_names = fix_cci_table_names,
-  cols_to_show_cci_table = cols_to_show_cci_table,
-  cols_numeric_cci_table = cols_numeric_cci_table,
-  cols_old_cci_table = cols_old_cci_table,
+  build_CCI_display = build_CCI_display,
+  ALL_ORA_CATEGORIES = ALL_ORA_CATEGORIES,
+  ALL_ORA_GO_ASPECTS = ALL_ORA_GO_ASPECTS,
+  ALL_ORA_TYPES = ALL_ORA_TYPES,
+  ORA_table = ORA_table,
+  subset_ORA_table = subset_ORA_table,
+  build_ORA_display = build_ORA_display,
+  build_ORA_visnetwork = build_ORA_visnetwork,
   ABBR_CELLTYPE = ABBR_CELLTYPE,
   ORA_KEYWORD_COUNTS = ORA_KEYWORD_COUNTS,
   ORA_KEYWORD_SUMMARY_UNIQUE = ORA_KEYWORD_SUMMARY_UNIQUE,
   ORA_KEYWORD_TEMPLATE = ORA_KEYWORD_TEMPLATE,
   TISSUE_COUNTS_SUMMARY = TISSUE_COUNTS_SUMMARY,
+  ALL_GLOBAL_CATEGORIES = ALL_GLOBAL_CATEGORIES,
+  build_GLOBAL_display = build_GLOBAL_display,
+  build_tissue_counts_display = build_tissue_counts_display,
   plot_keyword_tissue_vs_dataset = plot_keyword_tissue_vs_dataset,
-  show_DT = show_DT,
-  show_LRIFC = show_LRIFC,
-  show_scores = show_scores,
-  show_volcano = show_volcano,
   shiny_html_content = shiny_html_content
 )
 
