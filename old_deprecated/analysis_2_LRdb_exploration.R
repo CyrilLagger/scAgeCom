@@ -22,6 +22,12 @@ library(ComplexUpset)
 library(ggplot2)
 library(data.table)
 
+
+
+test <- LRI_mouse$LRI_curated
+
+test$
+
 ## Analysis data path ####
 path_directory_analysis <- "../data_scAgeCom/analysis/"
 

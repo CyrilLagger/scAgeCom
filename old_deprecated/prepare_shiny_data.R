@@ -8,143 +8,6 @@ library(latex2exp)
 library(ggplot2)
 library(plotly)
 
-## Loading and cleaning mouse LRI ####
-
-LRI_mouse_curated <- copy(scDiffCom::LRI_mouse$LRI_curated)
-LRI_mouse_curated[, SOURCE := gsub("SCT:SingleCellSignalR|SCT:CellPhoneDB|SCT:DLRP", "", SOURCE)]
-LRI_mouse_curated[, SOURCE := gsub(";;", ";", SOURCE)]
-LRI_mouse_curated[, SOURCE := sub(";$", "", SOURCE)]
-LRI_mouse_curated[, SOURCE := sub("^;", "", SOURCE)]
-LRI_cols_to_keep <- c(
-  "LIGAND_1", "LIGAND_2",
-  "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
-  "DATABASE", "SOURCE"
-)
-LRI_mouse_curated <- LRI_mouse_curated[, LRI_cols_to_keep, with = FALSE]
-setnames(
-  LRI_mouse_curated,
-  old = LRI_cols_to_keep,
-  new = c(
-    "Ligand (1)", "Ligand (2)",
-    "Receptor (1)", "Receptor (2)", "Receptor (3)",
-    "Database of Origin", "Retrieved Sources"
-  )
-)
-
-LRI_DATABASES <- sort(
-  unique(
-    unlist(
-      strsplit(
-        LRI_mouse_curated$`Database of Origin`,
-        ";")
-    )
-  )
-)
-
-LRI_mouse_curated[, COMPLEX := !is.na(`Ligand (2)`) | !is.na(`Receptor (2)`)]
-LRI_mouse_curated[, c(LRI_DATABASES) := lapply(LRI_DATABASES, function(i) {
-  ifelse(grepl(i, `Database of Origin`), TRUE, FALSE)
-})]
-
-## Loading and cleaning human LRI ####
-
-LRI_human_curated <- copy(scDiffCom::LRI_human$LRI_curated)
-LRI_human_curated[, SOURCE := gsub("SCT:SingleCellSignalR|SCT:CellPhoneDB|SCT:DLRP", "", SOURCE)]
-LRI_human_curated[, SOURCE := gsub(";;", ";", SOURCE)]
-LRI_human_curated[, SOURCE := sub(";$", "", SOURCE)]
-LRI_human_curated[, SOURCE := sub("^;", "", SOURCE)]
-LRI_cols_to_keep <- c(
-  "LIGAND_1", "LIGAND_2",
-  "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
-  "DATABASE", "SOURCE"
-)
-LRI_human_curated <- LRI_human_curated[, LRI_cols_to_keep, with = FALSE]
-setnames(
-  LRI_human_curated,
-  old = LRI_cols_to_keep,
-  new = c(
-    "Ligand (1)", "Ligand (2)",
-    "Receptor (1)", "Receptor (2)", "Receptor (3)",
-    "Database of Origin", "Retrieved Sources"
-  )
-)
-
-LRI_DATABASES <- sort(
-  unique(
-    unlist(
-      strsplit(
-        LRI_human_curated$`Database of Origin`,
-        ";")
-    )
-  )
-)
-
-LRI_human_curated[, COMPLEX := !is.na(`Ligand (2)`) | !is.na(`Receptor (2)`)]
-LRI_human_curated[, c(LRI_DATABASES) := lapply(LRI_DATABASES, function(i) {
-  ifelse(grepl(i, `Database of Origin`), TRUE, FALSE)
-})]
-
-## LRI functions ####
-
-plot_lri_upset <- function(
-  LRI_table,
-  groups
-) {
-  p <- ComplexUpset::upset(
-    as.data.frame(LRI_table),
-    groups,
-    base_annotations = list(
-      'Intersection size' = intersection_size(
-        mapping = aes(fill = COMPLEX),
-        counts = TRUE,
-        bar_number_threshold = 100
-      )
-    ),
-    themes = upset_default_themes(text = element_text(size = 20)),
-    min_size = 35
-  ) +
-    ggtitle("LRI Overlap by Databases of Origin")
-  return(p)
-}
-
-build_LRI_display <- function(
-  LRI_table,
-  LRI_database
-) {
-  dt <- LRI_table[
-    apply(
-      sapply(
-        LRI_database,
-        function(i) {
-          grepl(i, `Database of Origin`)
-        }
-      ),
-      MARGIN = 1,
-      any
-    )
-  ]
-  DT::datatable(
-    data = dt[, 1:7],
-    options = list(
-      pageLength = 10,
-      columnDefs = list(
-        list(
-          targets = c(6,7),
-          render = htmlwidgets::JS(
-            "function(data, type, row, meta) {",
-            "return type === 'display' && data.length > 20 ?",
-            "'<span title=\"' + data + '\">' + data.substr(0, 20) + '...</span>' : data;",
-            "}")
-        )
-      )
-    ),
-    caption = tags$caption(
-      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
-      "Table of Ligand-Receptor Interactions"
-    )
-  )
-}
-
 ## Loading scDiffCom objects ####
 
 DATASETS_COMBINED <- readRDS(
@@ -685,8 +548,22 @@ ORA_table[, BH_P_VALUE_FLAT := signif(BH_P_VALUE_FLAT, 3)]
 
 ##
 
+ALL_ORA_CATEGORIES_SPECIFIC <- c(
+  "By GO/KEGG",
+  "By Genes",
+  "By Cell Types"
+)
+
+ALL_ORA_CATEGORIES_GLOBAL <- c(
+  "By GO/KEGG",
+  "By Genes",
+  "By Cell Type Families"
+)
+
 ALL_ORA_CATEGORIES <- c(
   "LRIs",
+  "Ligand Gene(s)",
+  "Receptor Gene(s)",
   "Cell Types",
   "GO Terms",
   "KEGG Pathways",
@@ -715,20 +592,24 @@ subset_ORA_table <- function(
       Tissue == tissue_choice
   ]
   category_keep <- c(
-    "KEGG_PWS",
-    "GO_TERMS",
     "LRI",
+    "LIGAND_COMPLEX",
+    "RECEPTOR_COMPLEX",
     "ER_CELLTYPES",
+    "GO_TERMS",
+    "KEGG_PWS",
     "ER_CELLFAMILIES"
     )
   dt <- dt[ORA_CATEGORY %in% category_keep]
   dt[data.table(
     category_old = category_keep,
     category_new = c(
-      "KEGG Pathways",
-      "GO Terms",
       "LRIs",
+      "Ligand Gene(s)",
+      "Receptor Gene(s)",
       "Cell Types",
+      "GO Terms",
+      "KEGG Pathways",
       "Cell Families"
     )
   ),
@@ -849,24 +730,66 @@ build_ORA_visnetwork <- function(
   CCI_table,
   ORA_table,
   tissue_choice,
-  dataset_choice
+  dataset_choice,
+  abbr_celltype
 ) {
   CCI_dt <- copy(CCI_table)
   setnames(
     CCI_dt,
-    old = c("Emitter Cell Type", "Receiver Cell Type"),
-    new = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE")
+    old = c("Emitter Cell Type", "Receiver Cell Type", "Age Regulation"),
+    new = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "REGULATION")
   )
   ora_table_ER <- ORA_table[
     Dataset == dataset_choice &
       Tissue == tissue_choice &
       ORA_CATEGORY == "ER_CELLTYPES"
   ]
+  cci_table_detected <- CCI_dt[
+    Dataset == dataset_choice &
+      Tissue == tissue_choice
+  ]
+  actual_celltypes <- union(
+    cci_table_detected[["EMITTER_CELLTYPE"]],
+    cci_table_detected[["RECEIVER_CELLTYPE"]]
+  )
+  abbreviation_table <- abbr_celltype[[dataset_choice]][
+    ORIGINAL_CELLTYPE %in% actual_celltypes
+  ]
+  if (!identical(
+    sort(actual_celltypes),
+    sort(abbreviation_table[["ORIGINAL_CELLTYPE"]])
+  )) {
+    stop(
+      paste0(
+        "No abbreviation will be used:",
+        " `abbreviation table` must contain",
+        " a column with the original cell-types")
+    )
+  } else if (sum(duplicated(abbreviation_table)) > 0) {
+    stop(
+      paste0(
+        "No abbreviation will be used:",
+        " `abbreviation table` must not contain duplicated rows"))
+  } else {
+    cci_table_detected[
+      abbreviation_table,
+      on = "EMITTER_CELLTYPE==ORIGINAL_CELLTYPE",
+      "EMITTER_CELLTYPE" := i.ABBR_CELLTYPE]
+    cci_table_detected[
+      abbreviation_table,
+      on = "RECEIVER_CELLTYPE==ORIGINAL_CELLTYPE",
+      "RECEIVER_CELLTYPE" := i.ABBR_CELLTYPE]
+    ora_table_ER[
+      abbreviation_table,
+      on = "EMITTER_CELLTYPE==ORIGINAL_CELLTYPE",
+      "EMITTER_CELLTYPE" := i.ABBR_CELLTYPE]
+    ora_table_ER[
+      abbreviation_table,
+      on = "RECEIVER_CELLTYPE==ORIGINAL_CELLTYPE",
+      "RECEIVER_CELLTYPE" := i.ABBR_CELLTYPE]
+  }
   scDiffCom:::interactive_from_igraph(
-    cci_table_detected = CCI_dt[
-      Dataset == dataset_choice &
-        Tissue == tissue_choice
-    ],
+    cci_table_detected = cci_table_detected,
     conds = c("YOUNG", "OLD"),
     ora_table_ER = ora_table_ER,
     ora_table_LR = ORA_table[
@@ -877,6 +800,35 @@ build_ORA_visnetwork <- function(
     network_type = "ORA_network",
     layout_type = "bipartite",
     object_name = tissue_choice
+  )
+}
+
+build_ORA_plot <- function(
+  ORA_table,
+  tissue_choice,
+  dataset_choice,
+  category_choice,
+  type_choice,
+  go_aspect_choice = "biological_process"
+) {
+  dt <- ORA_table[
+    Dataset == dataset_choice &
+      Tissue == tissue_choice &
+      ORA_CATEGORY == category_choice
+  ]
+  setnames(
+    dt,
+    "GO Level",
+    "LEVEL"
+  )
+  scDiffCom:::plot_ora(
+    ora_dt = dt,
+    category = category_choice,
+    regulation = type_choice,
+    max_terms_show = 20,
+    GO_aspect = go_aspect_choice,
+    OR_threshold = 1,
+    bh_p_value_threshold = 0.05
   )
 }
 
@@ -1014,9 +966,25 @@ ORA_KEYWORD_TEMPLATE[, HAS_DATA := ifelse(DATASET_TISSUE %in% helper_dt$DATASET_
 ORA_KEYWORD_SUMMARY <- readRDS("../data_scAgeCom/analysis/outputs_data/ora_keyword_summary.rds")
 ORA_KEYWORD_SUMMARY[
   data.table(
-    old_type = c("GO_TERMS", "KEGG_PWS", "LRI", "ER_CELLFAMILIES", "ER_CELLTYPES"),
-    new_type = c("GO Terms", "KEGG Pathways", "LRI", "ERI Family", "ERI")
-  ),
+    old_type =c(
+      "LRI",
+      "LIGAND_COMPLEX",
+      "RECEPTOR_COMPLEX",
+      "ER_CELLTYPES",
+      "GO_TERMS",
+      "KEGG_PWS",
+      "ER_CELLFAMILIES"
+    ),
+    new_type = c(
+      "LRI",
+      "Ligand Gene(s)",
+      "Receptor Gene(s)",
+      "ERI",
+      "GO Terms",
+      "KEGG Pathways",
+      "Cell Families"
+    )
+    ),
   on = c("TYPE==old_type"),
   TYPE := i.new_type
 ]
@@ -1051,13 +1019,21 @@ setnames(
 )
 
 ORA_KEYWORD_COUNTS[
-  data.table(
-    old_names = c("LRI", "GO_TERMS", "KEGG_PWS", "ER_CELLFAMILIES"),
-    new_names = c("LRI", "GO Terms", "KEGG Pathways", "Cell-Type Families")
-  ),
-  on = "TYPE==old_names",
-  TYPE := i.new_names
+  unique(
+    ORA_table[ORA_CATEGORY == "GO_TERMS", c("VALUE", "ASPECT", "GO Level")]
+    ),
+  on = "VALUE",
+  c("ASPECT", "GO Level") := mget(paste0("i.", c("ASPECT", "GO Level")))
 ]
+
+# ORA_KEYWORD_COUNTS[
+#   data.table(
+#     old_names = c("LRI", "GO_TERMS", "KEGG_PWS", "ER_CELLFAMILIES"),
+#     new_names = c("LRI", "GO Terms", "KEGG Pathways", "Cell-Type Families")
+#   ),
+#   on = "TYPE==old_names",
+#   TYPE := i.new_names
+# ]
 
 ORA_KEYWORD_SUMMARY_UNIQUE <- ORA_KEYWORD_SUMMARY[
   GENDER %in% c("male", "female") &
@@ -1080,6 +1056,8 @@ ORA_KEYWORD_SUMMARY_UNIQUE[
 
 ALL_GLOBAL_CATEGORIES <- c(
   "LRI",
+  "Ligand Gene(s)",
+  "Receptor Gene(s)",
   "GO Terms",
   "KEGG Pathways",
   "ERI Family"
@@ -1088,24 +1066,42 @@ ALL_GLOBAL_CATEGORIES <- c(
 build_GLOBAL_display <- function(
   ORA_KEYWORD_COUNTS,
   global_category,
-  global_type
+  global_type,
+  go_aspect = NULL
 ) {
   dt <- ORA_KEYWORD_COUNTS[
     TYPE == global_category &
       REGULATION == global_type
   ][order(-`Overall (union)`)]
   setnames(dt, old = "VALUE", new = global_category)
+  if (global_category == "GO Terms") {
+    temp_aspect <- ifelse(
+      go_aspect == "Biological Process",
+      "biological_process",
+      ifelse(
+        go_aspect == "Molecular Function",
+        "molecular_function",
+        "cellular_component"
+      )
+    )
+    dt <- dt[ASPECT == temp_aspect]
+    dt <- dt[, -c(1,3, 10)]
+  } else {
+    dt <- dt[, -c(1,3, 10, 11)]
+  }
   DT::datatable(
-    data = dt[, -c(1,3)],
+    data = dt,
     options =list(
       pageLength = 10
     ),
     caption = tags$caption(
       style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
       paste0(
-        "Summary over-representation for ",
+        "Number of tissues in which ",
+        global_category,
+        " are over-represented among ",
         global_type,
-        " by tissue and dataset."
+        " CCIs."
         )
     )
   )
@@ -1114,6 +1110,7 @@ build_GLOBAL_display <- function(
 plot_keyword_tissue_vs_dataset <- function(
   ora_keyword_summary_unique,
   ora_keyword_template,
+  ORA_table,
   category,
   keyword
 ) {
@@ -1124,7 +1121,8 @@ plot_keyword_tissue_vs_dataset <- function(
   dt <- dcast.data.table(
     ora_keyword_summary_unique[
       TYPE == category &
-        VALUE == keyword],
+        VALUE == keyword
+      ],
     ID ~ DATASET,
     value.var = "REGULATION",
     fun.aggregate = paste0,
@@ -1147,14 +1145,14 @@ plot_keyword_tissue_vs_dataset <- function(
       "UP:DOWN", "DOWN:UP",
       "UP:FLAT", "FLAT:UP",
       "DOWN:FLAT", "FLAT:DOWN",
-      "NOT_OR"
+      "NOT_OR", "UP:DOWN:FLAT"
     ),
     new_values = c(
       "UP", "DOWN", "FLAT",
       "UP:DOWN", "UP:DOWN",
       "UP", "UP",
       "DOWN", "DOWN",
-      "NOT_OR"
+      "NOT Over-represented", "UP:DOWN"
     )
   ),
   on = "REGULATION==old_values",
@@ -1171,6 +1169,48 @@ plot_keyword_tissue_vs_dataset <- function(
     new = c("Dataset", "Tissue", "Regulation")
   )
   res <- res[HAS_DATA == TRUE]
+  ora_dt <- copy(ORA_table)
+  ora_dt[
+    data.table(
+      old_type =c(
+        "LRI",
+        "LIGAND_COMPLEX",
+        "RECEPTOR_COMPLEX",
+        "ER_CELLTYPES",
+        "GO_TERMS",
+        "KEGG_PWS",
+        "ER_CELLFAMILIES"
+      ),
+      new_type = c(
+        "LRI",
+        "Ligand Gene(s)",
+        "Receptor Gene(s)",
+        "ERI",
+        "GO Terms",
+        "KEGG Pathways",
+        "Cell Families"
+      )
+    ),
+    on = c("ORA_CATEGORY==old_type"),
+    ORA_CATEGORY := i.new_type
+  ]
+  dt_check_data <- ora_dt[
+    ORA_CATEGORY == category &
+    VALUE == keyword
+  ][, c("Dataset", "Tissue")]
+  dt_check_data[, HAS_DATA_SPEC := TRUE]
+  res[
+    dt_check_data,
+    on = c("Dataset", "Tissue"),
+    HAS_DATA_SPEC := i.HAS_DATA_SPEC
+  ]
+  res[is.na(res)] <- FALSE
+  res[, Regulation := ifelse(
+    HAS_DATA_SPEC,
+    Regulation,
+    "NOT Detected"
+  ) ]
+  res$Dataset <- gsub(" ", "\n", res$Dataset)
   p <- ggplot(res) +
     geom_tile(aes(
       Dataset,
@@ -1184,27 +1224,29 @@ plot_keyword_tissue_vs_dataset <- function(
       "DOWN" = "blue",
       "FLAT" = "green",
       "UP:DOWN" = "yellow",
-      "NOT_OR" = "gray", 
+      "NOT Over-represented" = "gray", 
+      "NOT Detected" = "white",
       "NO_DATA" = "transparent")) +
     ggtitle(paste0("Over-representation of ", keyword)) +
     scale_x_discrete(limits = c(
-      "TMS FACS (male)",
-      "TMS FACS (female)" ,
-      "TMS Droplet (male)",
-      "TMS Droplet (female)",
+      "TMS\nFACS\n(male)",
+      "TMS\nFACS\n(female)" ,
+      "TMS\nDroplet\n(male)",
+      "TMS\nDroplet\n(female)",
       "Calico2019"
-    )) +
+    ),
+    guide = guide_axis(n.dodge = 2)) +
     scale_y_discrete(limits = sort(unique(res$Tissue), decreasing = TRUE)) +
     theme(plot.title = element_text(hjust = 0.5)) +
     theme(text=element_text(size = 20)) +
     theme(axis.text=element_text(size = 18)) +
     xlab("Dataset") +
     ylab("Tissue")
-  p <- plotly::ggplotly(
+  plotly::ggplotly(
     p,
     source = "TCA_PLOT_KEYWORD_SUMMARY",
     tooltip = c("Dataset", "Tissue", "Regulation")
-  )  %>% toWebGL()
+  )
 }
 
 ## Layout config ####
@@ -1234,7 +1276,7 @@ shiny_text <- list(
   intro_title = paste(
     "Welcome to scAgeCom!"
   ),
-  intro_overview_title = paste(
+  intro_method_title = paste(
     "Overview of the analysis"
   )
 )
@@ -1249,34 +1291,33 @@ shiny_html_content <- list(
   ),
   intro_overview = tags$div(
     style = shiny_layout$style_intro_text,
-    tags$h2(
-      shiny_text$intro_overview_title,
-      style = shiny_layout$color_theme
-    ),
     tags$p(
       paste(
-        "This project provides a comprehensive investigation",
-        "of age-related changes in mouse intercellular communication.",
-        "It combines scRNA-seq data and curated ligand-receptor",
-        "interactions with a novel analysis technique that",
-        "allows to statistically infere differentially expressed",
-        "cell-cell interaction patterns."
+        "This webtool offers the opportunity to explore how",
+        "intercellular communication changes with age in 23 mouse tissues.",
+        "It includes both tissue-specific results and results shared accross",
+        "severa organs."
       )
     ),
     tags$p(
-      "Link to the future paper:..."
-    ),
-    tags$h3(
-      "Team and Acknowledgement",
-      style = shiny_layout$color_theme
+      "The full methodology behing this analysis is described in our",
+      "(manuscript in preparation). The most important steps are highlighted",
+      "below and we also recommend to look at the Help and Glossary section",
+      "of the site to make the best use of it."
     )
   ),
-  intro_method = tags$div(
+  intro_method_title = tags$p(
+    div(
+      style = shiny_layout$style_intro_title,
+      shiny_text$intro_method_title
+    )
+  ),
+  intro_code_title = tags$h3(
+    "Code - scDiffCom",
+    style = shiny_layout$color_theme
+  ),
+  intro_code_text = tags$div(
     style = shiny_layout$style_intro_text,
-    tags$h3(
-      "Code - scDiffCom",
-      style = shiny_layout$color_theme
-    ),
     tags$p(
       paste(
         "Inspired by several analysis techniques from",
@@ -1314,12 +1355,12 @@ shiny_html_content <- list(
       )
     ),
   ),
-  intro_scrna_data = tags$div(
+  intro_scrna_title =  tags$h3(
+    "Single-cell Datasets",
+    style = shiny_layout$color_theme
+  ),
+  intro_scrna_text = tags$div(
     style = shiny_layout$style_intro_text,
-    tags$h3(
-      "Single-cell Datasets",
-      style = shiny_layout$color_theme
-    ),
     tags$p(
       paste(
         "We have leveraged transcritomics single-data",
@@ -1355,12 +1396,12 @@ shiny_html_content <- list(
       )
     )
   ),
-  intro_lri =   tags$div(
+  intro_lri_title = tags$h3(
+    "Ligand-receptor Databases",
+    style = shiny_layout$color_theme
+  ),
+  intro_lri_text =   tags$div(
     style = "width: 60%; margin:auto; font-size: 18px; text-align: justify;",
-    tags$h3(
-      "Ligand-receptor Databases",
-      style = shiny_layout$color_theme
-    ),
     tags$p(
       "We have compared and compiled curated ligand-receptor interactions from 8 previous studies:"
     ),
@@ -1414,8 +1455,19 @@ shiny_html_content <- list(
         tags$a(href= "https://www.biorxiv.org/content/10.1101/566182v1", "bioRxiv article.", target="_blank")
       )
     )
+  ),
+  intro_contact_title = tags$h3(
+    "Contact Information",
+    style = shiny_layout$color_theme
+  ),
+  intro_contact_text = tags$div(
+    style = shiny_layout$style_intro_text,
+    tags$p(
+      "Please contact ..."
+    )
   )
 )
+
 
 
 
@@ -1434,12 +1486,15 @@ scAgeCom_shiny_data <- list(
   subset_cci_table = subset_cci_table,
   build_CCI_display = build_CCI_display,
   ALL_ORA_CATEGORIES = ALL_ORA_CATEGORIES,
+  ALL_ORA_CATEGORIES_SPECIFIC = ALL_ORA_CATEGORIES_SPECIFIC,
+  ALL_ORA_CATEGORIES_GLOBAL = ALL_ORA_CATEGORIES_GLOBAL,
   ALL_ORA_GO_ASPECTS = ALL_ORA_GO_ASPECTS,
   ALL_ORA_TYPES = ALL_ORA_TYPES,
   ORA_table = ORA_table,
   subset_ORA_table = subset_ORA_table,
   build_ORA_display = build_ORA_display,
   build_ORA_visnetwork = build_ORA_visnetwork,
+  build_ORA_plot = build_ORA_plot,
   ABBR_CELLTYPE = ABBR_CELLTYPE,
   ORA_KEYWORD_COUNTS = ORA_KEYWORD_COUNTS,
   ORA_KEYWORD_SUMMARY_UNIQUE = ORA_KEYWORD_SUMMARY_UNIQUE,
