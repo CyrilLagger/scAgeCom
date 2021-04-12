@@ -21,7 +21,7 @@ library(ggplot2)
 
 ## Specify the directory with all scDiffCom results ####
 
-path_input_directory <- "../data_scAgeCom/scDiffCom_results_17_03_2021/"
+path_input_directory <- "../data_scAgeCom/scDiffCom_results_23_03_2021/"
 #path_input_directory <- "../data_scAgeCom/scdiffcom_results_final"
 path_output_directory <- "../data_scAgeCom/analysis/"
 
@@ -50,16 +50,14 @@ process_dataset <- function(
       res <- readRDS(paste0(dataset_path, "/scdiffcom_", tiss, ".rds"))
     }
   )
-  tissues[tissues == "BAT"] <- "Adipose_Tissue_(Brown)"
-  tissues[tissues == "GAT"] <- "Adipose_Tissue_(Gonadal)"
-  tissues[tissues == "MAT"] <- "Adipose_Tissue_(Mesenteric)"
-  tissues[tissues == "SCAT"] <- "Adipose_Tissue_(Subcutaneous)"
-  #tissues[tissues == "brain_combined"] <- "Brain"
+  tissues[tissues == "BAT"] <- "Adipose_Brown"
+  tissues[tissues == "GAT"] <- "Adipose_Gonadal"
+  tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
+  tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
   names(dataset) <- tissues
   dataset <- lapply(
     seq_along(dataset), 
     function (i) {
-      #names(dataset[[i]]@parameters)[names(dataset[[i]]@parameters) == "LRdb_species"] <- "LRI_species"
       dataset[[i]]@parameters$object_name <- tissues[[i]]
       dataset[[i]]
     }
@@ -92,10 +90,21 @@ process_dataset <- function(
     "NO"
   )
   ]
+  dt[, LIGAND_COMPLEX := gsub(":.*", "", LRI)]
+  dt[, RECEPTOR_COMPLEX := gsub(".*:", "", LRI)]
   dataset_combined@cci_table_detected <- dt
   dataset_combined <- RunORA(
     object = dataset_combined,
-    categories = c("ER_CELLTYPES", "LRI", "GO_TERMS", "KEGG_PWS", "ER_CELLFAMILIES", "GENAGE"),
+    categories = c(
+      "ER_CELLTYPES",
+      "LRI",
+      "GO_TERMS",
+      "KEGG_PWS",
+      "ER_CELLFAMILIES",
+      "GENAGE",
+      "LIGAND_COMPLEX",
+      "RECEPTOR_COMPLEX"
+      ),
     overwrite = TRUE,
   )
   return(dataset_combined)
@@ -111,22 +120,22 @@ names(DATASETS_PROCESSED) <- RESULT_NAMES
 
 ## Add extra information such as minimum number of cells in each CCI
 
-DATASETS_PROCESSED <- lapply(
-  DATASETS_PROCESSED,
-  function(i) {
-    dt <- i@cci_table_detected
-    dt[, NCELLS_MIN :=
-         pmin(
-           get(paste0("NCELLS_EMITTER_", i@parameters$seurat_condition_id$cond1_name)),
-           get(paste0("NCELLS_EMITTER_", i@parameters$seurat_condition_id$cond2_name)),
-           get(paste0("NCELLS_RECEIVER_", i@parameters$seurat_condition_id$cond1_name)),
-           get(paste0("NCELLS_RECEIVER_", i@parameters$seurat_condition_id$cond2_name))
-         )
-    ]
-    i@cci_table_detected <- dt
-    return(i)
-  }
-)
+# DATASETS_PROCESSED <- lapply(
+#   DATASETS_PROCESSED,
+#   function(i) {
+#     dt <- i@cci_table_detected
+#     dt[, NCELLS_MIN :=
+#          pmin(
+#            get(paste0("NCELLS_EMITTER_", i@parameters$seurat_condition_id$cond1_name)),
+#            get(paste0("NCELLS_EMITTER_", i@parameters$seurat_condition_id$cond2_name)),
+#            get(paste0("NCELLS_RECEIVER_", i@parameters$seurat_condition_id$cond1_name)),
+#            get(paste0("NCELLS_RECEIVER_", i@parameters$seurat_condition_id$cond2_name))
+#          )
+#     ]
+#     i@cci_table_detected <- dt
+#     return(i)
+#   }
+# )
 
 
 ## Tissues of interest ####
@@ -153,7 +162,7 @@ tissue_cci_counts <- rbindlist(
         value.var = "N",
         fill = 0
       )
-      dt[, TOTAL := DOWN + FLAT + UP + NON_SIGNIFICANT_CHANGE]
+      dt[, TOTAL := DOWN + FLAT + UP + NSC]
       dt[
         dataset@cci_table_detected[, uniqueN(EMITTER_CELLTYPE), by = "ID"],
         on = "ID",
@@ -245,6 +254,333 @@ tissues_of_interest <- sort(unique(unlist(lapply(
     unique(i@cci_table_detected$ID)
   }
 ))))
+
+## counts of ORA keywords (intra-tissue union) and gender ####
+
+get_all_ora <- function(
+  category,
+  regulation,
+  gender,
+  dataset
+) {
+  dt <- rbindlist(
+    lapply(
+      DATASETS_PROCESSED,
+      function(i) {
+        i@ora_table[[category]][
+          get(paste0("OR_", regulation)) >= 1 & 
+            get(paste0("BH_P_VALUE_", regulation)) <= 0.05, c("ID", "VALUE")
+        ]
+      }
+    ),
+    idcol = "DATASET"
+  )
+  dt <- dt[ID %in% tissues_of_interest]
+  dt[, GENDER := ifelse(grepl("female", DATASET), "female", "male")]
+  if (dataset != "either") {
+    dt <- dt[grepl(dataset, DATASET)]
+  }
+  if (gender == "female") {
+    dt <- dt[GENDER == "female"]
+  } else if (gender == "male") {
+    dt <- dt[GENDER == "male"]
+  } else if (gender == "both") {
+    dt <- unique(dt[, c("GENDER", "ID", "VALUE")])
+    dt <- dcast.data.table(
+      dt,
+      ID + VALUE ~ GENDER,
+      fun.aggregate = length
+    )
+    if ("female" %in% colnames(dt) & "male" %in% colnames(dt)) {
+      dt <- dt[female == 1 & male == 1, c("ID", "VALUE")]
+    } else {
+      dt <- NULL
+    }
+  }
+  if (!is.null(dt)) {
+    dt <- unique(dt[, c("ID", "VALUE")])
+  }
+  dt
+}
+
+ora_cat <- c(
+  "LRI",
+  "LIGAND_COMPLEX",
+  "RECEPTOR_COMPLEX",
+  "ER_CELLTYPES",
+  "GO_TERMS",
+  "KEGG_PWS",
+  "ER_CELLFAMILIES"
+)
+
+ora_reg <- c("UP", "DOWN", "FLAT")
+ora_gender <- c("male", "female", "either", "both")
+ora_dataset <- c("calico", "facs", "droplet", "either")
+
+ora_keyword_summary <- rbindlist(
+  sapply(
+    ora_cat,
+    function(cat) {
+      rbindlist(
+        sapply(
+          ora_reg,
+          function(reg) {
+            rbindlist(
+              sapply(
+                ora_gender, 
+                function(gender) {
+                  rbindlist(
+                    sapply(
+                      ora_dataset,
+                      function(dataset) {
+                        get_all_ora(cat, reg, gender, dataset)
+                      },
+                      USE.NAMES = TRUE,
+                      simplify = FALSE
+                    ),
+                    idcol = "DATASET"
+                  )
+                },
+                USE.NAMES = TRUE,
+                simplify = FALSE
+              ),
+              idcol = "GENDER"
+            )
+          },
+          USE.NAMES = TRUE,
+          simplify = FALSE
+        ),
+        idcol = "REGULATION"
+      )
+    },
+    USE.NAMES = TRUE,
+    simplify = FALSE
+  ),
+  idcol = "TYPE"
+)
+
+my_fun_aggregate <- function(
+  x
+) {
+  paste(sort(x), collapse = ":")
+}
+
+ora_keyword_counts <- ora_keyword_summary[, .N, by = c("TYPE", "REGULATION", "GENDER", "DATASET", "VALUE")]
+
+
+ora_keyword_counts_wide <- dcast.data.table(
+  ora_keyword_counts,
+  TYPE + VALUE + REGULATION ~ DATASET + GENDER,
+  value.var = "N",
+  fill = 0
+)
+
+ora_keyword_tissues <- dcast.data.table(
+  ora_keyword_summary,
+  TYPE + REGULATION + GENDER + DATASET + VALUE ~ .,
+  value.var = "ID",
+  fun.aggregate = my_fun_aggregate
+)
+setnames(ora_keyword_tissues, ".", "TISSUES")
+
+ora_keyword_counts[
+  ora_keyword_tissues,
+  on = c("TYPE", "REGULATION", "GENDER", "DATASET", "VALUE"),
+  TISSUES := i.TISSUES
+]
+
+ora_keyword_counts_wide <- dcast.data.table(
+  ora_keyword_counts,
+  TYPE + VALUE + REGULATION ~ DATASET + GENDER,
+  value.var = "N",
+  fill = 0
+)
+ora_keyword_counts_wide <- ora_keyword_counts_wide[
+  ,
+  c("TYPE", "VALUE", "REGULATION", "either_either", "facs_male", "facs_female",
+    "droplet_male", "droplet_female")
+]
+
+ora_keyword_counts_wide <- dcast.data.table(
+  ora_keyword_counts,
+  TYPE + VALUE  ~ DATASET + GENDER + REGULATION,
+  value.var = "N",
+  fill = 0
+)
+ora_keyword_counts_wide <- ora_keyword_counts_wide[
+  ,
+  c("TYPE", "VALUE", "either_either_UP", "either_either_DOWN")#, "facs_male", "facs_female",
+  #"droplet_male", "droplet_female")
+]
+
+get_tissue_vs_dataset_table <- function(
+  value
+) {
+  dt <- dcast.data.table(
+    ora_keyword_summary[
+      VALUE == value &
+        GENDER %in% c("male", "female") &
+        DATASET %in% c("facs", "droplet", "calico")],
+    ID ~ DATASET + GENDER,
+    value.var = "REGULATION",
+    fun.aggregate = paste0,
+    fill = "NOT_OVER-REPRESENTED",
+    collapse = ":"
+  )
+  #dt[dt == "UP:FLAT"] <- "UP"
+  dt <- melt.data.table(
+    dt, 
+    id.vars = "ID"
+  )
+  return(dt)
+  ggplot(dt, aes(variable, ID)) + geom_tile(aes(fill = value)) +
+    ggtitle(paste0("Over-representation of '", value, "'")) +
+    scale_y_discrete(limits = sort(unique(dt$ID), decreasing = TRUE))
+}
+
+get_tissue_vs_dataset_table("FoxO signaling pathway")
+
+dt_ora[, "ORA_TYPE" := ifelse(
+  OR_UP >= OR_MIN &
+    BH_P_VALUE_UP <= BH_MAX &
+    OR_DOWN >= OR_MIN &
+    BH_P_VALUE_DOWN <= BH_MAX,
+  "DIFF",
+  ifelse(
+    OR_UP >= OR_MIN & BH_P_VALUE_UP <= BH_MAX,
+    "UP",
+    ifelse(
+      OR_DOWN >= OR_MIN & BH_P_VALUE_DOWN <= BH_MAX,
+      "DOWN",
+      ifelse(
+        OR_FLAT >= OR_MIN & BH_P_VALUE_FLAT <= BH_MAX,
+        "ROBUST",
+        "NONE"
+      )
+    )
+  )
+)]
+
+ora_keyword_summary[
+  VALUE == "immune response" &
+    GENDER %in% c("male", "female") &
+    DATASET %in% c("facs", "droplet", "calico")]
+
+test <- ora_keyword_counts_wide[either_either_UP > 4 & either_either_DOWN > 4]
+
+tissues_pairwise <- sapply(
+  tissues_of_interest,
+  function(tiss1) {
+    sapply(
+      tissues_of_interest,
+      function(tiss2) {
+        length(ora_keyword_summary[
+          TYPE == "LRI" &
+            REGULATION == "UP" &
+            GENDER == "either" &
+            DATASET == "either" &
+            ID %in% c(tiss1, tiss2)
+        ][duplicated(VALUE)]$VALUE
+        )
+      }
+    )
+  }
+)
+
+data_upset_test <- dcast.data.table(
+  ora_keyword_summary[
+    TYPE == "LRI" &
+      REGULATION == "UP" &
+      GENDER == "either" &
+      DATASET == "either"
+  ],
+  VALUE ~ ID,
+  fun.aggregate = length,
+  value.var = "ID"
+)
+
+my_fun_aggregate2 <- function(
+  x
+) {
+  temp <- as.numeric(tissues_of_interest %in% x)
+  paste0("N", sum(temp), ":" , paste(temp, collapse = ":"))
+}
+
+data_upset_test2 <- dcast.data.table(
+  ora_keyword_summary[
+    TYPE == "LRI" &
+      REGULATION == "UP" &
+      GENDER == "either" &
+      DATASET == "either"
+  ][, c("VALUE", "ID")],
+  VALUE ~ .,
+  fun.aggregate = my_fun_aggregate2,
+  value.var = "ID"
+)
+
+test <- data_upset_test2[, .N, by = "."][order(-N)]
+
+data_upset_test2[. == test[grepl("N11", .) & N > 10]$.]$VALUE
+
+ComplexUpset::upset(
+  as.data.frame(data_upset_test),
+  colnames(data_upset_test)[-1],
+  min_size = 2,
+  min_degree = 3
+)
+
+test <- ora_keyword_counts[
+  TYPE == "ER_CELLFAMILIES" &
+    GENDER == "either" &
+    DATASET == "either"
+]
+
+test2 <- dcast.data.table(
+  test,
+  VALUE ~ REGULATION,
+  value.var = "N",
+  fill = 0
+)
+
+get_LRI_info <- function(
+  LRI
+) {
+  rbindlist(
+    lapply(
+      DATASETS_PROCESSED,
+      function(dataset) {
+        dataset@cci_table_detected[
+          LRI == LRI, c("ID", "REGULATION", "ER_CELLTYPES", "ER_CELLFAMILIES")
+        ]
+      }
+    ),
+    idcol = "DATASET"
+  )
+}
+
+test <- get_LRI_info("Bsg:Itgb2")
+
+test2 <- dcast.data.table(
+  test[, .N, by = c("REGULATION", "ER_CELLFAMILIES")][order(-N)],
+  ER_CELLFAMILIES ~ REGULATION,
+  value.var = "N",
+  fill = 0
+)
+test2[, TOTAL := DOWN + FLAT + UP + NSC ]
+
+test3 <- ora_keyword_counts[
+  TYPE == "GO_TERMS" &
+    GENDER == "either" &
+    DATASET == "either"
+]
+
+test4 <- test3[
+  VALUE %in% go_names[names(go_names) %in% exclude_descendants(
+    ontoGO,
+    names(go_names[go_names %in% c("molecular_function", "cellular_component")]),
+    names(go_names[go_names %in% VALUE])
+  )]
+]
 
 ## Visualize general results and behaviour ####
 
@@ -485,323 +821,7 @@ plot_upsets_CFAM_DOWN <- cowplot::plot_grid(
   labels = names(upsets_CFAM_DOWN)
 )
 
-## counts of ORA keywords (intra-tissue union) and gender ####
 
-get_all_ora <- function(
-  category,
-  regulation,
-  gender,
-  dataset
-) {
-  dt <- rbindlist(
-    lapply(
-      DATASETS_PROCESSED,
-      function(i) {
-        i@ora_table[[category]][
-          get(paste0("OR_", regulation)) >= 1 & 
-            get(paste0("BH_P_VALUE_", regulation)) <= 0.05, c("ID", "VALUE")
-        ]
-      }
-    ),
-    idcol = "DATASET"
-  )
-  dt <- dt[ID %in% tissues_of_interest]
-  dt[, GENDER := ifelse(grepl("female", DATASET), "female", "male")]
-  if (dataset != "either") {
-    dt <- dt[grepl(dataset, DATASET)]
-  }
-  if (gender == "female") {
-    dt <- dt[GENDER == "female"]
-  } else if (gender == "male") {
-    dt <- dt[GENDER == "male"]
-  } else if (gender == "both") {
-    dt <- unique(dt[, c("GENDER", "ID", "VALUE")])
-    dt <- dcast.data.table(
-      dt,
-      ID + VALUE ~ GENDER,
-      fun.aggregate = length
-    )
-    if ("female" %in% colnames(dt) & "male" %in% colnames(dt)) {
-      dt <- dt[female == 1 & male == 1, c("ID", "VALUE")]
-    } else {
-      dt <- NULL
-    }
-  }
-  if (!is.null(dt)) {
-    dt <- unique(dt[, c("ID", "VALUE")])
-  }
-  dt
-}
-
-ora_cat <- c("GO_TERMS", "KEGG_PWS", "LRI", "ER_CELLFAMILIES", "ER_CELLTYPES")
-ora_reg <- c("UP", "DOWN", "FLAT")
-ora_gender <- c("male", "female", "either", "both")
-ora_dataset <- c("calico", "facs", "droplet", "either")
-
-ora_keyword_summary <- rbindlist(
-  sapply(
-    ora_cat,
-    function(cat) {
-      rbindlist(
-        sapply(
-          ora_reg,
-          function(reg) {
-            rbindlist(
-              sapply(
-                ora_gender, 
-                function(gender) {
-                  rbindlist(
-                    sapply(
-                      ora_dataset,
-                      function(dataset) {
-                        get_all_ora(cat, reg, gender, dataset)
-                      },
-                      USE.NAMES = TRUE,
-                      simplify = FALSE
-                    ),
-                    idcol = "DATASET"
-                  )
-                },
-                USE.NAMES = TRUE,
-                simplify = FALSE
-              ),
-              idcol = "GENDER"
-            )
-          },
-          USE.NAMES = TRUE,
-          simplify = FALSE
-        ),
-        idcol = "REGULATION"
-      )
-    },
-    USE.NAMES = TRUE,
-    simplify = FALSE
-  ),
-  idcol = "TYPE"
-)
-
-my_fun_aggregate <- function(
-  x
-) {
-  paste(sort(x), collapse = ":")
-}
-
-ora_keyword_counts <- ora_keyword_summary[, .N, by = c("TYPE", "REGULATION", "GENDER", "DATASET", "VALUE")]
-
-
-ora_keyword_counts_wide <- dcast.data.table(
-  ora_keyword_counts,
-  TYPE + VALUE + REGULATION ~ DATASET + GENDER,
-  value.var = "N",
-  fill = 0
-)
-
-ora_keyword_tissues <- dcast.data.table(
-  ora_keyword_summary,
-  TYPE + REGULATION + GENDER + DATASET + VALUE ~ .,
-  value.var = "ID",
-  fun.aggregate = my_fun_aggregate
-)
-setnames(ora_keyword_tissues, ".", "TISSUES")
-
-ora_keyword_counts[
-  ora_keyword_tissues,
-  on = c("TYPE", "REGULATION", "GENDER", "DATASET", "VALUE"),
-  TISSUES := i.TISSUES
-]
-
-ora_keyword_counts_wide <- dcast.data.table(
-  ora_keyword_counts,
-  TYPE + VALUE + REGULATION ~ DATASET + GENDER,
-  value.var = "N",
-  fill = 0
-)
-ora_keyword_counts_wide <- ora_keyword_counts_wide[
-  ,
-  c("TYPE", "VALUE", "REGULATION", "either_either", "facs_male", "facs_female",
-  "droplet_male", "droplet_female")
-]
-
-ora_keyword_counts_wide <- dcast.data.table(
-  ora_keyword_counts,
-  TYPE + VALUE  ~ DATASET + GENDER + REGULATION,
-  value.var = "N",
-  fill = 0
-)
-ora_keyword_counts_wide <- ora_keyword_counts_wide[
-  ,
-  c("TYPE", "VALUE", "either_either_UP", "either_either_DOWN")#, "facs_male", "facs_female",
-    #"droplet_male", "droplet_female")
-]
-
-get_tissue_vs_dataset_table <- function(
-  value
-) {
-  dt <- dcast.data.table(
-    ora_keyword_summary[
-      VALUE == value &
-        GENDER %in% c("male", "female") &
-        DATASET %in% c("facs", "droplet", "calico")],
-    ID ~ DATASET + GENDER,
-    value.var = "REGULATION",
-    fun.aggregate = paste0,
-    fill = "NOT_OVER-REPRESENTED",
-    collapse = ":"
-  )
-  #dt[dt == "UP:FLAT"] <- "UP"
-  dt <- melt.data.table(
-    dt, 
-    id.vars = "ID"
-  )
-  return(dt)
-  ggplot(dt, aes(variable, ID)) + geom_tile(aes(fill = value)) +
-    ggtitle(paste0("Over-representation of '", value, "'")) +
-    scale_y_discrete(limits = sort(unique(dt$ID), decreasing = TRUE))
-}
-
-get_tissue_vs_dataset_table("FoxO signaling pathway")
-
-dt_ora[, "ORA_TYPE" := ifelse(
-  OR_UP >= OR_MIN &
-    BH_P_VALUE_UP <= BH_MAX &
-    OR_DOWN >= OR_MIN &
-    BH_P_VALUE_DOWN <= BH_MAX,
-  "DIFF",
-  ifelse(
-    OR_UP >= OR_MIN & BH_P_VALUE_UP <= BH_MAX,
-    "UP",
-    ifelse(
-      OR_DOWN >= OR_MIN & BH_P_VALUE_DOWN <= BH_MAX,
-      "DOWN",
-      ifelse(
-        OR_FLAT >= OR_MIN & BH_P_VALUE_FLAT <= BH_MAX,
-        "ROBUST",
-        "NONE"
-      )
-    )
-  )
-)]
-
-ora_keyword_summary[
-  VALUE == "immune response" &
-    GENDER %in% c("male", "female") &
-    DATASET %in% c("facs", "droplet", "calico")]
-
-test <- ora_keyword_counts_wide[either_either_UP > 4 & either_either_DOWN > 4]
-
-tissues_pairwise <- sapply(
-  tissues_of_interest,
-  function(tiss1) {
-    sapply(
-      tissues_of_interest,
-      function(tiss2) {
-        length(ora_keyword_summary[
-          TYPE == "LRI" &
-            REGULATION == "UP" &
-            GENDER == "either" &
-            DATASET == "either" &
-            ID %in% c(tiss1, tiss2)
-        ][duplicated(VALUE)]$VALUE
-        )
-      }
-    )
-  }
-)
-
-data_upset_test <- dcast.data.table(
-  ora_keyword_summary[
-    TYPE == "LRI" &
-      REGULATION == "UP" &
-      GENDER == "either" &
-      DATASET == "either"
-  ],
-  VALUE ~ ID,
-  fun.aggregate = length,
-  value.var = "ID"
-)
-
-my_fun_aggregate2 <- function(
-  x
-) {
-  temp <- as.numeric(tissues_of_interest %in% x)
-  paste0("N", sum(temp), ":" , paste(temp, collapse = ":"))
-}
-
-data_upset_test2 <- dcast.data.table(
-  ora_keyword_summary[
-    TYPE == "LRI" &
-      REGULATION == "UP" &
-      GENDER == "either" &
-      DATASET == "either"
-  ][, c("VALUE", "ID")],
-  VALUE ~ .,
-  fun.aggregate = my_fun_aggregate2,
-  value.var = "ID"
-)
-
-test <- data_upset_test2[, .N, by = "."][order(-N)]
-
-data_upset_test2[. == test[grepl("N11", .) & N > 10]$.]$VALUE
-
-ComplexUpset::upset(
-  as.data.frame(data_upset_test),
-  colnames(data_upset_test)[-1],
-  min_size = 2,
-  min_degree = 3
-)
-
-test <- ora_keyword_counts[
-  TYPE == "ER_CELLFAMILIES" &
-    GENDER == "either" &
-    DATASET == "either"
-]
-
-test2 <- dcast.data.table(
-  test,
-  VALUE ~ REGULATION,
-  value.var = "N",
-  fill = 0
-)
-
-get_LRI_info <- function(
-  LRI
-) {
-  rbindlist(
-    lapply(
-      DATASETS_PROCESSED,
-      function(dataset) {
-        dataset@cci_table_detected[
-          LRI == LRI, c("ID", "REGULATION", "ER_CELLTYPES", "ER_CELLFAMILIES")
-        ]
-      }
-    ),
-    idcol = "DATASET"
-  )
-}
-
-test <- get_LRI_info("Bsg:Itgb2")
-
-test2 <- dcast.data.table(
-  test[, .N, by = c("REGULATION", "ER_CELLFAMILIES")][order(-N)],
-  ER_CELLFAMILIES ~ REGULATION,
-  value.var = "N",
-  fill = 0
-)
-test2[, TOTAL := DOWN + FLAT + UP + NON_SIGNIFICANT_CHANGE ]
-
-test3 <- ora_keyword_counts[
-  TYPE == "GO_TERMS" &
-    GENDER == "either" &
-    DATASET == "either"
-]
-
-test4 <- test3[
-  VALUE %in% go_names[names(go_names) %in% exclude_descendants(
-    ontoGO,
-    names(go_names[go_names %in% c("molecular_function", "cellular_component")]),
-    names(go_names[go_names %in% VALUE])
-  )]
-]
 
 
 
