@@ -223,23 +223,3 @@ for (analysis in analysis_list) {
     future::plan(sequential)
   }
 }
-
-
-
-
-
-
-
-
-
-min_cells <- 5
-is_log <- FALSE
-n_iter <- 10000
-
-normalization <- "size_factor"
-
-
-run_test <- FALSE
-
-
-
