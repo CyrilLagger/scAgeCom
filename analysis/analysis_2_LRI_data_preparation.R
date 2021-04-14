@@ -87,7 +87,7 @@ plot_lri_upset <- function(
     themes = upset_default_themes(text = element_text(size = 20)),
     min_size = min_size
   ) +
-    ggtitle("LRI Overlap by Databases of Origin")
+    ggtitle("Number of Ligand-Receptor Interactions")
   return(p)
 }
 
@@ -100,7 +100,7 @@ build_LRI_display <- function(
       sapply(
         LRI_database,
         function(i) {
-          grepl(i, `Database of Origin`)
+          grepl(i, `Database(s) of Origin`)
         }
       ),
       MARGIN = 1,
@@ -124,7 +124,7 @@ build_LRI_display <- function(
     ),
     caption = tags$caption(
       style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
-      "Table of Ligand-Receptor Interactions"
+      "Table of Mouse Ligand-Receptor Interactions"
     )
   )
 }
@@ -137,4 +137,18 @@ LRI_mouse_upset <- plot_lri_upset(
   min_size = 40
 )
 LRI_mouse_upset
+
+## save all results ####
+
+data_2_LRI_data_preparation <- list(
+  LRI_mouse_curated = LRI_mouse_curated,
+  LRI_DATABASES = LRI_DATABASES,
+  build_LRI_display = build_LRI_display,
+  plot_lri_upset = plot_lri_upset
+)
+
+saveRDS(
+  data_2_LRI_data_preparation,
+  "../data_scAgeCom/analysis/outputs_data/data_2_LRI_data_preparation.rds"
+)
 
