@@ -54,8 +54,27 @@ seurat_objects <- list(
 
 ## Check dataset content ####
 
+seurat_md <- readRDS("../data_scAgeCom/analysis/inputs_data/analysis_1_data_seurat_md.rds")
+
+md_facs <- setDT(seurat_md$tms_facs)
+
+test <- dcast.data.table(
+  md_facs[
+    sex == "female",
+    .N,
+    by = c("tissue", "mouse.id", "age")
+  ][
+    ,
+    .N,
+    by = c("tissue", "age")
+  ],
+  tissue ~ age,
+  value.var = "N"
+)
+
 ## Prepare data for scAgeComShiny ####
 
 ## Prepare figures for manuscript ####
+
 
 
