@@ -112,6 +112,7 @@ build_LRI_display <- function(
     class = "display compact",
     options = list(
       pageLength = 10,
+      dom = '<"top"f>rt<"bottom"lip><"clear">',
       columnDefs = list(
         list(
           targets = c(6,7),
