@@ -31,7 +31,7 @@ dataset_paths <- list.dirs(scAgeCom_path, recursive = FALSE)
 dataset_paths
 
 dataset_names <- c(
-  "Calico2019",
+  "Calico2019 (male)",
   "TMS Droplet (female)",
   "TMS Droplet (male)",
   "TMS FACS (female)",
@@ -366,7 +366,7 @@ CCI_cols_informative_shiny <- c(
   "Emitter Cell Type",
   "Receiver Cell Type",
   "Log2 FC",
-  "Adj. P-value",
+  "Adj. p-value",
   "Age Regulation",
   "Young CCI Score",
   "Old CCI Score",
@@ -399,7 +399,7 @@ setorder(
   CCI_table,
   -`Age Regulation`,
   -`Log2 FC`,
-  `Adj. P-value`,
+  `Adj. p-value`,
   -`Old CCI Score`,
   -`Young CCI Score`
 )
@@ -433,17 +433,26 @@ setnames(
   colnames(TISSUE_COUNTS_SUMMARY),
   c(
     "Dataset", "Tissue",
-    "Down CCI", "Flat CCI", "NSC CCI", "Up CCI",
-    "Total CCI", "Total Cell Types"
+    "Down CCIs",
+    "Flat CCIs",
+    "NSC CCIs",
+    "UP CCIs",
+    "Total Cell-Cell Interactions",
+    "Total Cell Types"
   )
 )
 
 setcolorder(
   TISSUE_COUNTS_SUMMARY,
   c(
-    "Tissue", "Dataset", "Total Cell Types",
-    "Total CCI", "Flat CCI", "Down CCI", "Up CCI", 
-    "NSC CCI"
+    "Tissue",
+    "Dataset",
+    "Total Cell Types",
+    "Total Cell-Cell Interactions",
+    "Flat CCIs",
+    "Down CCIs",
+    "UP CCIs", 
+    "NSC CCIs"
   )
 )
 
@@ -546,7 +555,8 @@ build_CCI_display <- function(
     data = dt[, -c(9, 10)],
     class = "display compact",
     options =list(
-      pageLength = 10
+      pageLength = 10,
+      dom = '<"top"f>rt<"bottom"lip><"clear">'
     ),
     caption = tags$caption(
       style = paste0(
@@ -600,7 +610,7 @@ build_CCI_display <- function(
     type = "scatter",
     mode = "markers",
     x = ~`Log2 FC`,
-    y = ~-log10(`Adj. P-value` + 1E-4),
+    y = ~-log10(`Adj. p-value` + 1E-4),
     text = ~paste(
       "LRI: ",
       `Ligand-Receptor Interaction`, 
@@ -946,30 +956,30 @@ subset_ORA_table <- function(
     "LRI",
     "LIGAND_COMPLEX",
     "RECEPTOR_COMPLEX",
-    "ER_CELLTYPES",
-    "EMITTER_CELLTYPE",
-    "RECEIVER_CELLTYPE",
+    #"ER_CELLTYPES",
+    #"EMITTER_CELLTYPE",
+    #"RECEIVER_CELLTYPE",
     "GO_TERMS",
-    "KEGG_PWS",
-    "ER_CELLFAMILIES",
-    "EMITTER_CELLFAMILY",
-    "RECEIVER_CELLFAMILY"
+    "KEGG_PWS"#,
+    #"ER_CELLFAMILIES",
+    #"EMITTER_CELLFAMILY",
+    #"RECEIVER_CELLFAMILY"
   )
   dt <- dt[ORA_CATEGORY %in% category_keep]
   dt[data.table(
     category_old = category_keep,
     category_new = c(
-      "LRIs",
-      "Ligand Gene(s)",
-      "Receptor Gene(s)",
-      "ER Cell Types",
-      "Emitter Cell Types",
-      "Receiver Cell Types",
-      "GO Terms",
-      "KEGG Pathways",
-      "ER Cell Families",
-      "Emitter Cell Families",
-      "Receiver Cell Families"
+      "Ligand-Receptor Interaction",
+      "Ligand",
+      "Receptor",
+      #"ER Cell Types",
+      #"Emitter Cell Types",
+      #"Receiver Cell Types",
+      "GO Term",
+      "KEGG Pathway"#,
+      #"ER Cell Families",
+      #"Emitter Cell Families",
+      #"Receiver Cell Families"
     )
   ),
   on = c("ORA_CATEGORY==category_old"),
@@ -1001,15 +1011,19 @@ build_ORA_display <- function(
   type_choice
 ) {
   dt <- ORA_table[ORA_CATEGORY == category_choice]
-  if (category_choice == "GO Terms") {
+  if (category_choice == "GO Term") {
     dt <- dt[ASPECT == go_aspect_choice]
     level_str <- "GO Level"
     filter <- "top"
-    category_label <- paste0("GO ", go_aspect_choice)
+    if (go_aspect_choice == "Biological Process") {
+      category_label <- paste0("GO ", go_aspect_choice, "es")
+    } else {
+      category_label <- paste0("GO ", go_aspect_choice, "s")
+    }
   } else {
     level_str <- NULL
     filter <- "top"
-    category_label <- category_choice
+    category_label <- paste0(category_choice, "s")
   }
   if(type_choice == "UP") {
     cols_to_keep <- c(
@@ -1050,14 +1064,14 @@ build_ORA_display <- function(
       cols_to_keep,
       with = FALSE]
   }
-  if (category_choice == "GO Terms") {
+  if (category_choice == "GO Term") {
     dt[, `GO Level` := as.factor(`GO Level`)]
   }
   setnames(
     dt,
     old = colnames(dt),
     new = c(
-      category_label,
+      category_choice,
       "ORA Score",
       "Odds Ratio",
       "Adj. p-value",
@@ -1084,7 +1098,7 @@ build_ORA_display <- function(
         category_label,
         " over-represented among ",
         type_choice,
-        "-regulated CCIs"
+        "-regulated cell-cell interactions"
       )
     ),
     rownames = FALSE,
