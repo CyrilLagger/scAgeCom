@@ -137,17 +137,17 @@ ORA_KEYWORD_COUNTS[
       "RECEIVER_CELLFAMILY"
     ),
     new_category = c(
-      "LRIs",
-      "Ligand Gene(s)",
-      "Receptor Gene(s)",
-      "ER Cell Types",
-      "Emitter Cell Types",
-      "Receiver Cell Types",
-      "GO Terms",
-      "KEGG Pathways",
-      "ER Cell Families",
-      "Emitter Cell Families",
-      "Receiver Cell Families"
+      "Ligand-Receptor Interaction",
+      "Ligand",
+      "Receptor",
+      "Emitter-Receiver Cell Type",
+      "Emitter Cell Type",
+      "Receiver Cell Type",
+      "GO Term",
+      "KEGG Pathway",
+      "Emitter-Receiver Cell Type Family",
+      "Emitter Cell Type Family",
+      "Receiver Cell Type Family"
     )
   ),
   on = c("ORA_CATEGORY==old_category"),
@@ -165,7 +165,7 @@ setcolorder(
     "TMS FACS (female)",
     "TMS Droplet (male)",
     "TMS Droplet (female)",
-    "Calico2019"
+    "Calico2019 (male)"
   )
 )
 
@@ -233,37 +233,10 @@ ORA_KEYWORD_COUNTS[
 ]
 ORA_KEYWORD_COUNTS[
   ,
-  Calico2019 := factor(
-    paste0(Calico2019, "/3")
+  `Calico2019 (male)` := factor(
+    paste0(`Calico2019 (male)`, "/3")
   ),
 ]
-
-
-
-# ORA_KEYWORD_COUNTS[
-#   ,
-#   `TMS Droplet (male)`:= ifelse(
-#     `TMS Droplet (male)` < 10 & `TMS Droplet (male)` > 0 ,
-#     paste0("0", `TMS Droplet (male)`, "/6"),
-#     paste0(`TMS Droplet (male)`, "/6")
-#   ),
-# ]
-# ORA_KEYWORD_COUNTS[
-#   ,
-#   `TMS Droplet (female)` := ifelse(
-#     `TMS Droplet (female)` < 10 & `TMS Droplet (female)` > 0 ,
-#     paste0("0", `TMS Droplet (female)`, "/9"),
-#     paste0(`TMS Droplet (female)`, "/9")
-#   ),
-# ]
-# ORA_KEYWORD_COUNTS[
-#   ,
-#   Calico2019 := ifelse(
-#     Calico2019 < 10 & Calico2019 > 0 ,
-#     paste0("0", Calico2019, "/3"),
-#     paste0(Calico2019, "/3")
-#   ),
-# ]
 
 ## create utility functions for ORA_KEYWORD_COUNTS table on shiny ####
 
@@ -278,7 +251,7 @@ build_KEYWORD_COUNTS_display <- function(
       ORA_REGULATION == regulation
   ]
   setnames(dt, old = "VALUE", new = category)
-  if (category == "GO Terms") {
+  if (category == "GO Term") {
     temp_aspect <- ifelse(
       go_aspect == "Biological Process",
       "biological_process",
@@ -290,8 +263,18 @@ build_KEYWORD_COUNTS_display <- function(
     )
     dt <- dt[ASPECT == temp_aspect]
     dt <- dt[, -c(1,2,10)]
+    if (go_aspect == "Biological Process") {
+      category_label <- paste0("GO ", go_aspect, "es")
+    } else {
+      category_label <- paste0("GO ", go_aspect, "s")
+    }
   } else {
     dt <- dt[, -c(1,2,10,11)]
+    if(grepl("Family", category)){
+      category_label <- sub("Family", "Families", category)
+    } else {
+      category_label <- paste0(category, "s")
+    }
   }
   DT <- DT::datatable(
     data = dt,
@@ -303,18 +286,24 @@ build_KEYWORD_COUNTS_display <- function(
     class = "display compact",
     options =list(
       pageLength = 10,
+      dom = '<"top"f>rt<"bottom"lip><"clear">',
       columnDefs = list(
         list(width = '300px', targets = c(1))
       )
     ),
     caption = tags$caption(
-      style = 'caption-side: top; text-align: center; color:black; font-size:100% ;',
+      style = paste0(
+        "caption-side: top; ",
+        "text-align: center; ",
+        "color: black; ",
+        "font-size: 120%;"
+        ),
       paste0(
         "Number of tissues in which ",
-        category,
+        category_label,
         " are over-represented among ",
         regulation,
-        " CCIs."
+        "-regulated cell-cell interactions"
       )
     )
   )  %>%
@@ -322,7 +311,7 @@ build_KEYWORD_COUNTS_display <- function(
       colnames(dt)[-1],
       `text-align` = 'center'
     )
-  if (category == "GO Terms") {
+  if (category == "GO Term") {
     DT <- DT %>% DT::formatStyle(c(7), `border-right` = "solid 2px")
   }
   DT
@@ -393,17 +382,17 @@ ORA_KEYWORD_SUMMARY[
       "RECEIVER_CELLFAMILY"
     ),
     new_category = c(
-      "LRIs",
-      "Ligand Gene(s)",
-      "Receptor Gene(s)",
-      "ER Cell Types",
-      "Emitter Cell Types",
-      "Receiver Cell Types",
-      "GO Terms",
-      "KEGG Pathways",
-      "ER Cell Families",
-      "Emitter Cell Families",
-      "Receiver Cell Families"
+      "Ligand-Receptor Interaction",
+      "Ligand",
+      "Receptor",
+      "Emitter-Receiver Cell Type",
+      "Emitter Cell Type",
+      "Receiver Cell Type",
+      "GO Term",
+      "KEGG Pathway",
+      "Emitter-Receiver Cell Type Family",
+      "Emitter Cell Type Family",
+      "Receiver Cell Type Family"
     )
   ),
   on = c("ORA_CATEGORY==old_category"),
@@ -452,7 +441,7 @@ plot_KEYWORD_SUMMARY <- function(
     on = c("Tissue", "Dataset"),
     Regulation := i.ORA_REGULATION
   ]
-  dt$Dataset <- gsub(" ", "\n", dt$Dataset)
+  #dt$Dataset <- gsub(" ", "\n", dt$Dataset)
   dt[is.na(dt)] <- "Not Detected"
   p <- ggplot(dt) +
     geom_tile(
@@ -466,6 +455,7 @@ plot_KEYWORD_SUMMARY <- function(
       colour = "black"
     ) +
     scale_fill_manual(
+      name = NULL,
       values = c(
         "No Data" = "transparent",
         "Not Over-represented" = "white",
@@ -477,22 +467,29 @@ plot_KEYWORD_SUMMARY <- function(
       )
     ) +
     ggtitle(
-      substr(
+      stringr::str_trunc(
         paste0(
           "Over-representation of ",
           keyword
         ),
-        1,
-        50
+        50, 
+        "right"
       )
     ) +
     scale_x_discrete(
       limits = c(
+        "TMS FACS (male)",
+        "TMS FACS (female)" ,
+        "TMS Droplet (male)",
+        "TMS Droplet (female)",
+        "Calico2019 (male)"
+      ),
+      labels = c(
         "TMS\nFACS\n(male)",
-        "TMS\nFACS\n(female)" ,
+        "TMS\nFACS\n(female)",
         "TMS\nDroplet\n(male)",
         "TMS\nDroplet\n(female)",
-        "Calico2019"
+        "Calico2019\n(male)"
       ),
       guide = guide_axis(n.dodge = 2)
     ) +
@@ -504,20 +501,24 @@ plot_KEYWORD_SUMMARY <- function(
     ) +
     xlab("") +
     ylab("") +
-    theme(plot.title = element_text(hjust = 0.5)) +
-    theme(text=element_text(size = 12)) +
-    theme(axis.text=element_text(size = 12))
+    #theme(plot.title = element_text(hjust = 0.5)) +
+    theme(text=element_text(size = 10)) +
+    theme(axis.text=element_text(size = 10))
   plotly::ggplotly(
     p,
     source = "TCA_PLOT_KEYWORD_SUMMARY",
     tooltip = c("Dataset", "Tissue", "Regulation")
-  )
+  ) #%>% plotly::layout(
+  #  legend = list(
+  #    title = list(text = "")
+  #  ) 
+  # )
 }
 
 plot_KEYWORD_SUMMARY(
   ORA_KEYWORD_SUMMARY,
   ORA_KEYWORD_TEMPLATE,
-  "GO Terms",
+  "GO Term",
   "A band"
 )
 
@@ -529,19 +530,18 @@ ALL_ORA_CATEGORIES_GLOBAL <- c(
   "By Cell Type Families"
 )
 
-
 ALL_ORA_CATEGORIES_KEYWORD <- c(
-  "LRIs",
-  "Ligand Gene(s)",
-  "Receptor Gene(s)",
+  "Ligand-Receptor Interaction",
+  "Ligand",
+  "Receptor",
   #"ER Cell Types",
   #"Emitter Cell Types",
   #"Receiver Cell Types",
-  "GO Terms",
-  "KEGG Pathways",
-  "ER Cell Families",
-  "Emitter Cell Families",
-  "Receiver Cell Families"
+  "GO Term",
+  "KEGG Pathway",
+  "Emitter-Receiver Cell Type Family",
+  "Emitter Cell Type Family",
+  "Receiver Cell Type Family"
 )
 
 ## save all results ####
