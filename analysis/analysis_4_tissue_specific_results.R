@@ -246,8 +246,8 @@ CCI_table[
 CCI_table[
   ,
   LOG2FC_L := {
-    max_L <- max(.SD[is.finite(LOG2FC_L)][["LOG2FC_L"]])
-    min_L <- min(.SD[is.finite(LOG2FC_L)][["LOG2FC_L"]])
+    max_L <- ceiling(max(.SD[is.finite(LOG2FC_L)][["LOG2FC_L"]]))
+    min_L <- floor(min(.SD[is.finite(LOG2FC_L)][["LOG2FC_L"]]))
     max_L <- max(max_L, -min_L)
     min_L <- min(-max_L, min_L)
     ifelse(
@@ -288,6 +288,40 @@ CCI_table[
   )
 ]
 
+# add all GO names attached to each LRI 
+
+CCI_table[
+  dcast.data.table(
+    scDiffCom::LRI_mouse$LRI_curated_GO[, c(1, 3)],
+    LRI ~ .,
+    value.var = "GO_NAME",
+    fun.aggregate = paste0,
+    collapse = ";"
+  ),
+  on = "LRI",
+  GO_NAMES := i..
+][
+  ,
+  GO_NAMES := paste0(";", GO_NAMES, ";")
+]
+
+# add all KEGG names attached to each LRI 
+
+CCI_table[
+  dcast.data.table(
+    scDiffCom::LRI_mouse$LRI_curated_KEGG[, c(1, 3)],
+    LRI ~ .,
+    value.var = "KEGG_NAME",
+    fun.aggregate = paste0,
+    collapse = ";"
+  ),
+  on = "LRI",
+  KEGG_NAMES := i..
+][
+  ,
+  KEGG_NAMES := paste0(";", KEGG_NAMES, ";")
+]
+
 # round numeric values
 CCI_table[, CCI_SCORE_YOUNG := signif(CCI_SCORE_YOUNG, 4)]
 CCI_table[, CCI_SCORE_OLD := signif(CCI_SCORE_OLD, 4)]
@@ -321,7 +355,9 @@ CCI_cols_informative <- c(
   "LIGAND_2",
   "RECEPTOR_1",
   "RECEPTOR_2",
-  "RECEPTOR_3"
+  "RECEPTOR_3",
+  "GO_NAMES",
+  "KEGG_NAMES"
 )
 CCI_cols_informative_shiny <- c(
   "Dataset",
@@ -346,7 +382,9 @@ CCI_cols_informative_shiny <- c(
   "LIGAND_2",
   "RECEPTOR_1",
   "RECEPTOR_2",
-  "RECEPTOR_3"
+  "RECEPTOR_3",
+  "GO_NAMES",
+  "KEGG_NAMES"
 )
 CCI_table <- CCI_table[, CCI_cols_informative, with = FALSE]
 setnames(
@@ -366,7 +404,7 @@ setorder(
   -`Young CCI Score`
 )
 
-## Create a table of counts summary for shiny #####
+## create a table of counts summary for shiny #####
 
 TISSUE_COUNTS_SUMMARY <- dcast.data.table(
   CCI_table[
@@ -409,7 +447,7 @@ setcolorder(
   )
 )
 
-## create utility function to diplay tissue counts summary on shiny #####
+## create utility function to display tissue counts summary on shiny #####
 
 build_tissue_counts_display <- function(
   tissue_counts_summary
@@ -417,6 +455,7 @@ build_tissue_counts_display <- function(
   dt <- tissue_counts_summary[, -c(8)]
   DT::datatable(
     data = dt,
+    class = "display compact",
     options =list(
       pageLength = 10,
       dom = "t"
@@ -437,9 +476,12 @@ build_tissue_counts_display <- function(
         $(header[i]).attr('title', tips[i]);
         }"
     )
-  )
+  ) %>%
+    DT::formatStyle(
+      colnames(dt)[3:7],
+      `text-align` = 'center'
+    )
 }
-
 
 ## create utility functions for CCI table on shiny ####
 
@@ -451,55 +493,43 @@ subset_CCI_table <- function(
   receiver_choice = NULL,
   LRI_choice = NULL,
   GENE_choice = NULL,
+  GO_choice = NULL,
+  KEGG_choice = NULL,
   filter
 ) {
+  dt <- CCI_table[
+    Dataset == dataset_choice &
+      Tissue == tissue_choice
+  ]
   if (filter) {
-    if ('All LRIs' %in% LRI_choice) {
-      if ("All Genes" %in% GENE_choice) {
-        dt <- CCI_table[
-          Dataset == dataset_choice &
-            Tissue == tissue_choice &
-            `Emitter Cell Type` %in% emitter_choice &
-            `Receiver Cell Type` %in% receiver_choice
-        ]
-      } else {
-        dt <- CCI_table[
-          Dataset == dataset_choice &
-            Tissue == tissue_choice &
-            `Emitter Cell Type` %in% emitter_choice &
-            `Receiver Cell Type` %in% receiver_choice &
-            (LIGAND_1 %in% GENE_choice | LIGAND_2 %in% GENE_choice |
-               RECEPTOR_1 %in% GENE_choice | RECEPTOR_2 %in% GENE_choice |
-               RECEPTOR_3 %in% GENE_choice)
-        ]
-      }
-    } else {
-      if ("All Genes" %in% GENE_choice) {
-        dt <- CCI_table[
-          Dataset == dataset_choice &
-            Tissue == tissue_choice &
-            `Emitter Cell Type` %in% emitter_choice &
-            `Receiver Cell Type` %in% receiver_choice &
-            `Ligand-Receptor Interaction` %in% LRI_choice
-        ]
-      } else {
-        dt <- CCI_table[
-          Dataset == dataset_choice &
-            Tissue == tissue_choice &
-            `Emitter Cell Type` %in% emitter_choice &
-            `Receiver Cell Type` %in% receiver_choice &
-            `Ligand-Receptor Interaction` %in% LRI_choice &
-            (LIGAND_1 %in% GENE_choice | LIGAND_2 %in% GENE_choice |
-               RECEPTOR_1 %in% GENE_choice | RECEPTOR_2 %in% GENE_choice |
-               RECEPTOR_3 %in% GENE_choice)
-        ]
-      }
-    }
-  } else {
-    dt <- CCI_table[
-      Dataset == dataset_choice &
-        Tissue == tissue_choice
+    dt <- dt[
+      `Emitter Cell Type` %in% emitter_choice &
+        `Receiver Cell Type` %in% receiver_choice
     ]
+    if (!("All Genes" %in% GENE_choice)) {
+      dt <- dt[
+        (LIGAND_1 %in% GENE_choice | LIGAND_2 %in% GENE_choice |
+           RECEPTOR_1 %in% GENE_choice | RECEPTOR_2 %in% GENE_choice |
+           RECEPTOR_3 %in% GENE_choice)
+      ]
+    }
+    if (!('All LRIs' %in% LRI_choice)) {
+      dt <- dt[
+        `Ligand-Receptor Interaction` %in% LRI_choice
+      ]
+    }
+    if (!('All GO Terms' %in% GO_choice)) {
+      choice_go <- paste0(paste0(";", GO_choice, ";"), collapse = "|")
+      dt <- dt[
+        grepl(choice_go, GO_NAMES, fixed = FALSE)
+      ]
+    }
+    if (!('All KEGG Pathways' %in% KEGG_choice)) {
+      choice_kegg <- paste0(paste0(";", KEGG_choice, ";"), collapse = "|")
+      dt <- dt[
+        grepl(choice_kegg, KEGG_NAMES, fixed = FALSE)
+      ]
+    }
   }
   dt
 }
@@ -509,23 +539,29 @@ build_CCI_display <- function(
 ) {
   dt <- CCI_table[
     ,
-    -c(1,2,13,14,15,16,17,18,19,20,21,22,23)
+    #-c(1,2,13,14,15,16,17,18,19,20,21,22,23)
+    3:12
   ]
   CCI_DT <- DT::datatable(
     data = dt[, -c(9, 10)],
+    class = "display compact",
     options =list(
       pageLength = 10
     ),
     caption = tags$caption(
       style = paste0(
         'caption-side: top; text-align: center; ',
-        'color:black; font-size:150% ;'
+        'color:black; font-size:120% ;'
       ),
       "Table of Cell-Cell Interactions"
     ),
     rownames = rownames,
     extensions = c("Buttons")
-  )
+  ) %>%
+    DT::formatStyle(
+      colnames(dt[, -c(9, 10)])[4:8],
+      `text-align` = 'center'
+    )
   vline <- function(x = 0, color = "black") {
     list(
       type = "line", 
@@ -553,67 +589,24 @@ build_CCI_display <- function(
     levels = c("UP", "DOWN", "FLAT", "NSC")
   )
   m <- list(
-    l = 100,
-    r = 100,
-    b = 100,
-    t = 100,
-    pad = 8
+    l = 10,
+    r = 10,
+    b = 10,
+    t = 30,
+    pad = 10
   )
   CCI_VOLCANO_PLOT <- plotly::plot_ly(
     data = dt,
     type = "scatter",
     mode = "markers",
     x = ~`Log2 FC`,
-    y = ~-log10(`Adj. P-value`),
+    y = ~-log10(`Adj. P-value` + 1E-4),
     text = ~paste(
       "LRI: ",
       `Ligand-Receptor Interaction`, 
-      '$<br>Emitter:',
+      '<br>Emitter:',
       `Emitter Cell Type`,
-      '$<br>Receiver:',
-      `Receiver Cell Type`
-    ),
-    color = ~`Age Regulation`,
-    colors = setNames(
-      c("red", "blue", "green", "gray"),
-      c("UP", "DOWN", "FLAT", "NSC")
-    )#,
-    #width = 900,
-    #height = 500
-  ) %>% plotly::layout(
-    title = "Interactive Aging Volcano Plot",
-    font = list(size = 20),
-    xaxis = list(
-      title = "Log2(FC)",
-      titlefont = list(size = 18)
-    ),
-    yaxis = list(
-      title = "-Log10(Adj. p-value)",
-      titlefont = list(size = 18)
-    ),
-    shapes = list(
-      vline(log2(1.5)),
-      vline(-log2(1.5)),
-      hline(-log10(0.05))
-    ),
-    legend = list(
-      x = 100,
-      y = 0.5
-    ),
-    margin = m
-  )  %>% toWebGL()
-  CCI_SCORE_PLOT <- plotly::plot_ly(
-    data = dt,
-    type = "scatter",
-    mode = "markers",
-    x = ~log10(`Young CCI Score`),
-    y = ~log10(`Old CCI Score`),
-    text = ~paste(
-      "LRI: ",
-      `Ligand-Receptor Interaction`, 
-      '$<br>Emitter:',
-      `Emitter Cell Type`,
-      '$<br>Receiver:',
+      '<br>Receiver:',
       `Receiver Cell Type`
     ),
     color = ~`Age Regulation`,
@@ -622,19 +615,88 @@ build_CCI_display <- function(
       c("UP", "DOWN", "FLAT", "NSC")
     )
   ) %>% plotly::layout(
-    title = "Interactive Score Plot",
-    font = list(size = 20),
+    title = list(
+      text = "Interactive Aging Volcano Plot",
+      font = list(size = 16),
+      xanchor = "left",
+      x = 0.0
+    ),
     xaxis = list(
-      title = "Log10(Young CCI Score)",
-      titlefont = list(size = 18)
+      title = list(
+        text = "Log2(FC)",
+        font = list(size = 14)
+      )
     ),
     yaxis = list(
-      title = "Log10(Old CCI Score)",
-      titlefont = list(size = 18)
+      title = list(
+        text = "-Log10(Adj. p-value)",
+        font = list(size = 14)
+      )
+    ),
+    shapes = list(
+      vline(log2(1.5)),
+      vline(-log2(1.5)),
+      hline(-log10(0.05))
     ),
     legend = list(
-      x = 100,
-      y = 0.5
+      orientation = "h",
+      xanchor = "center",
+      x = 0.5,
+      y = 1.02
+    ),
+    margin = m
+  )  %>% toWebGL()
+  min_score <-  10^(floor(
+    log10(
+      min(
+        min(dt[`Young CCI Score` > 0]$`Young CCI Score`),
+        min(dt[`Old CCI Score` > 0]$`Old CCI Score`)
+      )
+    )
+  ))
+  CCI_SCORE_PLOT <- plotly::plot_ly(
+    data = dt,
+    type = "scatter",
+    mode = "markers",
+    x = ~log10(`Young CCI Score` + min_score),
+    y = ~log10(`Old CCI Score` + min_score),
+    text = ~paste(
+      "LRI: ",
+      `Ligand-Receptor Interaction`, 
+      '<br>Emitter:',
+      `Emitter Cell Type`,
+      '<br>Receiver:',
+      `Receiver Cell Type`
+    ),
+    color = ~`Age Regulation`,
+    colors = setNames(
+      c("red", "blue", "green", "gray"),
+      c("UP", "DOWN", "FLAT", "NSC")
+    )
+  ) %>% plotly::layout(
+    title = list(
+      text = "Interactive Score Plot",
+      font = list(size = 16),
+      xanchor = "left",
+      x = 0.0
+    ),
+    xaxis = list(
+      title = list(
+        text = "Log10(Young CCI Score)",
+        font = list(size = 14)
+      )
+    ),
+    yaxis = list(
+      title = list(
+        text = "Log10(Old CCI Score)",
+        font = list(size = 14)
+      )
+    ),
+    legend = list(
+      orientation = "h",
+      xanchor = "center",
+      x = 0.5,
+      y = 1.02
     ),
     margin = m
   ) %>% toWebGL()
@@ -647,9 +709,9 @@ build_CCI_display <- function(
     text = ~paste(
       "LRI: ",
       `Ligand-Receptor Interaction`, 
-      '$<br>Emitter:',
+      '<br>Emitter:',
       `Emitter Cell Type`,
-      '$<br>Receiver:',
+      '<br>Receiver:',
       `Receiver Cell Type`
     ),
     color = ~`Age Regulation`,
@@ -658,30 +720,40 @@ build_CCI_display <- function(
       c("UP", "DOWN", "FLAT", "NSC")
     )
   )  %>% plotly::layout(
-    title = "Interactive 'Ligand-FC vs Receptor-FC' Plot",
-    font = list(size = 20),
+    title = list(
+      text = "Interactive 'Ligand-FC vs Receptor-FC' Plot",
+      font = list(size = 16),
+      xanchor = "left",
+      x = 0.0
+    ),
     xaxis = list(
-      title = "Ligand Log2(FC)",
-      titlefont = list(size = 18)
+      title = list(
+        text = "Ligand Log2(FC)",
+        font = list(size = 14)
+      )
     ),
     yaxis = list(
-      title = "Receptor Log2(FC)",
-      titlefont = list(size = 18)
+      title = list(
+        text = "Receptor Log2(FC)",
+        font = list(size = 14)
+      )
     ),
     legend = list(
-      x = 100,
-      y = 0.5
+      orientation = "h",
+      xanchor = "center",
+      x = 0.5,
+      y = 1.02
     ),
     margin = m
-  )  %>% toWebGL()
-  CCI_PLOTS <- subplot(
-    CCI_VOLCANO_PLOT,
-    CCI_SCORE_PLOT,
-    CCI_LRFC_PLOT,
-    nrows = 3,
-    titleX = TRUE,
-    titleY = TRUE
-  )
+  ) # %>% toWebGL()
+  # CCI_PLOTS <- subplot(
+  #   CCI_VOLCANO_PLOT,
+  #   CCI_SCORE_PLOT,
+  #   CCI_LRFC_PLOT,
+  #   nrows = 3,
+  #   titleX = TRUE,
+  #   titleY = TRUE
+  # )
   list(
     CCI_DT = CCI_DT,
     CCI_VOLCANO_PLOT = CCI_VOLCANO_PLOT,
@@ -697,9 +769,7 @@ build_CCI_display <- function(
 #     tissue_choice = "Liver",
 #     filter = FALSE
 #   )
-# )$CCI_DT
-
-
+# )$CCI_LRFC_PLOT
 
 ## create a single ORA table for shiny ####
 
@@ -861,7 +931,7 @@ ORA_table[
   )
 ]
 
-## create utility functions for CCI table on shiny ####
+## create utility functions for ORA table on shiny ####
 
 subset_ORA_table <- function(
   ORA_table,
@@ -934,15 +1004,12 @@ build_ORA_display <- function(
   if (category_choice == "GO Terms") {
     dt <- dt[ASPECT == go_aspect_choice]
     level_str <- "GO Level"
-    options = list(
-      #columnDefs = list(list(targets = c(1,2,), searchable = FALSE)),
-      pageLength = 10
-    )
     filter <- "top"
+    category_label <- paste0("GO ", go_aspect_choice)
   } else {
     level_str <- NULL
-    options <-list(pageLength = 10)
-    filter <- "none"
+    filter <- "top"
+    category_label <- category_choice
   }
   if(type_choice == "UP") {
     cols_to_keep <- c(
@@ -990,7 +1057,7 @@ build_ORA_display <- function(
     dt,
     old = colnames(dt),
     new = c(
-      category_choice,
+      category_label,
       "ORA Score",
       "Odds Ratio",
       "Adj. p-value",
@@ -1000,19 +1067,34 @@ build_ORA_display <- function(
   setorder(dt, -`ORA Score`)
   DT::datatable(
     data = dt,
-    options = options,
+    options = list(
+      columnDefs = list(
+        list(width = '300px', targets = c(0))
+      ),
+      dom = '<"top"f>rt<"bottom"lip><"clear">'
+    ),
     caption = tags$caption(
-      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
+      style = paste0(
+        "caption-side: top; ",
+        "text-align: center; ",
+        "color: black; ",
+        "font-size: 120%;"
+      ),
       paste0(
-        category_choice,
+        category_label,
         " over-represented among ",
         type_choice,
         "-regulated CCIs"
       )
     ),
     rownames = FALSE,
-    filter = filter
-  )
+    filter = filter,
+    class = "display compact"
+  ) %>%
+    DT::formatStyle(
+      colnames(dt)[-1],
+      `text-align` = 'center'
+    )
 }
 
 build_ORA_visnetwork <- function(
@@ -1060,6 +1142,14 @@ build_ORA_visnetwork <- function(
         "No abbreviation will be used:",
         " `abbreviation table` must not contain duplicated rows"))
   } else {
+    cci_table_detected[
+      ,
+      "EMITTER_CELLTYPE_ORIGINAL" := EMITTER_CELLTYPE
+    ]
+    cci_table_detected[
+      ,
+      "RECEIVER_CELLTYPE_ORIGINAL" := RECEIVER_CELLTYPE
+    ]
     cci_table_detected[
       abbreviation_table,
       on = "EMITTER_CELLTYPE==ORIGINAL_CELLTYPE",
@@ -1110,7 +1200,7 @@ build_ORA_plot <- function(
     "GO Level",
     "LEVEL"
   )
-  scDiffCom:::plot_ora(
+  p <- scDiffCom:::plot_ora(
     ora_dt = dt,
     category = category_choice,
     regulation = type_choice,
@@ -1119,6 +1209,21 @@ build_ORA_plot <- function(
     OR_threshold = 1,
     bh_p_value_threshold = 0.05
   )
+  if (category_choice %in% c("GO_TERMS", "KEGG_PWS")) {
+    p <- p +
+      scale_y_discrete(
+        label = function(x) {
+          y <- gsub("\n", " ", x)
+          y <- ifelse(
+            nchar(y) <= 50,
+            y,
+            paste(substr(y, 1, 46), "...")
+          )
+          stringr::str_wrap(y, 30)
+        }
+      )
+  }
+  p
 }
 
 ## create vectors to access categories in shiny ####
@@ -1175,6 +1280,77 @@ ALL_GENES <- rbindlist(
   idcol = "Dataset"
 )
 
+names(ALL_TISSUES) <- ALL_TISSUES
+
+ALL_GO_TERMS <- rbindlist(
+  lapply(
+    ALL_TISSUES,
+    function(tiss) {
+      dt <- unique(CCI_table[Tissue == tiss, c("Dataset", "GO_NAMES")])
+      datasets <- sort(unique(dt$Dataset))
+      names(datasets) <- datasets
+      rbindlist(
+        lapply(
+          datasets,
+          function(dataset) {
+            dt2 <- dt[Dataset == dataset]
+            data.table(
+              GO_NAMES = sort(
+                unique(
+                  unlist(
+                    strsplit(
+                      dt2$GO_NAMES,
+                      ";"
+                    )
+                  )
+                )
+              )
+            )
+          }
+        ),
+        idcol = "Dataset"
+      )
+    }
+  ),
+  idcol = "Tissue"
+)
+ALL_GO_TERMS <- ALL_GO_TERMS[GO_NAMES != ""]
+
+ALL_KEGG_PWS <- rbindlist(
+  lapply(
+    ALL_TISSUES,
+    function(tiss) {
+      dt <- unique(CCI_table[Tissue == tiss, c("Dataset", "KEGG_NAMES")])
+      datasets <- sort(unique(dt$Dataset))
+      names(datasets) <- datasets
+      rbindlist(
+        lapply(
+          datasets,
+          function(dataset) {
+            dt2 <- dt[Dataset == dataset]
+            data.table(
+              KEGG_NAMES = sort(
+                unique(
+                  unlist(
+                    strsplit(
+                      dt2$KEGG_NAMES,
+                      ";"
+                    )
+                  )
+                )
+              )
+            )
+          }
+        ),
+        idcol = "Dataset"
+      )
+    }
+  ),
+  idcol = "Tissue"
+)
+ALL_KEGG_PWS <- ALL_KEGG_PWS[KEGG_NAMES != ""]
+ALL_KEGG_PWS <- ALL_KEGG_PWS[KEGG_NAMES != "NA"]
+
 ABBR_CELLTYPE <- lapply(
   dataset_names,
   function(dataset){
@@ -1200,20 +1376,6 @@ ALL_ORA_CATEGORIES_SPECIFIC <- c(
   "By Genes"
 )
 
-ALL_ORA_CATEGORIES <- c(
-  "LRIs",
-  "Ligand Gene(s)",
-  "Receptor Gene(s)",
-  "ER Cell Types",
-  "Emitter Cell Types",
-  "Receiver Cell Types",
-  "GO Terms",
-  "KEGG Pathways",
-  "ER Cell Families",
-  "Emitter Cell Families",
-  "Receiver Cell Families"
-)
-
 ALL_ORA_TYPES <- c(
   "UP", 
   "DOWN",
@@ -1237,7 +1399,8 @@ data_4_tissue_specific_results <- list(
   ALL_CELLTYPES = ALL_CELLTYPES,
   ALL_LRIs = ALL_LRIs,
   ALL_GENES = ALL_GENES,
-  ALL_ORA_CATEGORIES = ALL_ORA_CATEGORIES,
+  ALL_GO_TERMS = ALL_GO_TERMS,
+  ALL_KEGG_PWS = ALL_KEGG_PWS,
   ALL_ORA_CATEGORIES_SPECIFIC = ALL_ORA_CATEGORIES_SPECIFIC,
   ALL_ORA_GO_ASPECTS = ALL_ORA_GO_ASPECTS,
   ALL_ORA_TYPES = ALL_ORA_TYPES,
