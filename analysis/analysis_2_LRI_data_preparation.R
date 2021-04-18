@@ -84,7 +84,7 @@ plot_lri_upset <- function(
         bar_number_threshold = 100
       )
     ),
-    themes = upset_default_themes(text = element_text(size = 20)),
+    themes = upset_default_themes(text = element_text(size = 16)),
     min_size = min_size
   ) +
     ggtitle("Number of Ligand-Receptor Interactions")
@@ -109,6 +109,7 @@ build_LRI_display <- function(
   ]
   DT::datatable(
     data = dt[, 1:7],
+    class = "display compact",
     options = list(
       pageLength = 10,
       columnDefs = list(
@@ -123,7 +124,7 @@ build_LRI_display <- function(
       )
     ),
     caption = tags$caption(
-      style = 'caption-side: top; text-align: center; color:black; font-size:150% ;',
+      style = 'caption-side: top; text-align: center; color:black; font-size:130% ;',
       "Table of Mouse Ligand-Receptor Interactions"
     )
   )
