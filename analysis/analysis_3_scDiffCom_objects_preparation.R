@@ -193,6 +193,7 @@ for (analysis in analysis_list) {
     if (n_ct > 1) {
       message("Size-factor normalization:")
       seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
+      saveRDS(seurat_tiss[[]], file = paste0(output_dir, "/md_", tiss, ".rds"))
       future::plan(multicore, workers = 30)
       scdf_res <- scDiffCom::run_interaction_analysis(
         seurat_object = seurat_tiss,
