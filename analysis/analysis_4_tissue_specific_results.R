@@ -150,7 +150,10 @@ process_dataset <- function(
       print(EMITTER_dt)
       new_object <- RunORA(
         object = i,
-        categories = NULL,
+        categories = c(
+          "LRI", "LIGAND_COMPLEX", "RECEPTOR_COMPLEX", "ER_CELLTYPES",
+          "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "GO_TERMS", "KEGG_PWS"
+        ),
         extra_annotations = list(
           EMITTER_dt,
           RECEIVER_dt,
@@ -171,6 +174,8 @@ dataset_processed <- lapply(
   }
 )
 names(dataset_processed) <- dataset_names
+
+#saveRDS(dataset_processed, "../data_scAgeCom/analysis/outputs_data/scAgeCom_results_processed_infORA.rds")
 
 ## create a single CCI table for shiny ####
 
@@ -805,3 +810,66 @@ saveRDS(
   data_4_tissue_specific_results,
   "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
 )
+
+## Summary graph for the manuscript ####
+
+dataset_summary <- CCI_table[
+  ,
+  c("Dataset", "Tissue", "Emitter Cell Type")
+][
+  ,
+  uniqueN(`Emitter Cell Type`),
+  by = c("Dataset", "Tissue")
+]
+
+
+ggplot2::ggplot(
+  dataset_summary,
+  ggplot2::aes(
+    Dataset,
+    Tissue
+  )
+) +
+  ggplot2::geom_tile(
+    ggplot2::aes(
+      width = 0.9,
+      height = 0.9
+    ),
+    colour = "black",
+    alpha = 0.5
+  ) +
+  #ggplot2::theme_bw()+
+  ggplot2::geom_text(
+    ggplot2::aes(label = paste(V1, "Cell Types"))
+  ) +
+  ggplot2::ggtitle(
+    ""
+    #"Distribution of number of cell types and age comparison across datasets"
+  ) +
+  ggplot2::scale_x_discrete(
+    limits = c(
+      "TMS FACS (male)",
+      "TMS FACS (female)" ,
+      "TMS Droplet (male)",
+      "TMS Droplet (female)",
+      "Calico Droplet (male)"
+    ),
+    labels = c(
+      "TMS\nFACS\n(male)",
+      "TMS\nFACS\n(female)",
+      "TMS\nDroplet\n(male)",
+      "TMS\nDroplet\n(female)",
+      "Calico\nDroplet\n(male)"
+    )
+  ) +
+  ggplot2::scale_y_discrete(
+    limits = sort(
+      unique(test$Tissue),
+      decreasing = TRUE
+    )
+  ) +
+  ggplot2::xlab("") +
+  ggplot2::ylab("") +
+  ggplot2::theme(text=ggplot2::element_text(size = 10)) +
+  ggplot2::theme(axis.text=ggplot2::element_text(size = 10))
+
