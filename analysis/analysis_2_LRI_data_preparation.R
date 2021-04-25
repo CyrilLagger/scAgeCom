@@ -23,8 +23,6 @@
 
 library(scDiffCom)
 library(data.table)
-library(ggplot2)
-library(ComplexUpset)
 
 ## Prepare mouse LRI database for scAgeComShiny ####
 
@@ -67,86 +65,11 @@ LRI_mouse_curated[, c(LRI_DATABASES) := lapply(LRI_DATABASES, function(i) {
   ifelse(grepl(i, `Database(s) of Origin`), TRUE, FALSE)
 })]
 
-## Prepare LRI utility functions for scAgeComShiny ####
-
-plot_lri_upset <- function(
-  LRI_table,
-  groups,
-  min_size
-) {
-  p <- ComplexUpset::upset(
-    as.data.frame(LRI_table),
-    groups,
-    base_annotations = list(
-      'Intersection size' = intersection_size(
-        mapping = aes(fill = COMPLEX),
-        counts = TRUE,
-        bar_number_threshold = 100
-      )
-    ),
-    themes = upset_default_themes(text = element_text(size = 16)),
-    min_size = min_size
-  ) +
-    ggtitle("Number of Ligand-Receptor Interactions")
-  return(p)
-}
-
-build_LRI_display <- function(
-  LRI_table,
-  LRI_database
-) {
-  dt <- LRI_table[
-    apply(
-      sapply(
-        LRI_database,
-        function(i) {
-          grepl(i, `Database(s) of Origin`)
-        }
-      ),
-      MARGIN = 1,
-      any
-    )
-  ]
-  DT::datatable(
-    data = dt[, 1:7],
-    class = "display compact",
-    options = list(
-      pageLength = 10,
-      dom = '<"top"f>rt<"bottom"lip><"clear">',
-      columnDefs = list(
-        list(
-          targets = c(6,7),
-          render = htmlwidgets::JS(
-            "function(data, type, row, meta) {",
-            "return type === 'display' && data.length > 20 ?",
-            "'<span title=\"' + data + '\">' + data.substr(0, 20) + '...</span>' : data;",
-            "}")
-        )
-      )
-    ),
-    caption = tags$caption(
-      style = 'caption-side: top; text-align: center; color:black; font-size:130% ;',
-      "Table of Mouse Ligand-Receptor Interactions"
-    )
-  )
-}
-
-## Prepare LRI figures for manuscript ####
-
-LRI_mouse_upset <- plot_lri_upset(
-  LRI_table = LRI_mouse_curated,
-  groups = LRI_DATABASES,
-  min_size = 40
-)
-LRI_mouse_upset
-
 ## save all results ####
 
 data_2_LRI_data_preparation <- list(
   LRI_mouse_curated = LRI_mouse_curated,
-  LRI_DATABASES = LRI_DATABASES,
-  build_LRI_display = build_LRI_display,
-  plot_lri_upset = plot_lri_upset
+  LRI_DATABASES = LRI_DATABASES
 )
 
 saveRDS(
