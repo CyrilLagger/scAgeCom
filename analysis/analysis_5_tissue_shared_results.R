@@ -17,11 +17,8 @@
 
 library(scDiffCom)
 library(data.table)
-library(ggplot2)
-library(htmltools)
-library(plotly)
 
-## load tissue specific results
+## load tissue specific results ####
 
 data_4_tissue_specific_results <- readRDS(
   "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
@@ -165,7 +162,7 @@ setcolorder(
     "TMS FACS (female)",
     "TMS Droplet (male)",
     "TMS Droplet (female)",
-    "Calico2019 (male)"
+    "Calico Droplet (male)"
   )
 )
 
@@ -233,97 +230,10 @@ ORA_KEYWORD_COUNTS[
 ]
 ORA_KEYWORD_COUNTS[
   ,
-  `Calico2019 (male)` := factor(
-    paste0(`Calico2019 (male)`, "/3")
+  `Calico Droplet (male)` := factor(
+    paste0(`Calico Droplet (male)`, "/3")
   ),
 ]
-
-## create utility functions for ORA_KEYWORD_COUNTS table on shiny ####
-
-build_KEYWORD_COUNTS_display <- function(
-  ora_keyword_counts,
-  category,
-  regulation,
-  go_aspect = NULL
-) {
-  dt <- ora_keyword_counts[
-    ORA_CATEGORY == category &
-      ORA_REGULATION == regulation
-  ]
-  setnames(dt, old = "VALUE", new = category)
-  if (category == "GO Term") {
-    temp_aspect <- ifelse(
-      go_aspect == "Biological Process",
-      "biological_process",
-      ifelse(
-        go_aspect == "Molecular Function",
-        "molecular_function",
-        "cellular_component"
-      )
-    )
-    dt <- dt[ASPECT == temp_aspect]
-    dt <- dt[, -c(1,2,10)]
-    if (go_aspect == "Biological Process") {
-      category_label <- paste0("GO ", go_aspect, "es")
-    } else {
-      category_label <- paste0("GO ", go_aspect, "s")
-    }
-  } else {
-    dt <- dt[, -c(1,2,10,11)]
-    if(grepl("Family", category)){
-      category_label <- sub("Family", "Families", category)
-    } else {
-      category_label <- paste0(category, "s")
-    }
-  }
-  DT <- DT::datatable(
-    data = dt,
-    filter = list(
-      position ="top",
-      clear = FALSE,
-      plain = FALSE
-    ),
-    class = "display compact",
-    options =list(
-      pageLength = 10,
-      dom = '<"top"f>rt<"bottom"lip><"clear">',
-      columnDefs = list(
-        list(width = '300px', targets = c(1))
-      )
-    ),
-    caption = tags$caption(
-      style = paste0(
-        "caption-side: top; ",
-        "text-align: center; ",
-        "color: black; ",
-        "font-size: 120%;"
-        ),
-      paste0(
-        "Number of tissues in which ",
-        category_label,
-        " are over-represented among ",
-        regulation,
-        "-regulated cell-cell interactions"
-      )
-    )
-  )  %>%
-    DT::formatStyle(
-      colnames(dt)[-1],
-      `text-align` = 'center'
-    )
-  if (category == "GO Term") {
-    DT <- DT %>% DT::formatStyle(c(7), `border-right` = "solid 2px")
-  }
-  DT
-}
-
-# build_KEYWORD_COUNTS_display(
-#   ora_keyword_counts = ORA_KEYWORD_COUNTS,
-#   category = "LRIs",
-#   regulation = "DOWN",
-#   go_aspect = "Biological Process"
-# )
-
 
 ## Create a "tissue vs dataset" summary table for each OR keyword ####
 
@@ -419,109 +329,6 @@ ORA_KEYWORD_TEMPLATE <- unique(
   ]
 )
 
-## create utility functions for ORA_KEYWORD_SUMMARY table on shiny ####
-
-plot_KEYWORD_SUMMARY <- function(
-  ora_keyword_summary,
-  ora_keyword_template,
-  category,
-  keyword
-) {
-  dt <- copy(ora_keyword_summary)[
-    ORA_CATEGORY == category
-  ]
-  if (!(keyword %in% dt$VALUE)) {
-    stop("`keyword` not found")
-  }
-  dt <- dt[
-    VALUE == keyword
-  ]
-  dt <- copy(ora_keyword_template)[
-    dt,
-    on = c("Tissue", "Dataset"),
-    Regulation := i.ORA_REGULATION
-  ]
-  #dt$Dataset <- gsub(" ", "\n", dt$Dataset)
-  dt[is.na(dt)] <- "Not Detected"
-  p <- ggplot(dt) +
-    geom_tile(
-      aes(
-        Dataset,
-        Tissue,
-        fill = Regulation,
-        width = 0.9,
-        height = 0.9
-      ),
-      colour = "black"
-    ) +
-    scale_fill_manual(
-      name = NULL,
-      values = c(
-        "No Data" = "transparent",
-        "Not Over-represented" = "white",
-        "Not Detected" = "gray",
-        "UP" = "red",
-        "DOWN" = "blue",
-        "FLAT" = "green",
-        "UP:DOWN" = "yellow"
-      )
-    ) +
-    ggtitle(
-      stringr::str_trunc(
-        paste0(
-          "Over-representation of ",
-          keyword
-        ),
-        50, 
-        "right"
-      )
-    ) +
-    scale_x_discrete(
-      limits = c(
-        "TMS FACS (male)",
-        "TMS FACS (female)" ,
-        "TMS Droplet (male)",
-        "TMS Droplet (female)",
-        "Calico2019 (male)"
-      ),
-      labels = c(
-        "TMS\nFACS\n(male)",
-        "TMS\nFACS\n(female)",
-        "TMS\nDroplet\n(male)",
-        "TMS\nDroplet\n(female)",
-        "Calico2019\n(male)"
-      ),
-      guide = guide_axis(n.dodge = 2)
-    ) +
-    scale_y_discrete(
-      limits = sort(
-        unique(dt$Tissue),
-        decreasing = TRUE
-      )
-    ) +
-    xlab("") +
-    ylab("") +
-    #theme(plot.title = element_text(hjust = 0.5)) +
-    theme(text=element_text(size = 10)) +
-    theme(axis.text=element_text(size = 10))
-  plotly::ggplotly(
-    p,
-    source = "TCA_PLOT_KEYWORD_SUMMARY",
-    tooltip = c("Dataset", "Tissue", "Regulation")
-  ) #%>% plotly::layout(
-  #  legend = list(
-  #    title = list(text = "")
-  #  ) 
-  # )
-}
-
-plot_KEYWORD_SUMMARY(
-  ORA_KEYWORD_SUMMARY,
-  ORA_KEYWORD_TEMPLATE,
-  "GO Term",
-  "A band"
-)
-
 ## create vectors to access categories in shiny ####
 
 ALL_ORA_CATEGORIES_GLOBAL <- c(
@@ -534,9 +341,6 @@ ALL_ORA_CATEGORIES_KEYWORD <- c(
   "Ligand-Receptor Interaction",
   "Ligand",
   "Receptor",
-  #"ER Cell Types",
-  #"Emitter Cell Types",
-  #"Receiver Cell Types",
   "GO Term",
   "KEGG Pathway",
   "Emitter-Receiver Cell Type Family",
@@ -551,9 +355,7 @@ data_5_tissue_shared_results <- list(
   ORA_KEYWORD_SUMMARY = ORA_KEYWORD_SUMMARY,
   ORA_KEYWORD_TEMPLATE = ORA_KEYWORD_TEMPLATE,
   ALL_ORA_CATEGORIES_GLOBAL = ALL_ORA_CATEGORIES_GLOBAL,
-  ALL_ORA_CATEGORIES_KEYWORD = ALL_ORA_CATEGORIES_KEYWORD,
-  build_KEYWORD_COUNTS_display = build_KEYWORD_COUNTS_display,
-  plot_KEYWORD_SUMMARY = plot_KEYWORD_SUMMARY
+  ALL_ORA_CATEGORIES_KEYWORD = ALL_ORA_CATEGORIES_KEYWORD
 )
 
 saveRDS(
