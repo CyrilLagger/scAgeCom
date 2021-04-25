@@ -18,7 +18,7 @@
 # Tabula Muris Senis scRNA-seq data have been retrieved from Amazon S3 
 # following the link given here https://github.com/czbiohub/tabula-muris-senis
 
-# Calico2019 scRNA-seq data have been downloaded from here
+# Calico scRNA-seq data have been downloaded from here
 # https://mca.research.calicolabs.com/data
 
 # There were both stored as h5ad scanpy files, that we converted to 
