@@ -2,13 +2,13 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - April 2021
+## Last update - June 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
 ## anais.equey@etu.univ-amu.fr
 ##
-## collect and prepare all results for shiny
+## collect all results for shiny
 ##
 ####################################################
 ##
