@@ -2,7 +2,7 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - April 2021
+## Last update - June 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
