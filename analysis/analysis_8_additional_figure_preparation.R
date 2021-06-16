@@ -1,13 +1,29 @@
+####################################################
+##
+## Project: scAgeCom
+##
+## Last update - June 2021
+##
+## cyril.lagger@liverpool.ac.uk
+## ursu_eugen@hotmail.com
+## anais.equey@etu.univ-amu.fr
+##
+## additional figure preparation
+##
+####################################################
+##
 
-library(kableExtra)
+## Libraries ####
+
 library(Seurat)
 library(data.table)
 library(scDiffCom)
 library(ggplot2)
 library(plotly)
 library(shiny)
+library(kableExtra)
 
-## Data-preprocessing table ####
+## Fig.2.1Data-preprocessing table ####
 
 fig2_sc_data <- expm1(
   scDiffCom::seurat_sample_tms_liver$RNA@data[1:4, 1:4]
@@ -112,9 +128,9 @@ fig2_sc_data %>%
   column_spec(1:5, bold = T) %>%
   save_kable(file = "../data_scAgeCom/figures/fig2_sc_data.png",  zoom = 2, vwidth = 1200)
 
-## LRI table  ####
+## Fig.2.2 LRI table  ####
 
-fig2_LRI_data <- as.data.frame(LRI_mouse_curated[c(1, 679, 2, 3784, 3), 1:5])
+fig2_LRI_data <- as.data.frame(scDiffCom::LRI_mouse$LRI_mouse_curated[c(1, 679, 2, 3784, 3), 1:5])
 fig2_LRI_data[is.na(fig2_LRI_data)] <- ""
 fig2_LRI_data[c(1,3,5),] <- "..."
 colnames(fig2_LRI_data) <- c("Gene 1", "Gene 2", "Gene 1", "Gene 2", "Gene 3")
@@ -130,7 +146,7 @@ fig2_LRI_data %>%
   kable_styling(font_size = 50) %>%
   save_kable(file = "../data_scAgeCom/figures/fig2_LRI_data.png", zoom = 3)
 
-## Potential CCI table ####
+## Fig.2.3 Potential CCI table ####
 
 fig2_cci_table_pot <- copy(readRDS( "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")$CCI_table)[Dataset == "TMS FACS (female)" & Tissue == "Mammary_Gland"]
 fig2_cci_table_pot[
@@ -176,7 +192,7 @@ fig2_cci_table_pot %>%
   save_kable(file = "../data_scAgeCom/figures/fig2_cci_table_pot.png", zoom = 2, vwidth = 2200)
 
 
-## tsne plots by cell types and age ####
+## Fig.2.1 tsne plots by cell types and age ####
 
 seurat_mg <- readRDS("../data_scAgeCom/analysis/inputs_data/seurat_testing_tms_facs_mammary_gland.rds")
 seurat_mg$age_group <- ifelse(
@@ -241,7 +257,7 @@ aging_example <- run_interaction_analysis(
   return_distributions = TRUE
 )
 
-## Differential permutations ####
+## Fig.2.4 Differential permutations ####
 
 distr_de <- data.frame(
   counts = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, ]
@@ -293,7 +309,7 @@ fig2_distr_de
 
 ggsave("../data_scAgeCom/figures/fig2_distr_de.png", fig2_distr_de, scale = 1.5)
 
-## Cond1 permutations ####
+## Fig.2.4 Cond1 permutations ####
 
 distr_cond1 <- data.frame(
   counts = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, ]
@@ -347,7 +363,7 @@ fig2_distr_cond1
 ggsave("../data_scAgeCom/figures/fig2_distr_cond1.png", fig2_distr_cond1, scale = 1.5)
 
 
-## Cond2 permutations ####
+## Fig.2.4 Cond2 permutations ####
 
 distr_cond2 <- data.frame(
   counts = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, ]
@@ -399,7 +415,7 @@ fig2_distr_cond2
 ggsave("../data_scAgeCom/figures/fig2_distr_cond2.png", fig2_distr_cond2, scale = 1.5)
 
 
-## Final CCI table ####
+## Fig.2.6 Final CCI table ####
 
 fig2_cci_table_final <- copy(readRDS( "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")$CCI_table)[Dataset == "TMS FACS (female)" & Tissue == "Mammary_Gland"]
 fig2_cci_table_final[
