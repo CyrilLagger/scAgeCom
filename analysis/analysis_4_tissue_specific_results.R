@@ -2,13 +2,13 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - April 2021
+## Last update - June 2021
 ##
 ## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
 ## anais.equey@etu.univ-amu.fr
 ##
-## preparation of tissue specific results
+## preparation of tissue-specific results
 ##
 ####################################################
 ##
@@ -17,10 +17,11 @@
 
 library(scDiffCom)
 library(data.table)
+library(rrvgo)
 
 ## relative path of scDiffCom results ####
 
-scAgeCom_path <- "../data_scAgeCom/scDiffCom_results_12_04_2021"
+scAgeCom_path <- "../data_scAgeCom/scDiffCom_results_29_04_2021"
 
 # it contains 5 datasets
 
@@ -175,7 +176,8 @@ dataset_processed <- lapply(
 )
 names(dataset_processed) <- dataset_names
 
-#saveRDS(dataset_processed, "../data_scAgeCom/analysis/outputs_data/scAgeCom_results_processed_infORA.rds")
+#saveRDS(dataset_processed, "../data_scAgeCom/analysis/outputs_data/scAgeCom_results_processed_29_04_2021.rds")
+dataset_processed <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_results_processed_29_04_2021.rds")
 
 ## create a single CCI table for shiny ####
 
@@ -618,6 +620,149 @@ ORA_table[
   )
 ]
 
+## create a ORA GO reduced table for TreeMap ####
+
+semd_BP <- GOSemSim::godata(
+  OrgDb = "org.Mm.eg.db",
+  ont = "BP"
+)
+semd_MF <- GOSemSim::godata(
+  OrgDb = "org.Mm.eg.db",
+  ont = "MF"
+)
+semd_CC <- GOSemSim::godata(
+  OrgDb = "org.Mm.eg.db",
+  ont = "CC"
+)
+
+all_org_go <- unique(c(names(semd_BP@IC), names(semd_CC@IC), names(semd_MF@IC)))
+
+# Warning: the computation goes over 58*9 cases and takes more than one hour
+GO_REDUCED_table <- rbindlist(
+  l = lapply(
+    setNames(
+      sort(unique(ORA_table$Dataset)),
+      sort(unique(ORA_table$Dataset))
+    ),
+    function(dataset) {
+      print(dataset)
+      dt <- copy(ORA_table)[
+        Dataset == dataset &
+          ORA_CATEGORY == "GO_TERMS" & 
+          VALUE_BIS %in% all_org_go
+      ]
+      if (nrow(dt) == 0) return(NULL)
+      rbindlist(
+        l = lapply(
+          setNames(
+            sort(unique(dt$Tissue)),
+            sort(unique(dt$Tissue))
+          ),
+          function(tissue) {
+            print(tissue)
+            rbindlist(
+              l = lapply(
+                setNames(
+                  sort(unique(dt$ASPECT)),
+                  sort(unique(dt$ASPECT))
+                ),
+                function(aspect) {
+                  print(aspect)
+                  rbindlist(
+                    l = lapply(
+                      list(UP = "UP", DOWN = "DOWN", FLAT = "FLAT"),
+                      function(regulation) {
+                        print(regulation)
+                        dt_intern <- dt[Tissue == tissue & ASPECT == aspect]
+                        if (regulation == "UP") {
+                          dt_intern <- dt_intern[IS_UP == TRUE]
+                          OR_intern <- dt_intern$OR_UP
+                          BH_intern <- dt_intern$BH_P_VALUE_UP
+                        } else if (regulation == "DOWN") {
+                          dt_intern <- dt_intern[IS_DOWN == TRUE]
+                          OR_intern <- dt_intern$OR_DOWN
+                          BH_intern <- dt_intern$BH_P_VALUE_DOWN
+                        } else if (regulation == "FLAT") {
+                          dt_intern <- dt_intern[IS_FLAT == TRUE]
+                          OR_intern <- dt_intern$OR_FLAT
+                          BH_intern <- dt_intern$BH_P_VALUE_FLAT
+                        } else {
+                          stop("Error")
+                        }
+                        if (aspect == "biological_process") {
+                          ont_intern <- "BP"
+                          semd_intern <- semd_BP
+                        } else if (aspect == "molecular_function") {
+                          ont_intern <- "MF"
+                          semd_intern <- semd_MF
+                        } else if (aspect == "cellular_component") {
+                          ont_intern <- "CC"
+                          semd_intern <- semd_CC
+                        }
+                        if (nrow(dt_intern) == 0) return(NULL)
+                        if (any(is.infinite(OR_intern))) {
+                          if (all(is.infinite(OR_intern))) {
+                            OR_intern <- rep(2, length(OR_intern))
+                            
+                          } else {
+                            max_finite <- max(OR_intern[is.finite(OR_intern)])
+                            OR_intern[is.infinite(OR_intern)] <- max_finite
+                          }
+                        } 
+                        scores_intern <- -log10(BH_intern) * log2(OR_intern)
+                        scores_intern <- setNames(
+                          scores_intern,
+                          dt_intern$VALUE_BIS
+                        )
+                        simMatrix <- calculateSimMatrix(
+                          x = dt_intern$VALUE_BIS,
+                          orgdb = "org.Mm.eg.db",
+                          semdata = semd_intern,
+                          ont = ont_intern,
+                          method = "Rel"
+                        )
+                        if (is.null(dim(simMatrix))) return(NULL)
+                        reducedTerms <- reduceSimMatrix(
+                          simMatrix = simMatrix,
+                          scores = scores_intern,
+                          threshold = 0.7,
+                          orgdb = "org.Mm.eg.db"
+                        )
+                        if (nrow(reducedTerms) == 0) return(NULL)
+                        setDT(reducedTerms)
+                        reducedTerms
+                      }
+                    ),
+                    idcol = "REGULATION"
+                  )
+                }
+              ),
+              idcol = "ASPECT"
+            )
+          }
+        ),
+        idcol = "Tissue"
+      )
+    }
+  ),
+  idcol = "Dataset"
+)
+
+saveRDS(
+  GO_REDUCED_table,
+  "../data_scAgeCom/analysis/outputs_data/data_4_GO_REDUCED_table_newINF.rds"
+)
+
+# treemapPlot(
+#   GO_REDUCED_table[
+#     Dataset == "TMS FACS (male)" &
+#       Tissue == "Kidney" &
+#       ASPECT == "biological_process" &
+#       REGULATION == "UP"
+#   ][, -c(1,2,3,4)]
+# )
+
+
 ## create vectors to access categories in shiny ####
 
 ALL_TISSUES <- sort(
@@ -786,12 +931,13 @@ CCI_table[, GO_NAMES := NULL]
 CCI_table[, KEGG_NAMES := NULL]
 colnames(CCI_table)
 
-## save all results ####
+## save all results for shiny ####
 
 data_4_tissue_specific_results <- list(
   CCI_table = CCI_table,
   ORA_table = ORA_table,
   TISSUE_COUNTS_SUMMARY = TISSUE_COUNTS_SUMMARY,
+  GO_REDUCED_table = GO_REDUCED_table,
   ALL_TISSUES = ALL_TISSUES,
   ALL_CELLTYPES = ALL_CELLTYPES,
   ALL_LRIs = ALL_LRIs,
@@ -811,15 +957,165 @@ saveRDS(
   "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
 )
 
-## Summary graph for the manuscript ####
+## Prepare meta.data for summary picture
 
-dataset_summary <- CCI_table[
+# scAgeCom_md_path <- "../data_scAgeCom/scDiffCom_results_md_25_04_2021/"
+# 
+# md_paths <- list.dirs(scAgeCom_md_path, recursive = FALSE)
+# md_paths
+# 
+# md_names <- c(
+#   "Calico Droplet (male)",
+#   "TMS Droplet (female)",
+#   "TMS Droplet (male)",
+#   "TMS FACS (female)",
+#   "TMS FACS (male)"
+# )
+# names(md_names) <- md_names
+# 
+# 
+# process_md <- function(
+#   md_path
+# ) {
+#   tissues <- gsub(".*md_(.+)\\.rds.*", "\\1", list.files(md_path))
+#   md <- lapply(
+#     X = tissues,
+#     FUN = function(
+#       tiss
+#     ) {
+#       res <- readRDS(paste0(md_path, "/md_", tiss, ".rds"))
+#     }
+#   )
+#   # change some tissue names
+#   tissues[tissues == "BAT"] <- "Adipose_Brown"
+#   tissues[tissues == "GAT"] <- "Adipose_Gonadal"
+#   tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
+#   tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
+#   names(md) <- tissues
+#   return(md)
+# }
+# 
+# test <- process_md(md_paths[[1]])
+
+## Prepare Figure 3 for the manuscript ####
+
+#retrieve the age information
+md_paths <- list.dirs("../data_scAgeCom/scDiffCom_md_29_04_2021", recursive = FALSE)
+md_paths
+
+process_md <- function(
+  md_path
+) {
+  # retrieve and load each object in the dataset
+  tissues <- gsub(".*md_(.+)\\.rds.*", "\\1", list.files(md_path))
+  mds <- lapply(
+    X = tissues,
+    FUN = function(
+      tiss
+    ) {
+      res <- readRDS(paste0(md_path, "/md_", tiss, ".rds"))
+      sort(unique(res$age))
+    }
+  )
+  # change some tissue names
+  tissues[tissues == "BAT"] <- "Adipose_Brown"
+  tissues[tissues == "GAT"] <- "Adipose_Gonadal"
+  tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
+  tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
+  names(mds) <- tissues
+  return(mds)
+}
+
+md_processed <- lapply(
+  md_paths,
+  function(path) {
+    process_md(path)
+  }
+)
+names(md_processed) <- dataset_names
+
+md_age <- rbindlist(
+  lapply(
+    md_processed,
+    function(dataset) {
+      rbindlist(
+        lapply(
+          dataset,
+          function(tissue) {
+            data.table(
+              age_group = tissue
+            )
+          }
+        ),
+        idcol = "Tissue"
+      )
+    }
+  ),
+  idcol = "Dataset"
+)
+
+md_age_dc <- dcast.data.table(
+  md_age,
+  Dataset + Tissue ~ age_group,
+  value.var = "age_group"
+)
+
+md_age_dc[
+  ,
+  age_group := ifelse(
+    !is.na(young),
+    "7-8m vs 22-23m",
+    ifelse(
+      is.na(`18m`),
+      "3m vs 24m",
+      ifelse(
+        is.na(`21m`) & is.na(`24m`),
+        "3m vs 18m",
+        ifelse(
+          is.na(`21m`),
+          "3m vs 18/24m",
+          "3m vs 18/21m"
+        )
+      )
+    )
+  )
+]
+
+md_age_dc[
+  ,
+  age_group2 := ifelse(
+    Dataset == "TMS FACS (female)" & Tissue == "Mammary_Gland",
+    "(3m vs 18/21m)",
+    ifelse(
+      Dataset == "TMS Droplet (male)" & Tissue %in% c("Liver", "Spleen"),
+      "(3m vs 24m)",
+      ifelse(
+        Dataset == "TMS Droplet (male)" & Tissue %in% c("Lung"),
+        "(3m vs 18m)",
+        ""
+      )
+    )
+  )
+]
+
+
+fig3_data <- readRDS(
+  "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
+)
+
+dataset_summary <- fig3_data$CCI_table[
   ,
   c("Dataset", "Tissue", "Emitter Cell Type")
 ][
   ,
   uniqueN(`Emitter Cell Type`),
   by = c("Dataset", "Tissue")
+]
+
+dataset_summary[
+  md_age_dc,
+  on = c("Dataset", "Tissue"),
+  age_group2 := i.age_group2
 ]
 
 
@@ -829,47 +1125,47 @@ ggplot2::ggplot(
     Dataset,
     Tissue
   )
-) +
-  ggplot2::geom_tile(
-    ggplot2::aes(
-      width = 0.9,
-      height = 0.9
-    ),
-    colour = "black",
-    alpha = 0.5
-  ) +
-  #ggplot2::theme_bw()+
-  ggplot2::geom_text(
-    ggplot2::aes(label = paste(V1, "Cell Types"))
-  ) +
-  ggplot2::ggtitle(
-    ""
-    #"Distribution of number of cell types and age comparison across datasets"
-  ) +
-  ggplot2::scale_x_discrete(
-    limits = c(
-      "TMS FACS (male)",
-      "TMS FACS (female)" ,
-      "TMS Droplet (male)",
-      "TMS Droplet (female)",
-      "Calico Droplet (male)"
-    ),
-    labels = c(
-      "TMS\nFACS\n(male)",
-      "TMS\nFACS\n(female)",
-      "TMS\nDroplet\n(male)",
-      "TMS\nDroplet\n(female)",
-      "Calico\nDroplet\n(male)"
-    )
-  ) +
-  ggplot2::scale_y_discrete(
-    limits = sort(
-      unique(test$Tissue),
-      decreasing = TRUE
-    )
-  ) +
-  ggplot2::xlab("") +
-  ggplot2::ylab("") +
-  ggplot2::theme(text=ggplot2::element_text(size = 10)) +
-  ggplot2::theme(axis.text=ggplot2::element_text(size = 10))
-
+) + ggplot2::geom_tile(
+  ggplot2::aes(
+    width = 0.9,
+    height = 0.9
+  ),
+  colour = "black",
+  fill = "coral",
+  alpha = 1
+) + ggplot2::ggtitle(
+  "Number of cell types per dataset (additional age information)"
+) + ggplot2::geom_text(
+  #ggplot2::aes(label = paste(V1, "Cell Types", age_group2)),
+  ggplot2::aes(label = paste(V1, age_group2)),
+  size = 8,
+  fontface = "bold"
+) + ggplot2::scale_x_discrete(
+  limits = c(
+    "TMS FACS (male)",
+    "TMS FACS (female)" ,
+    "TMS Droplet (male)",
+    "TMS Droplet (female)",
+    "Calico Droplet (male)"
+  ),
+  labels = c(
+    "TMS\nFACS\n(male)\n3m vs 18/24m",
+    "TMS\nFACS\n(female)\n3m vs 18m",
+    "TMS\nDroplet\n(male)\n3m vs 18/24m",
+    "TMS\nDroplet\n(female)\n3m vs 18/21m",
+    "Calico\nDroplet\n(male)\n7-8m vs 22-23m"
+  )
+) + ggplot2::scale_y_discrete(
+  limits = sort(
+    unique(dataset_summary$Tissue),
+    decreasing = TRUE
+  )
+) + ggplot2::xlab(
+  ""
+) + ggplot2::ylab(
+  ""
+) + ggplot2::theme(
+  text = ggplot2::element_text(size = 26),
+  axis.text = ggplot2::element_text(size = 26, face = "bold")
+)
+#manual save 2000x1400

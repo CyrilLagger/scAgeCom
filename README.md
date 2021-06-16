@@ -1,8 +1,7 @@
 # scAgeCom 
 
-This repository contains the scripts used to produce the data related to scAgeCom,
-our "Murine Atlas of Age-related Changes in Intercellular Communication" (
-manuscript in preparation)
+This repository contains the scripts used to produce scAgeCom data,
+our "Murine Atlas of Age-related Changes in Intercellular Communication" 
 
 Data are produced by combining our R package
 [scDiffCom]("https://github.com/CyrilLagger/scDiffCom")
