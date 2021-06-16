@@ -8,7 +8,7 @@
 ## ursu_eugen@hotmail.com
 ## anais.equey@etu.univ-amu.fr
 ##
-## scRNA-seq data preparation
+## general statistics
 ##
 ####################################################
 ##
@@ -121,6 +121,8 @@ regulation_distr_long[
   )
 ]
 
+## Figure 6 ####
+
 ggplot(
   data = regulation_distr_long,
   aes(
@@ -146,152 +148,12 @@ ggplot(
 ) + xlab(
   "Fraction of CCIs per regulation group"
 ) + theme(
-  text = element_text(size = 30),
-  axis.text.x = element_text(size = 16)
+  text = element_text(size = 34, face = "bold"),
+  axis.text.x = element_text(size = 18),
+  axis.text.y = element_text(size = 28, face = "bold")
 )
+#manual save 3000x1400
 
-
-###########################
-
-
-
-stat_table[, N_LRI_per_ER := `Total Cell-Cell Interactions`/(`Total Cell Types`)^2]
-
-
-
-test[, frac_up := `UP CCIs`/`Total Cell-Cell Interactions`*100]
-test[, frac_down := `Down CCIs`/`Total Cell-Cell Interactions`*100]
-test[, frac_flat := `Flat CCIs`/`Total Cell-Cell Interactions`*100]
-
-test2 <- melt.data.table(
-  test[, c(1,2,10, 11,12)],
-  id.vars = c("Tissue", "Dataset"),
-  value.vars = c("frac_up", "frac_down", "fracs_flat")
-)
-
-ggplot(test2, aes(x = Dataset, y = value, color = variable)) + geom_boxplot()
-ggplot(test2, aes(x = Dataset, y = frac_down)) + geom_boxplot()
-
-
-
-ggplot(test, aes(x = frac_up, y = frac_down)) + geom_point()
-
-ggplot(test, aes(x = `Total Cell Types`, y = N_LRI_per_ER)) + geom_point()
-
-
-sum(test$`Total Cell-Cell Interactions`)
-mean(test$N_LRI_per_ER)
-sd(test$N_LRI_per_ER)
-
-hist(test$N_LRI_per_ER, breaks = 20)
-
-
-hist(test$frac_down, breaks = 20)
-hist(test$frac_up, breaks = 20)
-
-test3 <- copy(scAgeCom_shiny_data$CCI_table)
-test3[, ERI := paste(`Emitter Cell Type`, `Receiver Cell Type`, sep = "_")]
-test3[, ID := paste(Dataset, Tissue, sep = "_")]
-test3[, ID2 := paste(ID, ERI, sep = "_")]
-test3[, .N, by = "ID2"]
-
-setkey(test3, ID, ERI)
-
-
-
-test4 <- test3[, .N, by = c("Tissue", "Dataset", "ERI")]
-test5 <- test3[, .N, by = c("Tissue", "Dataset", "ERI", "Age Regulation")]
-
-test4[
-  test5[`Age Regulation` == "UP"],
-  on = c("Tissue", "Dataset", "ERI"),
-  N_UP := i.N
-]
-test4[
-  test5[`Age Regulation` == "DOWN"],
-  on = c("Tissue", "Dataset", "ERI"),
-  N_DOWN := i.N
-]
-test4[
-  test5[`Age Regulation` == "FLAT"],
-  on = c("Tissue", "Dataset", "ERI"),
-  N_FLAT := i.N
-]
-test4[
-  test5[`Age Regulation` == "NSC"],
-  on = c("Tissue", "Dataset", "ERI"),
-  N_NSC := i.N
-]
-
-test5 <- melt.data.table(
-  test4,
-  id.vars = c("Tissue", "Dataset", "ERI"),
-  measure.vars = c("N_UP", "N_DOWN", "N_FLAT", "N_NSC")
-)
-
-test4[is.na(test4)] <- 0
-
-test4[, mean(N)]
-test4[, sd(N)]
-test4[, median(N)]
-hist(test4$N, breaks = 100)
-
-test4[, mean(N_UP)]
-test4[, sd(N_UP)]
-hist(test4$N_UP, breaks = 100)
-
-test4[, mean(N_DOWN)]
-test4[, sd(N_DOWN)]
-hist(test4$N_DOWN, breaks = 100)
-
-test4[, mean(N_FLAT)]
-test4[, sd(N_FLAT)]
-hist(test4$N_FLAT, breaks = 100)
-
-
-
-
-
-p <- ggplot(
-  test4
-) + geom_boxplot(
-  aes(
-    x = N,
-    y = Tissue#,
-    #color = Dataset
-  )
-)
-
-ggplot(
-  test4
-) + geom_boxplot(
-  aes(
-    x = N_UP,
-    y = Tissue#,
-    #color = Dataset
-  )
-)
-
-ggplot(
-  test4
-) + geom_histogram(
-  aes(
-    x = N
-  ),
-  bins = 100
-)
-
-ggplot(
-  test5
-) + geom_boxplot(
-  aes(
-    y = value,
-    x = Tissue,
-    color = variable
-  )
-) + facet_wrap(
-  Dataset ~ .
-)
 
 
 
