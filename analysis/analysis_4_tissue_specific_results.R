@@ -1363,6 +1363,11 @@ supp2_table_detected[
   by = c("Dataset", "Tissue")
 ]
 
+fwrite(
+  supp2_table_detected,
+  "../data_scAgeCom/analysis/outputs_data/data_4_supp2_table_detected.csv"
+)
+
 
 # supp2_table_final <- dcast.data.table(
 #   supp2_table_clean[, -c("N")],
