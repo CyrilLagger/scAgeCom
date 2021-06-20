@@ -30,10 +30,6 @@ library(kableExtra)
 ## Prepare mouse LRI database for scAgeComShiny ####
 
 LRI_mouse_curated <- copy(scDiffCom::LRI_mouse$LRI_curated)
-LRI_mouse_curated[
-  ,
-  SOURCE := gsub("SCT:SingleCellSignalR|SCT:CellPhoneDB|SCT:DLRP", "", SOURCE)
-  ]
 LRI_mouse_curated[, SOURCE := gsub(";;", ";", SOURCE)]
 LRI_mouse_curated[, SOURCE := sub(";$", "", SOURCE)]
 LRI_mouse_curated[, SOURCE := sub("^;", "", SOURCE)]
@@ -94,10 +90,10 @@ names(LRI_human_to_xlsx) <- paste0(names(LRI_human_to_xlsx), "_human")
 LRI_mouse_to_xlsx <- scDiffCom::LRI_mouse[c(1,2,3)]
 names(LRI_mouse_to_xlsx) <- paste0(names(LRI_mouse_to_xlsx), "_mouse")
 
-#openxlsx::write.xlsx(
+# openxlsx::write.xlsx(
 #  c(LRI_mouse_to_xlsx, LRI_human_to_xlsx),
 #  file = "../data_scAgeCom/analysis/outputs_data/Supplemental_Data_1.xlsx"
-#)
+# )
 
 ## Prepare Figure 1.a for the manuscript ####
 
