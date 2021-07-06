@@ -130,20 +130,23 @@ fig2_sc_data %>%
 
 ## Fig.2.2 LRI table  ####
 
-fig2_LRI_data <- as.data.frame(scDiffCom::LRI_mouse$LRI_mouse_curated[c(1, 679, 2, 3784, 3), 1:5])
+fig2_LRI_data <- as.data.frame(scDiffCom::LRI_mouse$LRI_curated[c(1, 643, 2, 3573), c(2, 3, 1, 4,5, 6)])
 fig2_LRI_data[is.na(fig2_LRI_data)] <- ""
-fig2_LRI_data[c(1,3,5),] <- "..."
-colnames(fig2_LRI_data) <- c("Gene 1", "Gene 2", "Gene 1", "Gene 2", "Gene 3")
+fig2_LRI_data[c(1,3),] <- "..."
+fig2_LRI_data[, 3] <- "\u00A0 \u00A0"
+colnames(fig2_LRI_data) <- c("L1", "L2", "\u00A0 \u00A0  ", "R1", "R2", "R3")
 
 
 fig2_LRI_data %>% 
   kbl(
     caption = "<span style = 'font-size: 50px; font-weight: bold'>Ligand-Receptor Interactions</span>",
-    align = rep("c", 5)
+    align = rep("l", 5)
   ) %>%
   kable_styling("striped", full_width = FALSE) %>%
-  add_header_above(c("Ligand" = 2, "Receptor" = 3)) %>%
+  add_header_above(c("Ligand" = 2, "\u00A0" = 1, "Receptor" = 3)) %>%
   kable_styling(font_size = 50) %>%
+  column_spec(1:5, bold = T) %>%
+  column_spec(3, width = "5cm") %>%
   save_kable(file = "../data_scAgeCom/figures/fig2_LRI_data.png", zoom = 3)
 
 ## Fig.2.3 Potential CCI table ####
@@ -289,25 +292,26 @@ fig2_distr_de <- ggplot(
   xend = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001],
   y = 38,
   yend = 0.5,
-  size = 2,
+  size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001]+0.5,
-  y = 40,
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001]+0.8,
+  y = 42,
   label = "True Difference",
-  size = 8
+  size = 22
 ) + xlab(
   "Score(Cond2) - Score(Cond1)"
 ) + ylab(
   "Frequency"
 ) + theme(
-  text=element_text(size=28),
+  text=element_text(size=80),
+  axis.text.x = element_text(size = 80),
   axis.text.y = element_blank()
 ) 
 fig2_distr_de
-
-ggsave("../data_scAgeCom/figures/fig2_distr_de.png", fig2_distr_de, scale = 1.5)
+#manual save 2000x1400
+#ggsave("../data_scAgeCom/figures/fig2_distr_de.png", fig2_distr_de, scale = 1.5)
 
 ## Fig.2.4 Cond1 permutations ####
 
@@ -342,25 +346,27 @@ fig2_distr_cond1 <- ggplot(
   xend = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
   y = 22,
   yend = 0.5,
-  size = 2,
+  size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
   x = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
   y = 25,
-  label = "True Score",
-  size = 8
+  label = "True Score 1",
+  size = 22
 ) + xlab(
   "Score(Cond1)"
 ) + ylab(
   "Frequency"
 ) + theme(
-  text=element_text(size=28),
+  text=element_text(size=80),
+  axis.text.x = element_text(size = 80),
   axis.text.y = element_blank()
 ) + xlim(-0.5, 10.5)
 fig2_distr_cond1
+#manual save 2000x1400
 
-ggsave("../data_scAgeCom/figures/fig2_distr_cond1.png", fig2_distr_cond1, scale = 1.5)
+#ggsave("../data_scAgeCom/figures/fig2_distr_cond1.png", fig2_distr_cond1, scale = 1.5)
 
 
 ## Fig.2.4 Cond2 permutations ####
@@ -394,20 +400,21 @@ fig2_distr_cond2 <- ggplot(
   xend = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, 1001],
   y = 22,
   yend = 0.5,
-  size = 2,
+  size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
   x = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, 1001]-0.3,
   y = 25,
-  label = "True Score",
-  size = 8
+  label = "True Score 2",
+  size = 22
 ) + xlab(
   "Score(Cond2)"
 ) + ylab(
   "Frequency"
 ) + theme(
-  text=element_text(size=28),
+  text=element_text(size=80),
+  axis.text.x = element_text(size = 80),
   axis.text.y = element_blank()
 ) + xlim(-0.5, 13)
 fig2_distr_cond2
@@ -540,7 +547,7 @@ plot_volcano_CCI <- function(
     marker = list(size = 15)
   ) %>% plotly::layout(
     title = list(
-      text = "Interactive Aging Volcano Plot",
+      text = "",
       font = list(size = 20),
       xanchor = "left",
       x = 0.0
@@ -548,7 +555,7 @@ plot_volcano_CCI <- function(
     xaxis = list(
       title = list(
         text = "Log2(FC)",
-        font = list(size = 32)
+        font = list(size = 36)
       ),
       tickfont = list(
         size = 24
@@ -557,10 +564,11 @@ plot_volcano_CCI <- function(
     yaxis = list(
       title = list(
         text = "-Log10(Adj. p-value)",
-        font = list(size = 32)
+        font = list(size = 36),
+        standoff = 40
       ),
       tickfont = list(
-        size = 24
+        size = 28
       )
     ),
     shapes = list(
@@ -572,8 +580,8 @@ plot_volcano_CCI <- function(
       orientation = "h",
       xanchor = "center",
       x = 0.5,
-      y = 1.02,
-      font = list(size = 28)
+      y = 1.1,
+      font = list(size = 34)
     ),
     margin = m
   ) 
@@ -888,6 +896,341 @@ plot_ORA_visnetwork(
   ABBR_CELLTYPE
 )
 
+plot_ora_local <- function(
+  ora_dt,
+  category,
+  regulation,
+  max_terms_show,
+  GO_aspect,
+  OR_threshold,
+  bh_p_value_threshold
+) {
+  VALUE <- ASPECT <- LEVEL <-
+    OR <- OR_UP <- OR_DOWN <- OR_FLAT <-
+    BH_PVAL <- BH_P_VALUE_UP <- BH_P_VALUE_DOWN <- BH_P_VALUE_FLAT <-
+    ORA_SCORE <- ORA_SCORE_UP <- ORA_SCORE_DOWN <- ORA_SCORE_FLAT <- NULL
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop(
+      paste0(
+        "Package \"ggplot2\" needed for this function to work.",
+        "Please install it."
+      ),
+      call. = FALSE
+    )
+  }
+  if (OR_threshold < 1) {
+    stop(
+      "'OR_thtreshold' muste be bigger than 1"
+    )
+  }
+  if (bh_p_value_threshold > 0.05) {
+    stop(
+      "'bh_p_value_threshold' must be smaller than 0.05"
+    )
+  }
+  dt <- copy(ora_dt)
+  if(regulation == "UP") {
+    dt[, OR := OR_UP]
+    dt[, BH_PVAL := BH_P_VALUE_UP]
+    dt[, ORA_SCORE := ORA_SCORE_UP ]
+  } else if(regulation == "DOWN") {
+    dt[, OR := OR_DOWN]
+    dt[, BH_PVAL := BH_P_VALUE_DOWN]
+    dt[, ORA_SCORE := ORA_SCORE_DOWN ]
+  } else if(regulation == "FLAT") {
+    dt[, OR := OR_FLAT]
+    dt[, BH_PVAL := BH_P_VALUE_FLAT]
+    dt[, ORA_SCORE := ORA_SCORE_FLAT ]
+  } else {
+    stop("Can't find 'regulation' type")
+  }
+  if (category == "GO_TERMS") {
+    dt <- dt[
+      ASPECT == GO_aspect
+    ]
+    dt[, VALUE := paste0(
+      "(L",
+      LEVEL,
+      ") ",
+      VALUE
+    )]
+  }
+  dt <- dt[
+    OR > 1 &
+      BH_PVAL <= 0.05
+  ]
+  if (any(is.infinite(dt$OR))) {
+    extra_label_annotation <- " (* : infinite odds ratios are normalized)"
+    dt[
+      ,
+      VALUE := ifelse(
+        is.infinite(OR),
+        paste0("* ", VALUE),
+        VALUE
+      )
+    ]
+    dt_finite <- dt[is.finite(OR)]
+    if (nrow(dt_finite) > 0) {
+      dt[
+        ,
+        OR := ifelse(
+          is.infinite(OR),
+          1 + max(dt_finite$OR),
+          OR
+        )
+      ]
+    } else {
+      dt[, OR := 100]
+    }
+    dt[
+      ,
+      ORA_SCORE := -log10(BH_PVAL) * log2(OR)
+    ]
+  } else {
+    extra_label_annotation <- NULL
+  }
+  dt <- dt[
+    OR > OR_threshold &
+      BH_PVAL <= bh_p_value_threshold
+  ][order(-ORA_SCORE)]
+  n_row_tokeep <- min(max_terms_show, nrow(dt))
+  dt <- dt[1:n_row_tokeep]
+  dt$VALUE <- sapply(
+    dt$VALUE,
+    function(i) {
+      words <- strsplit(i, " ")[[1]]
+      n_words <- length(words)
+      if (n_words >= 5) {
+        if (n_words%%2 == 0) {
+          mid <- n_words/2
+        } else {
+          mid <- (n_words+1)/2
+        }
+        res <- paste0(
+          paste0(words[1:mid], collapse = " "),
+          "\n",
+          paste0(words[(mid+1):length(words)], collapse = " ")
+        )
+      } else {
+        res <- i
+      }
+      res
+    }
+  )
+  category_label <- ifelse(
+    category == "LRI",
+    "Ligand-Receptor Interactions",
+    ifelse(
+      category == "LIGAND_COMPLEX",
+      "Ligand Genes",
+      ifelse(
+        category == "RECEPTOR_COMPLEX",
+        "Receptor Genes",
+        ifelse(
+          category == "ER_CELLTYPES",
+          "Emitter-Receiver Cell Types",
+          ifelse(
+            category == "EMITTER_CELLTYPE",
+            "Emitter Cell Types",
+            ifelse(
+              category == "RECEIVER_CELLTYPE",
+              "Receiver Cell Types",
+              ifelse(
+                category == "GO_TERMS",
+                ifelse(
+                  GO_aspect == "biological_process",
+                  "GO Biological Processes",
+                  ifelse(
+                    GO_aspect == "molecular_function",
+                    "GO Molecular Functions",
+                    "GO Cellular Components"
+                  )
+                ),
+                ifelse(
+                  category == "KEGG_PWS",
+                  "KEGG Pathways",
+                  category
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+  ggplot2::ggplot(
+    dt,
+    ggplot2::aes(
+      ORA_SCORE,
+      stats::reorder(VALUE, ORA_SCORE)
+    )
+  ) +
+    ggplot2::geom_point(
+      ggplot2::aes(
+        size = -log10(BH_PVAL),
+        color = log2(OR)
+      )
+    ) +
+    ggplot2::scale_color_gradient(low = "orange", high = "red") +
+    ggplot2::scale_size_continuous(range = c(5, 8)) +
+    ggplot2::xlab(paste0("ORA score ", regulation)) +
+    ggplot2::ylab("") +
+    ggplot2::labs(
+      size = "-log10(Adj. P-Value)",
+      color = "log2(Odds Ratio)",
+      caption = extra_label_annotation
+    ) +
+    ggplot2::theme(text = ggplot2::element_text(size = 40)) +
+    ggplot2::theme(legend.position = c(0.8, 0.3)) +
+    ggplot2::theme(legend.title = ggplot2::element_text(size = 34)) +
+    ggplot2::theme(legend.text = ggplot2::element_text(size = 26)) +
+    ggplot2::theme(plot.title.position = "plot") +
+    ggplot2::ggtitle(
+      paste0(
+        "Top ",
+        n_row_tokeep,
+        " over-represented ",
+        regulation,
+        "-regulated ",
+        category_label
+      )
+    )
+}
+
+plot_ora_local(
+  ora_dt = ORA_table[
+    ORA_CATEGORY == "LRI" &
+      Dataset == "TMS Droplet (male)" &
+      Tissue == "Bladder"
+  ],
+  category = "LRI",
+  regulation = "UP",
+  max_terms_show = 20,
+  GO_aspect = NULL,
+  OR_threshold = 1,
+  bh_p_value_threshold = 0.045
+)
+
+plot_ORA_GO_treemap_local <- function(
+  GO_REDUCED_table,
+  tissue_choice,
+  dataset_choice,
+  type_choice,
+  go_aspect_choice,
+  title_text,
+  domain = NULL
+) {
+  Dataset <- Tissue <- ASPECT <- REGULATION <- 
+    new_parent <- term <- parentTerm <- ids <- 
+    parents <- score <- text <- NULL
+  ex_data <- GO_REDUCED_table[
+    Dataset == dataset_choice &
+      Tissue == tissue_choice &
+      ASPECT == go_aspect_choice &
+      REGULATION == type_choice
+  ][, c("score", "term", "parentTerm")]
+  if (nrow(ex_data) == 0) return(NULL)
+  ex_data[, new_parent := ifelse(
+    term %in% parentTerm,
+    "",
+    parentTerm
+  )]
+  new_data <- data.table(
+    labels = c(ex_data$term, ex_data[new_parent == ""]$term),
+    parents = c(ex_data$parentTerm, rep("", length(ex_data[new_parent == ""]$term)))
+  )
+  new_data[
+    ,
+    ids := sapply(
+      1:nrow(.SD),
+      function(i) {
+        if (labels[[i]] == parents[[i]]) {
+          res <- paste(labels[[i]], parents[[i]], sep = " - ")
+        } else {
+          res <- labels[[i]]
+        }
+        res
+      }
+    )
+  ]
+  new_data[
+    ,
+    score := sapply(
+      1:nrow(.SD),
+      function(i) {
+        if (parents[[i]] == "") {
+          res <- sum(ex_data[parentTerm == labels[[i]]]$score)
+        } else {
+          res <- ex_data[term == labels[[i]]]$score
+        }
+        res
+      }
+    )
+  ]
+  new_data[
+    ,
+    text := gsub(" ", "\n", labels)
+  ]
+  m <- list(
+    l = 5,
+    r = 5,
+    b = 5,
+    t = 30,
+    pad = 0
+  )
+  plotly::plot_ly(
+    new_data,
+    type = "treemap",
+    opacity = 1,
+    ids = ~ids,
+    parents = ~parents,
+    values = ~score,
+    labels = ~labels,
+    text = ~text,
+    textposition = "middle center",
+    branchvalues = "total",
+    hoverinfo = "label+value",
+    marker = list(
+      line = list(color = "black")
+    ),
+    textinfo = "text",
+    domain = domain
+  ) %>% plotly::layout(
+    title = list(
+      text = title_text,
+      font = list(size = 16),
+      xanchor = "left",
+      x = 0.0
+    ),
+    #uniformtext = list(
+    #  minsize = 16,
+    #  mode = "hide"
+    #),
+    margin = m
+  )
+}
+
+GO_REDUCED_table_local <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_shiny_data.rds")$GO_REDUCED_table
+
+p_treemap <- plot_ORA_GO_treemap_local(
+  GO_REDUCED_table = GO_REDUCED_table_local,
+  tissue_choice = "Bladder",
+  dataset_choice = "TMS Droplet (male)",
+  type_choice = "UP",
+  go_aspect_choice = "biological_process",
+  title_text = paste0(
+    "GO Biological Processes - ",
+    "UP"
+  )
+)
+
+Sys.setenv(
+  "PATH" = paste(
+    Sys.getenv("PATH"),
+    "C:\\Users\\clagger\\AppData\\Local\\Programs\\orca",
+    sep = .Platform$path.sep)
+)
+orca(p_treemap, "../data_scAgeCom/figures/fig4_ora_go.png", scale = 3)
 
 ## Figure 5 ####
 
@@ -916,6 +1259,7 @@ plot_KEYWORD_summary <- function(
     Regulation := i.ORA_REGULATION
   ]
   dt[is.na(dt)] <- "Not Detected"
+  print(dt)
   p <- ggplot2::ggplot(dt) +
     ggplot2::geom_tile(
       ggplot2::aes(
@@ -930,14 +1274,15 @@ plot_KEYWORD_summary <- function(
     ggplot2::scale_fill_manual(
       name = NULL,
       values = c(
-        "No Data" = "transparent",
+        #"No Data" = "transparent",
         "Not Over-represented" = "white",
         "Not Detected" = "gray",
-        "UP" = "red",
-        "DOWN" = "blue",
-        "FLAT" = "green",
-        "UP:DOWN" = "yellow"
-      )
+        "UP" = "red"#,
+        #"DOWN" = "blue",
+        #"FLAT" = "green",
+        #"UP:DOWN" = "yellow"
+      ),
+      drop = FALSE
     ) +
     ggplot2::ggtitle(
       stringr::str_trunc(
@@ -973,8 +1318,9 @@ plot_KEYWORD_summary <- function(
     ) +
     ggplot2::xlab("") +
     ggplot2::ylab("") +
-    ggplot2::theme(text=ggplot2::element_text(size = 14)) +
-    ggplot2::theme(axis.text = ggplot2::element_text(size = 14, face = "bold"))
+    ggplot2::theme(text=ggplot2::element_text(size = 32)) +
+    ggplot2::theme(axis.text = ggplot2::element_text(size = 32, face = "bold")) +
+    ggplot2::theme(legend.position = c(0.8, 0.8))
   p
 }
 
@@ -982,6 +1328,6 @@ plot_KEYWORD_summary <- function(
 plot_KEYWORD_summary(
   fig5_data$ORA_KEYWORD_SUMMARY,
   fig5_data$ORA_KEYWORD_TEMPLATE,
-  "GO Term",
-  "T cell differentiation"
+  "Ligand-Receptor Interaction",
+  "Lgals3:Lag3"
 )

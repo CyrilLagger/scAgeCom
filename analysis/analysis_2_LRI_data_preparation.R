@@ -101,6 +101,8 @@ LRI_upset_mouse <- ComplexUpset::upset(
   as.data.frame(LRI_mouse_curated),
   LRI_DATABASES,
   name = "Database",
+  set_sizes = ComplexUpset::upset_set_size()
+  + ylab('Database size'),
   base_annotations = list(
     'Intersection size' = ComplexUpset::intersection_size(
       mapping = ggplot2::aes(fill = Type),
@@ -114,7 +116,8 @@ LRI_upset_mouse <- ComplexUpset::upset(
     )
   ),
   themes = ComplexUpset::upset_default_themes(
-    text = ggplot2::element_text(size = 26)
+    text = ggplot2::element_text(size = 36),
+    plot.title = element_text(size=30)
   ),
   min_size = 40
 ) + ggplot2::ggtitle(
