@@ -1167,7 +1167,7 @@ ggplot2::ggplot(
   ""
 ) + ggplot2::theme(
   text = ggplot2::element_text(size = 28),
-  axis.text = ggplot2::element_text(size = 28, face = "bold")
+  axis.text = ggplot2::element_text(size = 28, colour = "black")
 )
 #manual save 2000x1400
 

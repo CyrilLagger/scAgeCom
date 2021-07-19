@@ -90,7 +90,6 @@ rownames(fig2_sc_aggr ) <- c(
 fig2_sc_aggr[3,] <- "..."
 fig2_sc_aggr[, 3] <- "..."
 
-
 cbind(
   fig2_sc_data,
   fig2_sc_aggr
@@ -521,7 +520,7 @@ plot_volcano_CCI <- function(
   m <- list(
     l = 10,
     r = 10,
-    b = 10,
+    b = 30,
     t = 30,
     pad = 10
   )
@@ -544,7 +543,7 @@ plot_volcano_CCI <- function(
       c("red", "blue", "green", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
-    marker = list(size = 15)
+    marker = list(size = 10)
   ) %>% plotly::layout(
     title = list(
       text = "",
@@ -555,7 +554,8 @@ plot_volcano_CCI <- function(
     xaxis = list(
       title = list(
         text = "Log2(FC)",
-        font = list(size = 36)
+        font = list(size = 36),
+        standoff = 30
       ),
       tickfont = list(
         size = 24
@@ -612,7 +612,7 @@ plot_scores_CCI <- function(
   m <- list(
     l = 10,
     r = 10,
-    b = 10,
+    b = 30,
     t = 30,
     pad = 10
   )
@@ -635,18 +635,19 @@ plot_scores_CCI <- function(
       c("red", "blue", "green", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
-    marker = list(size = 15)
+    marker = list(size = 10)
   ) %>% plotly::layout(
     title = list(
       text = "Interactive Score Plot",
-      font = list(size = 16),
+      font = list(size = 20),
       xanchor = "left",
       x = 0.0
     ),
     xaxis = list(
       title = list(
         text = "Log10(Young CCI Score)",
-        font = list(size = 32)
+        font = list(size = 36),
+        standoff = 30
       ),
       tickfont = list(
         size = 24
@@ -655,7 +656,8 @@ plot_scores_CCI <- function(
     yaxis = list(
       title = list(
         text = "Log10(Old CCI Score)",
-        font = list(size = 32)
+        font = list(size = 36),
+        standoff = 40
       ),
       tickfont = list(
         size = 24
@@ -666,7 +668,7 @@ plot_scores_CCI <- function(
       xanchor = "center",
       x = 0.5,
       y = 1.02,
-      font = list(size = 28)
+      font = list(size = 34)
     ),
     margin = m
   )
@@ -688,7 +690,7 @@ plot_lrfc_CCI <- function(
   m <- list(
     l = 10,
     r = 10,
-    b = 10,
+    b = 30,
     t = 30,
     pad = 10
   )
@@ -711,18 +713,19 @@ plot_lrfc_CCI <- function(
       c("red", "blue", "green", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
-    marker = list(size = 15)
+    marker = list(size = 10)
   )  %>% plotly::layout(
     title = list(
-      text = "Interactive 'Ligand-FC vs Receptor-FC' Plot",
-      font = list(size = 16),
+      text = "",
+      font = list(size = 20),
       xanchor = "left",
       x = 0.0
     ),
     xaxis = list(
       title = list(
         text = "Ligand Log2(FC)",
-        font = list(size = 32)
+        font = list(size = 36),
+        standoff = 30
       ),
       tickfont = list(
         size = 24
@@ -731,7 +734,8 @@ plot_lrfc_CCI <- function(
     yaxis = list(
       title = list(
         text = "Receptor Log2(FC)",
-        font = list(size = 32)
+        font = list(size = 36),
+        standoff = 40
       ),
       tickfont = list(
         size = 24
@@ -742,7 +746,7 @@ plot_lrfc_CCI <- function(
       xanchor = "center",
       x = 0.5,
       y = 1.02,
-      font = list(size = 28)
+      font = list(size = 34)
     ),
     margin = m
   )
@@ -1072,7 +1076,7 @@ plot_ora_local <- function(
       )
     ) +
     ggplot2::scale_color_gradient(low = "orange", high = "red") +
-    ggplot2::scale_size_continuous(range = c(5, 8)) +
+    ggplot2::scale_size_continuous(range = c(8, 10)) +
     ggplot2::xlab(paste0("ORA score ", regulation)) +
     ggplot2::ylab("") +
     ggplot2::labs(
