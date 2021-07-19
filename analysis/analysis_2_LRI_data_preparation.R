@@ -100,28 +100,30 @@ names(LRI_mouse_to_xlsx) <- paste0(names(LRI_mouse_to_xlsx), "_mouse")
 LRI_upset_mouse <- ComplexUpset::upset(
   as.data.frame(LRI_mouse_curated),
   LRI_DATABASES,
-  name = "Database",
+  name = "Database Groupings by Frequency",
   set_sizes = ComplexUpset::upset_set_size()
-  + ylab('Database size'),
+  + ylab('Database Size'),
   base_annotations = list(
-    'Intersection size' = ComplexUpset::intersection_size(
+    'Intersection Size' = ComplexUpset::intersection_size(
       mapping = ggplot2::aes(fill = Type),
       counts = TRUE,
       bar_number_threshold = 100,
       text = list(size = 8)
-    #) + scale_fill_grey(
-    #  start = 0.2, end = 0.6
     ) + scale_fill_manual(
       values = c("purple", "coral")
+    ) + theme(
+      axis.title.y = element_text(margin =margin(t = 0, r = -200, b = 0, l = 0)),
+      legend.position = c(0.8, 0.85)
     )
   ),
   themes = ComplexUpset::upset_default_themes(
-    text = ggplot2::element_text(size = 36),
-    plot.title = element_text(size=30)
+    text = ggplot2::element_text(size = 40),
+    plot.title = element_text(size=34)
   ),
   min_size = 40
 ) + ggplot2::ggtitle(
-  "Number of curated mouse ligand-receptor interactions"
+  "Co-Origin of curated mouse ligand-receptor interactions"
 )
 LRI_upset_mouse
-#manul save: 2000x1200
+#manual save: 2100x1200
+
