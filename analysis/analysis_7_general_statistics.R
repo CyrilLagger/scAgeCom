@@ -318,7 +318,7 @@ plot_KEYWORD_summary_local <- function(
     ggplot2::ggtitle(
       stringr::str_trunc(
         paste0(
-          "Over-representation of ",
+          "Over-representation with age of ",
           keyword
         ),
         70, 
