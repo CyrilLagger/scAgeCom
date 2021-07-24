@@ -122,7 +122,7 @@ LRI_upset_mouse <- ComplexUpset::upset(
   ),
   min_size = 40
 ) + ggplot2::ggtitle(
-  "Co-Origin of curated mouse ligand-receptor interactions"
+  "Origin of curated mouse ligand-receptor interactions"
 )
 LRI_upset_mouse
 #manual save: 2100x1200
