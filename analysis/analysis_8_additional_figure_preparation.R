@@ -1122,7 +1122,8 @@ plot_ORA_GO_treemap_local <- function(
   type_choice,
   go_aspect_choice,
   title_text,
-  domain = NULL
+  domain = NULL,
+  min_size
 ) {
   Dataset <- Tissue <- ASPECT <- REGULATION <- 
     new_parent <- term <- parentTerm <- ids <- 
@@ -1206,27 +1207,39 @@ plot_ORA_GO_treemap_local <- function(
       xanchor = "left",
       x = 0.0
     ),
-    #uniformtext = list(
-    #  minsize = 16,
-    #  mode = "hide"
-    #),
+    uniformtext = list(
+     minsize = min_size,
+     mode = "hide"
+    ),
     margin = m
   )
 }
 
 GO_REDUCED_table_local <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_shiny_data.rds")$GO_REDUCED_table
 
+GO_REDUCED_bladder <- GO_REDUCED_table_local[
+  Dataset ==  "TMS Droplet (male)" &
+    Tissue == "Bladder" &
+    ASPECT == "biological_process" & 
+    REGULATION == "UP" & 
+    cluster %in% c(1,2,3,4)
+]
+
+GO_REDUCED_bladder
+
 p_treemap <- plot_ORA_GO_treemap_local(
-  GO_REDUCED_table = GO_REDUCED_table_local,
+  GO_REDUCED_table = GO_REDUCED_bladder,
   tissue_choice = "Bladder",
   dataset_choice = "TMS Droplet (male)",
   type_choice = "UP",
   go_aspect_choice = "biological_process",
   title_text = paste0(
-    "GO Biological Processes - ",
+    "Top GO Biological Processes - ",
     "UP"
-  )
+  ),
+  min_size = 12
 )
+p_treemap
 
 Sys.setenv(
   "PATH" = paste(
@@ -1234,7 +1247,7 @@ Sys.setenv(
     "C:\\Users\\clagger\\AppData\\Local\\Programs\\orca",
     sep = .Platform$path.sep)
 )
-orca(p_treemap, "../data_scAgeCom/figures/fig4_ora_go.png", scale = 3)
+orca(p_treemap, "../data_scAgeCom/figures/fig4_ora_go_empty.png", scale = 3)
 
 ## Figure 5 ####
 
