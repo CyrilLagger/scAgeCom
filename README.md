@@ -5,7 +5,7 @@ our "Murine Atlas of Age-related Changes in Intercellular Communication"
 ([preprint](https://www.biorxiv.org/content/10.1101/2021.08.13.456238v1)).
 
 Data are produced by combining our R package
-[scDiffCom]("https://github.com/CyrilLagger/scDiffCom")
+[scDiffCom](https://github.com/CyrilLagger/scDiffCom)
 with scRNA-seq data from
 [Tabula Muris Senis](https://tabula-muris-senis.ds.czbiohub.org/)
 and the
