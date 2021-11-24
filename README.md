@@ -13,8 +13,8 @@ with scRNA-seq data from
 and the
 [Murine aging cell atlas](https://mca.research.calicolabs.com/).
 
-All results are also available online as a shiny app
-[scagecom.org](https://scagecom.org/). The code of the App is available 
+All results are also available online as a shiny app:
+[scagecom.org](https://scagecom.org/). The code of the app is available 
 [here](https://github.com/CyrilLagger/scAgeComShiny).
 
 
