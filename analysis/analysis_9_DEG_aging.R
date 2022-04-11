@@ -8,7 +8,7 @@
 ## ursu_eugen@hotmail.com
 ## anais.equey@etu.univ-amu.fr
 ##
-## Perform MAST DEG analysis on TMS data 
+## Perform MAST DEG analysis on TMS data
 ## that match scAgeCom cell types and conditions
 ##
 ####################################################
@@ -411,7 +411,9 @@ table(wilcox_results$regulation)
 
 ## Load scAgeCom results ####
 
-scAgeCom_results <- readRDS("data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")
+scAgeCom_results <- readRDS(
+  "data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
+)
 CCI_results <- scAgeCom_results$CCI_table
 
 ## Comparing DEG with scAgeCom ####
@@ -526,8 +528,7 @@ deg_comp <- CCI_results[, .N, by = c(
 ]
 deg_comp[
   ,
-  pct := N/sum(N)*100
+  pct := N / sum(N) * 100
 ]
 
-
-fwrite(deg_comp, "data_deg_wilcox_aging/wilcox_results_dt.rds")
+fwrite(deg_comp, "data_deg_wilcox_aging/deg_comparison.csv")
