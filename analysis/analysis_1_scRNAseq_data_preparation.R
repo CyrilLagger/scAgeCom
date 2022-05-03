@@ -389,8 +389,3 @@ all_scdiffcom_ontology <- unique(
 all_scdiffcom_ontology %in% cl_names
 all_scdiffcom_ontology[!all_scdiffcom_ontology %in% cl_names]
 # there is some difference because of undetermined cell-types
-
-
-
-
-
