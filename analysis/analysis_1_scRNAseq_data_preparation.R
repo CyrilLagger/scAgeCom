@@ -76,7 +76,7 @@ lapply(seurats_unprocessed, function(x) {
 
 # Content of "counts" slot: integers
 lapply(seurats_unprocessed, function(x) {
-  x$RNA@counts[1:5,1:5]
+  x$RNA@counts[1:5, 1:5]
 })
 
 # Content of metadata
@@ -148,7 +148,8 @@ identical(
   as.character(md_tms_facs$cell_ontology_class),
   as.character(seurats_unprocessed$tms_facs$cell_ontology_class)
 )
-seurats_unprocessed$tms_facs$cell_ontology_final <- md_tms_facs$cell_ontology_final
+seurats_unprocessed$tms_facs$cell_ontology_final <-
+  md_tms_facs$cell_ontology_final
 seurats_unprocessed$tms_facs$cell_family <- md_tms_facs$cell_family
 seurats_unprocessed$tms_facs$cell_abbreviation <- md_tms_facs$cell_abbreviation
 
@@ -184,9 +185,11 @@ identical(
   as.character(md_tms_droplet$cell_ontology_class),
   as.character(seurats_unprocessed$tms_droplet$cell_ontology_class)
 )
-seurats_unprocessed$tms_droplet$cell_ontology_final <- md_tms_droplet$cell_ontology_final
+seurats_unprocessed$tms_droplet$cell_ontology_final <-
+  md_tms_droplet$cell_ontology_final
 seurats_unprocessed$tms_droplet$cell_family <- md_tms_droplet$cell_family
-seurats_unprocessed$tms_droplet$cell_abbreviation <- md_tms_droplet$cell_abbreviation
+seurats_unprocessed$tms_droplet$cell_abbreviation <-
+  md_tms_droplet$cell_abbreviation
 
 ## Change Calico Kidney cell-type annotations ####
 
@@ -224,11 +227,20 @@ md_calico_kidney[
     subtype_ontology_final
   )
 ]
-identical(md_calico_kidney$cell_ontology_final, md_calico_kidney$subtype_ontology_final)
-identical(as.character(md_calico_kidney$cell_type), as.character(seurats_unprocessed$calico_kidney$cell_type))
-seurats_unprocessed$calico_kidney$cell_ontology_final <- md_calico_kidney$cell_ontology_final
-seurats_unprocessed$calico_kidney$cell_family <- md_calico_kidney$cell_family
-seurats_unprocessed$calico_kidney$cell_abbreviation <- md_calico_kidney$cell_abbreviation
+identical(
+  md_calico_kidney$cell_ontology_final,
+  md_calico_kidney$subtype_ontology_final
+)
+identical(
+  as.character(md_calico_kidney$cell_type),
+  as.character(seurats_unprocessed$calico_kidney$cell_type)
+)
+seurats_unprocessed$calico_kidney$cell_ontology_final <-
+  md_calico_kidney$cell_ontology_final
+seurats_unprocessed$calico_kidney$cell_family <-
+  md_calico_kidney$cell_family
+seurats_unprocessed$calico_kidney$cell_abbreviation <-
+  md_calico_kidney$cell_abbreviation
 
 ## Change Calico Lung cell-type annotations ####
 
@@ -238,7 +250,9 @@ setDT(md_calico_lung)
 md_calico_lung[
   dt_celltype_conversion[tissue == "Lung"],
   on = c("cell_type==cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(paste0("i.", names(dt_celltype_conversion)[3:5]))
+  names(dt_celltype_conversion)[3:5] := mget(
+    paste0("i.", names(dt_celltype_conversion)[3:5])
+  )
 ]
 sort(table(md_calico_lung$cell_ontology_final), decreasing = TRUE)
 sort(unique(md_calico_lung$cell_ontology_final))
@@ -265,11 +279,20 @@ md_calico_lung[
     subtype_ontology_final
   )
 ]
-identical(md_calico_lung$cell_ontology_final, md_calico_lung$subtype_ontology_final)
-identical(as.character(md_calico_lung$cell_type), as.character(seurats_unprocessed$calico_lung$cell_type))
-seurats_unprocessed$calico_lung$cell_ontology_final <- md_calico_lung$cell_ontology_final
-seurats_unprocessed$calico_lung$cell_family <- md_calico_lung$cell_family
-seurats_unprocessed$calico_lung$cell_abbreviation <- md_calico_lung$cell_abbreviation
+identical(
+  md_calico_lung$cell_ontology_final,
+  md_calico_lung$subtype_ontology_final
+)
+identical(
+  as.character(md_calico_lung$cell_type),
+  as.character(seurats_unprocessed$calico_lung$cell_type)
+)
+seurats_unprocessed$calico_lung$cell_ontology_final <-
+  md_calico_lung$cell_ontology_final
+seurats_unprocessed$calico_lung$cell_family <-
+  md_calico_lung$cell_family
+seurats_unprocessed$calico_lung$cell_abbreviation <-
+  md_calico_lung$cell_abbreviation
 
 ## Change Calico Spleen cell-type annotations ####
 
@@ -279,7 +302,9 @@ setDT(md_calico_spleen)
 md_calico_spleen[
   dt_celltype_conversion[tissue == "Spleen"],
   on = c("cell_type==cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(paste0("i.", names(dt_celltype_conversion)[3:5]))
+  names(dt_celltype_conversion)[3:5] := mget(
+    paste0("i.", names(dt_celltype_conversion)[3:5])
+  )
 ]
 
 sort(table(md_calico_spleen$cell_ontology_final), decreasing = TRUE)
@@ -305,11 +330,20 @@ md_calico_spleen[
     subtype_ontology_final
   )
 ]
-identical(md_calico_spleen$cell_ontology_final, md_calico_spleen$subtype_ontology_final)
-identical(as.character(md_calico_spleen$cell_type), as.character(seurats_unprocessed$calico_spleen$cell_type))
-seurats_unprocessed$calico_spleen$cell_ontology_final <- md_calico_spleen$cell_ontology_final
-seurats_unprocessed$calico_spleen$cell_family <- md_calico_spleen$cell_family
-seurats_unprocessed$calico_spleen$cell_abbreviation <- md_calico_spleen$cell_abbreviation
+identical(
+  md_calico_spleen$cell_ontology_final,
+  md_calico_spleen$subtype_ontology_final
+)
+identical(
+  as.character(md_calico_spleen$cell_type),
+  as.character(seurats_unprocessed$calico_spleen$cell_type)
+)
+seurats_unprocessed$calico_spleen$cell_ontology_final <-
+  md_calico_spleen$cell_ontology_final
+seurats_unprocessed$calico_spleen$cell_family <-
+  md_calico_spleen$cell_family
+seurats_unprocessed$calico_spleen$cell_abbreviation <-
+  md_calico_spleen$cell_abbreviation
 
 
 ## save new Seurat objects ####
