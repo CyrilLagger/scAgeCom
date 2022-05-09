@@ -112,7 +112,7 @@ mart_lri_mouse_anno <- merge.data.table(
 )
 mart_lri_mouse_anno <- merge.data.table(
     mart_lri_mouse_anno,
-    mart_lri_human[, c(1,2)],
+    mart_lri_human[, c(1, 2)],
     by.x = "hsapiens_homolog_associated_gene_name",
     by.y = "hgnc_symbol_human",
     all.x = TRUE,
@@ -141,22 +141,22 @@ gene2pubmed_mouse <- gene2pubmed[tax_id == "10090"]
 gene2pubmed_human <- gene2pubmed[tax_id == "9606"]
 gene2pubmed_mouse[
     ,
-    `:=` (count_GeneID = .N),
+    `:=`(count_GeneID = .N),
     by = "GeneID"
 ]
 gene2pubmed_mouse[
     ,
-    `:=` (count_PubMed_ID = .N),
+    `:=`(count_PubMed_ID = .N),
     by = "PubMed_ID"
 ]
 gene2pubmed_human[
     ,
-    `:=` (count_GeneID = .N),
+    `:=`(count_GeneID = .N),
     by = "GeneID"
 ]
 gene2pubmed_human[
     ,
-    `:=` (count_PubMed_ID = .N),
+    `:=`(count_PubMed_ID = .N),
     by = "PubMed_ID"
 ]
 
@@ -401,15 +401,19 @@ saveRDS(
 
 ## Prepare Supplemental Data 1 for the manuscript ####
 
-LRI_human_to_xlsx <- scDiffCom::LRI_human[c(1,2,3)]
-names(LRI_human_to_xlsx) <- paste0(names(LRI_human_to_xlsx), "_human")
-LRI_mouse_to_xlsx <- scDiffCom::LRI_mouse[c(1,2,3)]
-names(LRI_mouse_to_xlsx) <- paste0(names(LRI_mouse_to_xlsx), "_mouse")
+xlsx_lri_human <- scDiffCom::LRI_human[c(1, 2, 3)]
+names(xlsx_lri_human) <- paste0(names(xlsx_lri_human), "_human")
+xlsx_lri_mouse <- scDiffCom::LRI_mouse[c(1, 2, 3)]
+names(xlsx_lri_mouse) <- paste0(names(xlsx_lri_mouse), "_mouse")
+xlsx_lri_mouse$LRI_curated_mouse <- dt_lri_mouse
 
-# openxlsx::write.xlsx(
-#  c(LRI_mouse_to_xlsx, LRI_human_to_xlsx),
-#  file = "../data_scAgeCom/analysis/outputs_data/Supplemental_Data_1.xlsx"
-# )
+openxlsx::write.xlsx(
+  c(xlsx_lri_mouse, xlsx_lri_human),
+  file = paste0(
+    path_scagecom_output,
+    "Supplemental_Data_1.xlsx"
+    )
+)
 
 ## Prepare Figure 1.a for the manuscript ####
 
@@ -418,7 +422,7 @@ LRI_upset_mouse <- ComplexUpset::upset(
   LRI_DATABASES,
   name = "Database Groupings by Frequency",
   set_sizes = ComplexUpset::upset_set_size()
-  + ylab('Database Size'),
+  + ylab("Database Size"),
   base_annotations = list(
     'Intersection Size' = ComplexUpset::intersection_size(
       mapping = ggplot2::aes(fill = Type),
@@ -442,4 +446,3 @@ LRI_upset_mouse <- ComplexUpset::upset(
 )
 LRI_upset_mouse
 #manual save: 2100x1200
-
