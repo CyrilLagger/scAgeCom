@@ -53,9 +53,9 @@ path_seurat <- "/workspace/lcyril_data/scRNA_seq/seurat_processed/"
 paths_dataset_unprocessed <- c(
   tms_facs = paste0(path_seurat, "seurat_tms_facs.rds"),
   tms_droplet = paste0(path_seurat, "seurat_tms_droplet.rds"),
-  calico_kidney = paste0(path_seurat, "seurat_calico_kidney.rds"),
-  calico_lung = paste0(path_seurat, "seurat_calico_lung.rds"),
-  calico_spleen = paste0(path_seurat, "seurat_calico_spleen.rds")
+  calico_kidney = paste0(path_seurat, "seurat_calico_kidney_unfiltered.rds"),
+  calico_lung = paste0(path_seurat, "seurat_calico_lung_unfiltered.rds"),
+  calico_spleen = paste0(path_seurat, "seurat_calico_spleen_unfiltered.rds")
 )
 
 # requires several GB of RAM
@@ -265,7 +265,6 @@ md_calico_lung[
   )
 ]
 anyNA(md_calico_lung$cell_ontology_final)
-
 md_calico_lung[
   dt_celltype_conversion[tissue == "Lung"],
   on = c("subtype==cell_ontology_class"),
@@ -345,53 +344,61 @@ seurats_unprocessed$calico_spleen$cell_family <-
 seurats_unprocessed$calico_spleen$cell_abbreviation <-
   md_calico_spleen$cell_abbreviation
 
-
 ## save new Seurat objects ####
 
-# saveRDS(
-#   seurats_unprocessed$tms_facs,
-#   paste0(
-#     path_seurat,
-#     "seurat_final_tms_facs.rds"
-#   )
-# )
-# saveRDS(
-#   seurats_unprocessed$tms_droplet,
-#   paste0(
-#     path_seurat,
-#     "seurat_final_tms_droplet.rds"
-#   )
-# )
-# saveRDS(
-#   seurats_unprocessed$calico_kidney,
-#   paste0(
-#     path_seurat,
-#     "seurat_final_calico_kidney.rds"
-#   )
-# )
-# saveRDS(
-#   seurats_unprocessed$calico_lung,
-#   paste0(
-#     path_seurat,
-#     "seurat_final_calico_lung.rds"
-#   )
-# )
-# saveRDS(
-#   seurats_unprocessed$calico_spleen,
-#   paste0(
-#     path_seurat,
-#     "seurat_final_calico_spleen.rds"
-#   )
-# )
+saveRDS(
+  seurats_unprocessed$tms_facs,
+  paste0(
+    path_seurat,
+    "seurat_final_tms_facs.rds"
+  )
+)
+saveRDS(
+  seurats_unprocessed$tms_droplet,
+  paste0(
+    path_seurat,
+    "seurat_final_tms_droplet.rds"
+  )
+)
+saveRDS(
+  seurats_unprocessed$calico_kidney,
+  paste0(
+    path_seurat,
+    "seurat_final_calico_kidney_unfiltered.rds"
+  )
+)
+saveRDS(
+  seurats_unprocessed$calico_lung,
+  paste0(
+    path_seurat,
+    "seurat_final_calico_lung_unfiltered.rds"
+  )
+)
+saveRDS(
+  seurats_unprocessed$calico_spleen,
+  paste0(
+    path_seurat,
+    "seurat_final_calico_spleen_unfiltered.rds"
+  )
+)
 
 ## Load processed datasets ####
 
 paths_dataset_processed <- c(
   tms_facs = paste0(path_seurat, "seurat_final_tms_facs.rds"),
   tms_droplet = paste0(path_seurat, "seurat_final_tms_droplet.rds"),
-  calico_kidney = paste0(path_seurat, "seurat_final_calico_kidney.rds"),
-  calico_lung = paste0(path_seurat, "seurat_final_calico_lung.rds"),
-  calico_spleen = paste0(path_seurat, "seurat_final_calico_spleen.rds")
+  calico_kidney = paste0(
+    path_seurat,
+    "seurat_final_calico_kidney_unfiltered.rds"
+  ),
+  calico_lung = paste0(
+    path_seurat,
+    "seurat_final_calico_lung_unfiltered.rds"
+  ),
+  calico_spleen = paste0(
+    path_seurat,
+    "seurat_final_calico_spleen_unfiltered.rds"
+  )
 )
 
 seurats_processed <- list(
@@ -410,8 +417,7 @@ dt_metadata <- rbindlist(
     function(i) {
       as.data.table(i[[]])
     }
-  )
-  ,
+  ),
   idcol = "dataset",
   fill = TRUE
 )
