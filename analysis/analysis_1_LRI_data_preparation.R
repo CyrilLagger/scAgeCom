@@ -15,6 +15,7 @@
 
 ## Add libraries ####
 
+library(data.table)
 library(scDiffCom)
 library(biomaRt)
 library(rentrez)
