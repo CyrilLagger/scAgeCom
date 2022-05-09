@@ -50,7 +50,7 @@ path_seurat <- "/workspace/lcyril_data/scRNA_seq/seurat_processed/"
 
 ## Loading unprocessed datasets ####
 
-paths_datased_unprocessed <- c(
+paths_dataset_unprocessed <- c(
   tms_facs = paste0(path_seurat, "seurat_tms_facs.rds"),
   tms_droplet = paste0(path_seurat, "seurat_tms_droplet.rds"),
   calico_kidney = paste0(path_seurat, "seurat_calico_kidney.rds"),
@@ -60,11 +60,11 @@ paths_datased_unprocessed <- c(
 
 # requires several GB of RAM
 seurats_unprocessed <- list(
-  tms_facs = readRDS(paths_datased_unprocessed[["tms_facs"]]),
-  tms_droplet = readRDS(paths_datased_unprocessed[["tms_droplet"]]),
-  calico_kidney = readRDS(paths_datased_unprocessed[["calico_kidney"]]),
-  calico_lung = readRDS(paths_datased_unprocessed[["calico_lung"]]),
-  calico_spleen = readRDS(paths_datased_unprocessed[["calico_spleen"]])
+  tms_facs = readRDS(paths_dataset_unprocessed[["tms_facs"]]),
+  tms_droplet = readRDS(paths_dataset_unprocessed[["tms_droplet"]]),
+  calico_kidney = readRDS(paths_dataset_unprocessed[["calico_kidney"]]),
+  calico_lung = readRDS(paths_dataset_unprocessed[["calico_lung"]]),
+  calico_spleen = readRDS(paths_dataset_unprocessed[["calico_spleen"]])
 )
 
 ## Double check basic contents of Seurat unprocessed objects ####
