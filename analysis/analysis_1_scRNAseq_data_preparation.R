@@ -426,11 +426,9 @@ saveRDS(
 
 ## Check which cell-type annotations are all in cell-ontology ####
 
-onto_cell <- ontoProc::getCellOnto()
-
 table(
-  unique(dt_metadata$cell_ontology_final) %in% onto_cell$name
+  unique(dt_metadata$cell_ontology_final) %in% ontoProc::getCellOnto()$name
 )
 unique(dt_metadata$cell_ontology_final)[
-  !unique(dt_metadata$cell_ontology_final) %in% onto_cell$name
+  !unique(dt_metadata$cell_ontology_final) %in% ontoProc::getCellOnto()$name
 ]
