@@ -417,14 +417,14 @@ openxlsx::write.xlsx(
 
 ## Prepare Figure 1.a for the manuscript ####
 
-LRI_upset_mouse <- ComplexUpset::upset(
-  as.data.frame(LRI_mouse_curated),
-  LRI_DATABASES,
+fig_lri_upset_mouse <- ComplexUpset::upset(
+  as.data.frame(shiny_dt_lri_mouse),
+  shiny_lri_dbs,
   name = "Database Groupings by Frequency",
   set_sizes = ComplexUpset::upset_set_size()
   + ylab("Database Size"),
   base_annotations = list(
-    'Intersection Size' = ComplexUpset::intersection_size(
+    "Intersection Size" = ComplexUpset::intersection_size(
       mapping = ggplot2::aes(fill = Type),
       counts = TRUE,
       bar_number_threshold = 100,
@@ -432,17 +432,30 @@ LRI_upset_mouse <- ComplexUpset::upset(
     ) + scale_fill_manual(
       values = c("purple", "coral")
     ) + theme(
-      axis.title.y = element_text(margin =margin(t = 0, r = -200, b = 0, l = 0)),
+      axis.title.y = element_text(
+        margin = margin(t = 0, r = -200, b = 0, l = 0)
+      ),
       legend.position = c(0.8, 0.85)
     )
   ),
   themes = ComplexUpset::upset_default_themes(
     text = ggplot2::element_text(size = 40),
-    plot.title = element_text(size=34)
+    plot.title = element_text(size = 34)
   ),
   min_size = 40
 ) + ggplot2::ggtitle(
   "Origin of curated mouse ligand-receptor interactions"
 )
-LRI_upset_mouse
+fig_lri_upset_mouse
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_lri_upset_mouse.png"
+  ),
+  plot = fig_lri_upset_mouse,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 3
+)
 #manual save: 2100x1200
