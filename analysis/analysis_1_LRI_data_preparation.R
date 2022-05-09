@@ -22,6 +22,18 @@ library(rentrez)
 library(ggplot2)
 library(kableExtra)
 
+## Specific paths ####
+
+path_project <- "/workspace/postdoc_aging/projects/all_projects/"
+path_scagecom_input <- paste0(
+  path_project,
+  "P1_scInterComAging/data_scAgeCom/input/"
+)
+path_scagecom_output <- paste0(
+  path_project,
+  "P1_scInterComAging/data_scAgeCom/output/"
+)
+
 ## Dataset Overview ####
 
 # The collections of ligand-receptor interactions (for both human and
