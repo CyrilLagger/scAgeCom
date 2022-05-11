@@ -136,6 +136,7 @@ mart_lri_mouse_anno <- unique(mart_lri_mouse_anno)
 anyNA(mart_lri_mouse_anno$mgi_symbol)
 table(mart_lri_mouse_anno$mgi_symbol %in% genes_lri_mouse)
 table(genes_lri_mouse %in% mart_lri_mouse_anno$mgi_symbol)
+genes_lri_mouse[!genes_lri_mouse %in% mart_lri_mouse_anno$mgi_symbol]
 
 ## Load gene2pubmed data ####
 
