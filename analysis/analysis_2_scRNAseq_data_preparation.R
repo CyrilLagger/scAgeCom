@@ -13,7 +13,7 @@
 ####################################################
 ##
 
-## Libraries ####
+## Add libraries ####
 
 library(Seurat)
 library(org.Mm.eg.db)
@@ -767,11 +767,38 @@ saveRDS(
   )
 )
 
+## Load datasets to analyse ####
+
+paths_dataset_analysis <- c(
+  tms_facs = paste0(path_seurat, "seurat_final_and_renamed_tms_facs.rds"),
+  tms_droplet = paste0(path_seurat, "seurat_final_and_renamed_tms_droplet.rds"),
+  calico_kidney = paste0(
+    path_seurat,
+    "seurat_final_and_renamed_calico_kidney_unfiltered.rds"
+  ),
+  calico_lung = paste0(
+    path_seurat,
+    "seurat_final_and_renamed_calico_lung_unfiltered.rds"
+  ),
+  calico_spleen = paste0(
+    path_seurat,
+    "seurat_final_and_renamed_calico_spleen_unfiltered.rds"
+  )
+)
+
+seurats_analysis <- list(
+  tms_facs = readRDS(paths_dataset_analysis[["tms_facs"]]),
+  tms_droplet = readRDS(paths_dataset_analysis[["tms_droplet"]]),
+  calico_kidney = readRDS(paths_dataset_analysis[["calico_kidney"]]),
+  calico_lung = readRDS(paths_dataset_analysis[["calico_lung"]]),
+  calico_spleen = readRDS(paths_dataset_analysis[["calico_spleen"]])
+)
+
 ## Create metadata data.table ####
 
 dt_metadata <- rbindlist(
   lapply(
-    seurats_processed_renamed,
+    seurats_analysis,
     function(i) {
       as.data.table(i[[]])
     }
@@ -789,7 +816,7 @@ saveRDS(
 )
 
 ## Check which cell-type annotations are all in cell-ontology ####
-s
+
 table(
   unique(dt_metadata$cell_ontology_final) %in% ontoProc::getCellOnto()$name
 )

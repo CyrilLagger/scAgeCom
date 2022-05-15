@@ -2,41 +2,35 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - April 2022
+## Last update - May 2022
 ##
-## cyril.lagger@liverpool.ac.uk
+## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
-## anais.equey@etu.univ-amu.fr
+## anais.equey@gmail.com
 ##
 ## scDiffCom objects preparation
 ##
 ####################################################
 ##
 
-## Libraries ####
+## Add libraries ####
 
-library(Seurat)
-library(scDiffCom)
 library(future)
+
+## Set options ####
 
 options(future.globals.maxSize = 15 * 1024^3)
 
-## Dataset path on Server ####
+## Check Seurat analysis objects ####
 
-server_path <- "/workspace/lcyril_data/scRNA_seq/seurat_processed/"
+seurats_analysis
 
-dataset_path <- c(
-  tms_facs = paste0(server_path, "seurat_final_tms_facs.rds"),
-  tms_droplet = paste0(server_path, "seurat_final_tms_droplet.rds"),
-  calico_kidney = paste0(server_path, "seurat_final_calico_kidney.rds"),
-  calico_lung = paste0(server_path, "seurat_final_calico_lung.rds"),
-  calico_spleen = paste0(server_path, "seurat_final_calico_spleen.rds")
+## scDiffCom output path ####
+
+path_scagecom_output_scdiffcom <- paste0(
+  path_scagecom_output,
+  "scDiffCom_14_05_2022"
 )
-
-## Output path ####
-
-# dir_data_output <- getwd()
-dir_data_output <- paste0(getwd(), "/data_scAgeCom_11_04_2022")
 
 ## List of analysis to do over datasets and sex ####
 
@@ -55,7 +49,7 @@ analysis_list <- list(
 for (analysis in analysis_list) {
   message(paste0("Starting the analysis of ", analysis))
   output_dir <- paste0(
-    dir_data_output,
+    path_scagecom_output_scdiffcom,
     "/scdiffcom_",
     analysis
   )
@@ -65,19 +59,19 @@ for (analysis in analysis_list) {
   }
   message("Reading seurat object.")
   if (analysis == "calico_male") {
-    seurat_kidney <- readRDS(dataset_path[["calico_kidney"]])
+    seurat_kidney <- seurats_analysis$calico_kidney
     seurat_kidney$age_group <- ifelse(
       seurat_kidney$age == "young",
       "YOUNG",
       "OLD"
     )
-    seurat_lung <- readRDS(dataset_path[["calico_lung"]])
+    seurat_lung <- seurats_analysis$calico_lung
     seurat_lung$age_group <- ifelse(
       seurat_lung$age == "young",
       "YOUNG",
       "OLD"
     )
-    seurat_spleen <- readRDS(dataset_path[["calico_spleen"]])
+    seurat_spleen <- seurats_analysis$calico_spleen
     seurat_spleen$age_group <- ifelse(
       seurat_spleen$age == "young",
       "YOUNG",
@@ -91,7 +85,7 @@ for (analysis in analysis_list) {
     )
     n_tissue <- 3
   } else if (analysis == "facs_female") {
-    seurat_obj <- readRDS(dataset_path[["tms_facs"]])
+    seurat_obj <- seurats_analysis$tms_facs
     seurat_obj <- subset(seurat_obj, subset = sex == "female")
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
@@ -107,7 +101,7 @@ for (analysis in analysis_list) {
     )
     n_tissue <- length(tissue_list)
   } else if (analysis == "facs_male") {
-    seurat_obj <- readRDS(dataset_path[["tms_facs"]])
+    seurat_obj <- seurats_analysis$tms_facs
     seurat_obj <- subset(seurat_obj, subset = sex == "male")
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
@@ -124,7 +118,7 @@ for (analysis in analysis_list) {
     )
     n_tissue <- length(tissue_list)
   } else if (analysis == "facs_mixed") {
-    seurat_obj <- readRDS(dataset_path[["tms_facs"]])
+    seurat_obj <- seurats_analysis$tms_facs
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
       "YOUNG",
@@ -140,7 +134,7 @@ for (analysis in analysis_list) {
     )
     n_tissue <- length(tissue_list)
   } else if (analysis == "droplet_female") {
-    seurat_obj <- readRDS(dataset_path[["tms_droplet"]])
+    seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
       subset = age %in% c("3m", "18m", "21m", "24m")
@@ -158,7 +152,7 @@ for (analysis in analysis_list) {
     )
     n_tissue <- length(tissue_list)
   } else if (analysis == "droplet_male") {
-    seurat_obj <- readRDS(dataset_path[["tms_droplet"]])
+    seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
       subset = age %in% c("3m", "18m", "21m", "24m")
@@ -175,7 +169,7 @@ for (analysis in analysis_list) {
     )
     n_tissue <- length(tissue_list)
   } else if (analysis == "droplet_mixed") {
-    seurat_obj <- readRDS(dataset_path[["tms_droplet"]])
+    seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
       subset = age %in% c("3m", "18m", "21m", "24m")
@@ -231,7 +225,7 @@ for (analysis in analysis_list) {
       message("Size-factor normalization:")
       seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
       saveRDS(seurat_tiss[[]], file = paste0(output_dir, "/md_", tiss, ".rds"))
-      future::plan(multicore, workers = 30)
+      future::plan(multicore, workers = 24)
       scdf_res <- scDiffCom::run_interaction_analysis(
         seurat_object = seurat_tiss,
         LRI_species = "mouse",
