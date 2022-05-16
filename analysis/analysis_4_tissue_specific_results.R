@@ -390,7 +390,63 @@ dt_ora_full[
     sub(".*_", "", VALUE)
   )]
 
-## Prepare Figure 3 for the manuscript ####
+# add ORA regulation annotations
+
+dt_ora_full[
+  ,
+  ':='(
+    IS_UP = ifelse(
+      OR_UP >= 1 & BH_P_VALUE_UP <= 0.05,
+      TRUE,
+      FALSE
+    ),
+    IS_DOWN = ifelse(
+      OR_DOWN >= 1 & BH_P_VALUE_DOWN <= 0.05,
+      TRUE,
+      FALSE
+    ),
+    IS_FLAT = ifelse(
+      OR_FLAT >= 1 & BH_P_VALUE_FLAT <= 0.05,
+      TRUE,
+      FALSE
+    )
+  )
+]
+
+dt_ora_full[
+  ,
+  ORA_REGULATION := ifelse(
+    !IS_UP & !IS_DOWN & !IS_FLAT,
+    "Not Over-represented",
+    ifelse(
+      !IS_UP & !IS_DOWN & IS_FLAT,
+      "FLAT",
+      ifelse(
+        !IS_UP & IS_DOWN & !IS_FLAT,
+        "DOWN",
+        ifelse(
+          IS_UP & !IS_DOWN & !IS_FLAT,
+          "UP",
+          ifelse(
+            IS_UP & !IS_DOWN & IS_FLAT,
+            "UP",
+            ifelse(
+              !IS_UP & IS_DOWN & IS_FLAT,
+              "DOWN",
+              ifelse(
+                IS_UP & IS_DOWN & !IS_FLAT,
+                "UP:DOWN",
+                "UP:DOWN"
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+]
+
+## Prepare Figure "dataset summary" for the manuscript ####
 
 fun_process_md <- function(
   md_path
@@ -766,5 +822,5 @@ fwrite(
   paste0(
     path_scagecom_output,
     "Supplementary_Data_cci_classification.csv"
-    )
+  )
 )
