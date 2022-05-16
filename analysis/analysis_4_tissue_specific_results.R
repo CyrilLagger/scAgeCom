@@ -15,9 +15,7 @@
 
 ## Add libraries ####
 
-library(rrvgo)
 library(openxlsx)
-library(GOSemSim)
 
 ## Retrieve scDiffCom results ####
 
@@ -79,7 +77,7 @@ fun_process_scd <- function(
     FUN = function(
       tiss
     ) {
-      res <- readRDS(paste0(dataset_path, "/scdiffcom_", tiss, ".rds"))
+      readRDS(paste0(dataset_path, "/scdiffcom_", tiss, ".rds"))
     }
   )
   # change some tissue names
@@ -89,7 +87,7 @@ fun_process_scd <- function(
   tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
   dataset <- lapply(
     seq_along(dataset),
-    function (i) {
+    function(i) {
       dataset[[i]]@parameters$object_name <- tissues[[i]]
       dataset[[i]]
     }
@@ -99,14 +97,14 @@ fun_process_scd <- function(
   dataset <- lapply(
     dataset,
     function(i) {
-      new_object <- EraseRawCCI(i)
+      scDiffCom::EraseRawCCI(i)
     }
   )
   # add cell type families ORA
   dataset <- lapply(
     dataset,
     function(i) {
-      print(GetParameters(i)$object_name)
+      print(scDiffCom::GetParameters(i)$object_name)
       temp_cell_types <- unique(
         GetTableCCI(
           object = i,
@@ -120,13 +118,13 @@ fun_process_scd <- function(
             cell_ontology_final %in% temp_cell_types
         ][, c("cell_ontology_final", "cell_family")]
       )
-      EMITTER_dt <- copy(temp_meta_family)
+      EMITTER_dt <- data.table::copy(temp_meta_family)
       setnames(
         EMITTER_dt,
         old = colnames(EMITTER_dt),
         new = c("EMITTER_CELLTYPE", "EMITTER_CELLFAMILY")
       )
-      RECEIVER_dt <- copy(temp_meta_family)
+      RECEIVER_dt <- data.table::copy(temp_meta_family)
       setnames(
         RECEIVER_dt,
         old = colnames(RECEIVER_dt),
@@ -216,7 +214,7 @@ dt_cci_full <- rbindlist(
 )
 
 # add log2fc on top of logfc and deal with infinite values
-dt_cci_full[, LOG2FC_BASE := LOGFC*log2(exp(1))]
+dt_cci_full[, LOG2FC_BASE := LOGFC * log2(exp(1))]
 dt_cci_full[
   ,
   LOG2FC := {
@@ -310,7 +308,7 @@ dt_cci_full[
 
 table(
   scDiffCom::LRI_mouse$LRI_curated_GO$GO_ID %in%
-   scDiffCom::gene_ontology_level$ID
+    scDiffCom::gene_ontology_level$ID
 )
 any(duplicated(scDiffCom::gene_ontology_level$ID))
 
@@ -320,7 +318,7 @@ dt_cci_full[
       scDiffCom::gene_ontology_level,
       on = "GO_ID==ID",
       GO_NAME := i.NAME
-      ][, c(1, 3)],
+    ][, c(1, 3)],
     LRI ~ .,
     value.var = "GO_NAME",
     fun.aggregate = paste0,
@@ -392,58 +390,15 @@ dt_ora_full[
     sub(".*_", "", VALUE)
   )]
 
-
-## Prepare meta.data for summary picture
-
-# scAgeCom_md_path <- "../data_scAgeCom/scDiffCom_results_md_25_04_2021/"
-# 
-# md_paths <- list.dirs(scAgeCom_md_path, recursive = FALSE)
-# md_paths
-# 
-# md_names <- c(
-#   "Calico Droplet (male)",
-#   "TMS Droplet (female)",
-#   "TMS Droplet (male)",
-#   "TMS FACS (female)",
-#   "TMS FACS (male)"
-# )
-# names(md_names) <- md_names
-# 
-# 
-# process_md <- function(
-#   md_path
-# ) {
-#   tissues <- gsub(".*md_(.+)\\.rds.*", "\\1", list.files(md_path))
-#   md <- lapply(
-#     X = tissues,
-#     FUN = function(
-#       tiss
-#     ) {
-#       res <- readRDS(paste0(md_path, "/md_", tiss, ".rds"))
-#     }
-#   )
-#   # change some tissue names
-#   tissues[tissues == "BAT"] <- "Adipose_Brown"
-#   tissues[tissues == "GAT"] <- "Adipose_Gonadal"
-#   tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
-#   tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
-#   names(md) <- tissues
-#   return(md)
-# }
-# 
-# test <- process_md(md_paths[[1]])
-
 ## Prepare Figure 3 for the manuscript ####
 
-#retrieve the age information
-md_paths <- list.dirs("../data_scAgeCom/scDiffCom_md_29_04_2021", recursive = FALSE)
-md_paths
-
-process_md <- function(
+fun_process_md <- function(
   md_path
 ) {
   # retrieve and load each object in the dataset
   tissues <- gsub(".*md_(.+)\\.rds.*", "\\1", list.files(md_path))
+  tissues <- tissues[!grepl("scdiffcom_", tissues)]
+  print(tissues)
   mds <- lapply(
     X = tissues,
     FUN = function(
@@ -462,17 +417,17 @@ process_md <- function(
   return(mds)
 }
 
-md_processed <- lapply(
-  md_paths,
+mds_processed <- lapply(
+  paths_scd_results,
   function(path) {
-    process_md(path)
+    fun_process_md(path)
   }
 )
-names(md_processed) <- dataset_names
+names(mds_processed) <- scd_dataset_names
 
-md_age <- rbindlist(
+mds_age <- rbindlist(
   lapply(
-    md_processed,
+    mds_processed,
     function(dataset) {
       rbindlist(
         lapply(
@@ -483,103 +438,89 @@ md_age <- rbindlist(
             )
           }
         ),
-        idcol = "Tissue"
+        idcol = "tissue"
       )
     }
   ),
-  idcol = "Dataset"
+  idcol = "dataset"
 )
 
-md_age_dc <- dcast.data.table(
-  md_age,
-  Dataset + Tissue ~ age_group,
-  value.var = "age_group"
-)
-
-md_age_dc[
+dt_datasets_summary <- dt_cci_full[!grepl("mixed", dataset)][
   ,
-  age_group := ifelse(
-    !is.na(young),
-    "7-8m vs 22-23m",
-    ifelse(
-      is.na(`18m`),
-      "3m vs 24m",
+  c("dataset", "tissue", "EMITTER_CELLTYPE")
+][
+  ,
+  uniqueN(EMITTER_CELLTYPE),
+  by = c("dataset", "tissue")
+][
+  dcast.data.table(
+    mds_age,
+    dataset + tissue ~ age_group,
+    value.var = "age_group"
+  )[
+    ,
+    age_group := ifelse(
+      !is.na(young),
+      "7-8m vs 22-23m",
       ifelse(
-        is.na(`21m`) & is.na(`24m`),
-        "3m vs 18m",
+        is.na(`18m`),
+        "3m vs 24m",
         ifelse(
-          is.na(`21m`),
-          "3m vs 18/24m",
-          "3m vs 18/21m"
+          is.na(`21m`) & is.na(`24m`),
+          "3m vs 18m",
+          ifelse(
+            is.na(`21m`),
+            "3m vs 18/24m",
+            "3m vs 18/21m"
+          )
         )
       )
     )
-  )
-]
-
-md_age_dc[
-  ,
-  age_group2 := ifelse(
-    Dataset == "TMS FACS (female)" & Tissue == "Mammary_Gland",
-    "(3m vs 18/21m)",
-    ifelse(
-      Dataset == "TMS Droplet (male)" & Tissue %in% c("Liver", "Spleen"),
-      "(3m vs 24m)",
+  ][
+    ,
+    age_group2 := ifelse(
+      dataset == "TMS FACS (female)" & tissue == "Mammary_Gland",
+      "(3m vs 18/21m)",
       ifelse(
-        Dataset == "TMS Droplet (male)" & Tissue %in% c("Lung"),
-        "(3m vs 18m)",
-        ""
+        dataset == "TMS Droplet (male)" & tissue %in% c("Liver", "Spleen"),
+        "(3m vs 24m)",
+        ifelse(
+          dataset == "TMS Droplet (male)" & tissue %in% c("Lung"),
+          "(3m vs 18m)",
+          ""
+        )
       )
     )
-  )
-]
-
-
-fig3_data <- readRDS(
-  "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
-)
-
-dataset_summary <- fig3_data$CCI_table[
-  ,
-  c("Dataset", "Tissue", "Emitter Cell Type")
-][
-  ,
-  uniqueN(`Emitter Cell Type`),
-  by = c("Dataset", "Tissue")
-]
-
-dataset_summary[
-  md_age_dc,
-  on = c("Dataset", "Tissue"),
+  ],
+  on = c("dataset", "tissue"),
   age_group2 := i.age_group2
 ]
 
-
-ggplot2::ggplot(
-  dataset_summary,
-  ggplot2::aes(
-    Dataset,
-    Tissue
+fig_datasets_summary <- ggplot(
+  dt_datasets_summary,
+  aes(
+    dataset,
+    tissue
   )
-) + ggplot2::geom_tile(
-  ggplot2::aes(
+) + geom_tile(
+  aes(
     width = 0.9,
     height = 0.9
   ),
   colour = "black",
   fill = "coral",
   alpha = 1
-) + ggplot2::ggtitle(
+) + ggtitle(
   "Number of cell types per dataset (additional age information)"
-) + ggplot2::geom_text(
-  #ggplot2::aes(label = paste(V1, "Cell Types", age_group2)),
-  ggplot2::aes(label = paste(V1, age_group2)),
+) + geom_text(
+  #aes(label = paste(V1, "Cell Types", age_group2)),
+  aes(label = paste(V1, age_group2)),
   size = 8,
   fontface = "bold"
-) + ggplot2::scale_x_discrete(
+) + scale_x_discrete(
   limits = c(
     "TMS FACS (male)",
-    "TMS FACS (female)" ,
+    "TMS FACS (female)",
     "TMS Droplet (male)",
     "TMS Droplet (female)",
     "Calico Droplet (male)"
@@ -591,27 +532,41 @@ ggplot2::ggplot(
     "TMS\nDroplet\n(female)\n3m vs 18/21m",
     "Calico\nDroplet\n(male)\n7-8m vs 22-23m"
   )
-) + ggplot2::scale_y_discrete(
+) + scale_y_discrete(
   limits = sort(
-    unique(dataset_summary$Tissue),
+    unique(dt_fig_3$tissue),
     decreasing = TRUE
   )
-) + ggplot2::xlab(
+) + xlab(
   ""
-) + ggplot2::ylab(
+) + ylab(
   ""
-) + ggplot2::theme(
-  text = ggplot2::element_text(size = 28),
-  axis.text = ggplot2::element_text(size = 28, colour = "black")
+) + theme(
+  text = element_text(size = 28),
+  axis.text = element_text(size = 28, colour = "black")
+)
+fig_datasets_summary
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_datasets_summary.png"
+  ),
+  plot = fig_datasets_summary,
+  width = 2100,
+  height = 1400,
+  units = "px",
+  scale = 3
 )
 #manual save 2000x1400
 
-## Prepare supplemental data 2 ####
+## Prepare Supplementary Data (CCI classification) ####
 
-supp2_table <- lapply(
+dt_cci_classification <- lapply(
   paths_scd_results,
   function(path) {
     tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(path))
+    tissues <- tissues[!grepl("md_", tissues)]
+    print(tissues)
     dataset <- lapply(
       X = tissues,
       FUN = function(
@@ -625,8 +580,8 @@ supp2_table <- lapply(
     tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
     tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
     dataset <- lapply(
-      seq_along(dataset), 
-      function (i) {
+      seq_along(dataset),
+      function(i) {
         dataset[[i]]@parameters$object_name <- tissues[[i]]
         dataset[[i]]
       }
@@ -756,8 +711,14 @@ supp2_table <- lapply(
               RECEIVER_CELLTYPE,
               sep = "_")]
           cci_dt[, CCI := paste(ER_CELLTYPES, LRI, sep = "_")]
-          cci_dt[, DE_DIRECTION := ifelse(is.na(DE_DIRECTION), "NONE", DE_DIRECTION)]
-          cci_dt[, REGULATION := ifelse(is.na(REGULATION), "NOT_DETECTED", REGULATION)]
+          cci_dt[
+            ,
+            DE_DIRECTION := ifelse(is.na(DE_DIRECTION), "NONE", DE_DIRECTION)
+          ]
+          cci_dt[
+            ,
+            REGULATION := ifelse(is.na(REGULATION), "NOT_DETECTED", REGULATION)
+          ]
           cci_dt[is.na(cci_dt)] <- FALSE
           cci_dt[
             ,
@@ -780,54 +741,30 @@ supp2_table <- lapply(
           ]
         }
       ),
-      idcol = "Tissue"
+      idcol = "tissue"
     )
   }
 )
-names(supp2_table) <- dataset_names
-supp2_table <- rbindlist(
-  supp2_table,
-  idcol = "Dataset"
+names(dt_cci_classification) <- scd_dataset_names
+dt_cci_classification <- rbindlist(
+  dt_cci_classification,
+  idcol = "dataset"
 )
-
-supp2_table_non_detected <- supp2_table[REGULATION == "NOT_DETECTED"]
-supp2_table_detected <- supp2_table[REGULATION != "NOT_DETECTED"]
-supp2_table_detected[
+dt_cci_classification[REGULATION == "NOT_DETECTED"]
+dt_cci_classification <- dt_cci_classification[REGULATION != "NOT_DETECTED"]
+dt_cci_classification[
   ,
-  PCT := N/sum(N)*100,
-  by = c("Dataset", "Tissue")
+  PCT := N / sum(N) * 100,
+  by = c("dataset", "tissue")
+]
+dt_cci_classification <- dt_cci_classification[
+  !grepl("mixed", dataset)
 ]
 
 fwrite(
-  supp2_table_detected,
-  "../data_scAgeCom/analysis/outputs_data/data_4_supp2_table_detected.csv"
+  dt_cci_classification,
+  paste0(
+    path_scagecom_output,
+    "Supplementary_Data_cci_classification.csv"
+    )
 )
-
-
-# supp2_table_final <- dcast.data.table(
-#   supp2_table_clean[, -c("N")],
-#   ... ~ Dataset + Tissue,
-#   value.var = "PCT"
-# )
-# supp2_table_final[is.na(supp2_table_final)] <- 0
-# supp2_table_final[
-#   ,
-#   AVG_PCT := rowMeans(.SD),
-#   .SDcols = 14:71
-# ]
-# supp2_table_final <- supp2_table_final[,c(1:13,72)]
-# 
-# supp2_template <- CJ(
-#   IS_CCI_EXPRESSED_YOUNG = c(TRUE, FALSE),
-#   IS_CCI_SCORE_YOUNG = c(TRUE, FALSE),
-#   IS_CCI_SPECIFIC_YOUNG = c(TRUE, FALSE),
-#   IS_CCI_EXPRESSED_OLD = c(TRUE, FALSE),
-#   IS_CCI_SCORE_OLD = c(TRUE, FALSE),
-#   IS_CCI_SPECIFIC_OLD = c(TRUE, FALSE),
-#   IS_DE_LOGFC = c(TRUE, FALSE),
-#   IS_DE_SIGNIFICANT = c(TRUE, FALSE),
-#   DE_DIRECTION = c("NONE", "UP", "DOWN"),
-#   IS_CCI_DETECTED_YOUNG = c(TRUE, FALSE),
-#   IS_CCI_DETECTED_OLD = c(TRUE, FALSE),
-#   IS_CCI_DE = c(TRUE, FALSE)
-# )
