@@ -807,14 +807,6 @@ dt_metadata <- rbindlist(
   fill = TRUE
 )
 
-saveRDS(
-  dt_metadata,
-  paste0(
-    path_scagecom_output,
-    "a2_dt_metadata.rds"
-  )
-)
-
 ## Check which cell-type annotations are all in cell-ontology ####
 
 table(
