@@ -134,6 +134,12 @@ setorder(
   -`Young CCI Score`
 )
 
+## Select datasets for shiny CCI results ####
+
+shiny_dt_cci_full <- shiny_dt_cci_full[
+  !grepl("mixed", Dataset)
+]
+
 ## Create a table of counts summary for shiny #####
 
 shiny_tissue_counts_summary <- dcast.data.table(
@@ -407,6 +413,15 @@ saveRDS(
   )
 )
 
+## Select datasets for ORA results ####
+
+shiny_dt_ora_full <- shiny_dt_ora_full[
+  !grepl("mixed", Dataset)
+]
+shiny_dt_go_reduced <- shiny_dt_go_reduced[
+  !grepl("mixed", Dataset)
+]
+
 ## Process the cross-tissue keyword counts table ####
 
 shiny_dt_ora_key_counts <- copy(dt_ora_key_counts)
@@ -527,6 +542,15 @@ shiny_dt_ora_key_counts[
   ),
 ]
 
+shiny_dt_ora_key_counts[
+  ,
+  `TMS FACS (mixed)` :=  NULL
+]
+shiny_dt_ora_key_counts[
+  ,
+  `TMS Droplet (mixed)` :=  NULL
+]
+
 ## Process the cross-tissue keyword summary table ####
 
 shiny_dt_ora_key_summary <- copy(dt_ora_key_summary)
@@ -580,6 +604,9 @@ shiny_dt_ora_key_summary[
   c("ASPECT", "GO Level") := mget(paste0("i.", c("ASPECT", "LEVEL")))
 ]
 shiny_dt_ora_key_summary[, `GO Level` := factor(`GO Level`)]
+shiny_dt_ora_key_summary <- shiny_dt_ora_key_summary[
+  !grepl("mixed", Dataset)
+]
 
 shiny_dt_ora_key_template <- unique(
   shiny_dt_ora_key_summary[
@@ -588,6 +615,9 @@ shiny_dt_ora_key_template <- unique(
     c("Tissue", "Dataset")
   ]
 )
+shiny_dt_ora_key_template <- shiny_dt_ora_key_template[
+  !grepl("mixed", Dataset)
+]
 
 ## Create vectors to access categories in shiny ####
 
