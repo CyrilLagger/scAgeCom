@@ -347,7 +347,7 @@ dt_lri_mouse[
     )
 ]
 
-## Prepare Supplemental Data 1 for the manuscript ####
+## Prepare Supplementary Data (LRI database) ####
 
 xlsx_lri_human <- scDiffCom::LRI_human[c(1, 2, 3)]
 names(xlsx_lri_human) <- paste0(names(xlsx_lri_human), "_human")
@@ -359,7 +359,7 @@ openxlsx::write.xlsx(
   c(xlsx_lri_mouse, xlsx_lri_human),
   file = paste0(
     path_scagecom_output,
-    "Supplemental_Data_1.xlsx"
+    "Supplementary_Data_1.xlsx"
     )
 )
 
