@@ -45,7 +45,7 @@ path_scagecom_output <- paste0(
 dt_lri_human <- copy(scDiffCom::LRI_human$LRI_curated)
 genes_lri_human <- unique(
   unlist(
-   dt_lri_human[, 2:6]
+    dt_lri_human[, 2:6]
   )
 )
 genes_lri_human <- genes_lri_human[!is.na(genes_lri_human)]
@@ -53,7 +53,7 @@ genes_lri_human <- genes_lri_human[!is.na(genes_lri_human)]
 dt_lri_mouse <- copy(scDiffCom::LRI_mouse$LRI_curated)
 genes_lri_mouse <- unique(
   unlist(
-   dt_lri_mouse[, 2:6]
+    dt_lri_mouse[, 2:6]
   )
 )
 genes_lri_mouse <- genes_lri_mouse[!is.na(genes_lri_mouse)]
@@ -117,19 +117,19 @@ setDT(mart_ortho_mouse)
 setDT(mart_lri_human)
 
 mart_lri_mouse_anno <- merge.data.table(
-    mart_lri_mouse,
-    mart_ortho_mouse,
-    by = "ensembl_gene_id",
-    all.x = TRUE,
-    all.y = TRUE
+  mart_lri_mouse,
+  mart_ortho_mouse,
+  by = "ensembl_gene_id",
+  all.x = TRUE,
+  all.y = TRUE
 )
 mart_lri_mouse_anno <- merge.data.table(
-    mart_lri_mouse_anno,
-    mart_lri_human[, c(1, 2)],
-    by.x = "hsapiens_homolog_associated_gene_name",
-    by.y = "hgnc_symbol_human",
-    all.x = TRUE,
-    all.y = TRUE
+  mart_lri_mouse_anno,
+  mart_lri_human[, c(1, 2)],
+  by.x = "hsapiens_homolog_associated_gene_name",
+  by.y = "hgnc_symbol_human",
+  all.x = TRUE,
+  all.y = TRUE
 )
 mart_lri_mouse_anno <- unique(mart_lri_mouse_anno)
 
@@ -147,113 +147,113 @@ gene2pubmed <- fread(
   )
 )
 setnames(
-    gene2pubmed,
-    old = colnames(gene2pubmed)[[1]],
-    new = c("tax_id")
+  gene2pubmed,
+  old = colnames(gene2pubmed)[[1]],
+  new = c("tax_id")
 )
 gene2pubmed_mouse <- gene2pubmed[tax_id == "10090"]
 gene2pubmed_human <- gene2pubmed[tax_id == "9606"]
 gene2pubmed_mouse[
-    ,
-    `:=`(count_GeneID = .N),
-    by = "GeneID"
+  ,
+  `:=`(count_GeneID = .N),
+  by = "GeneID"
 ]
 gene2pubmed_mouse[
-    ,
-    `:=`(count_PubMed_ID = .N),
-    by = "PubMed_ID"
+  ,
+  `:=`(count_PubMed_ID = .N),
+  by = "PubMed_ID"
 ]
 gene2pubmed_human[
-    ,
-    `:=`(count_GeneID = .N),
-    by = "GeneID"
+  ,
+  `:=`(count_GeneID = .N),
+  by = "GeneID"
 ]
 gene2pubmed_human[
-    ,
-    `:=`(count_PubMed_ID = .N),
-    by = "PubMed_ID"
+  ,
+  `:=`(count_PubMed_ID = .N),
+  by = "PubMed_ID"
 ]
 
 ## Get aging pubmed ids #####
 
 pmid_aging <- rentrez::entrez_search(
-    "pubmed",
-    paste0(
-        "aging[TIAB] OR longevity[TIAB] OR senescence[TIAB]",
-        " OR age-related[TIAB] OR dementia[TIAB] OR alzheimer[TIAB]",
-        " OR atherosclerosis[TIAB] OR parkinson[TIAB] OR stroke[TIAB]"
-    ),
-    retmax = 1000001
+  "pubmed",
+  paste0(
+    "aging[TIAB] OR longevity[TIAB] OR senescence[TIAB]",
+    " OR age-related[TIAB] OR dementia[TIAB] OR alzheimer[TIAB]",
+    " OR atherosclerosis[TIAB] OR parkinson[TIAB] OR stroke[TIAB]"
+  ),
+  retmax = 1000001
 )
 any(duplicated(pmid_aging$ids))
 
 gene2pubmed_mouse_aging <- gene2pubmed_mouse[
-    PubMed_ID %in% pmid_aging$ids &
+  PubMed_ID %in% pmid_aging$ids &
     count_PubMed_ID <= 50
 ]
 gene2pubmed_human_aging <- gene2pubmed_human[
-    PubMed_ID %in% pmid_aging$ids &
+  PubMed_ID %in% pmid_aging$ids &
     count_PubMed_ID <= 50
 ]
 
 ## Add number of pmid to LRI ####
 
 pmid_aging_lri <- lapply(
-    genes_lri_mouse,
-    function(i) {
-        temp1 <- gene2pubmed_mouse_aging[
-            GeneID %in%
-            mart_lri_mouse_anno[
-                mgi_symbol == i
-            ]$entrezgene_id
-        ]$PubMed_ID
-        temp2 <- gene2pubmed_human_aging[
-            GeneID %in%
-            mart_lri_mouse_anno[
-                mgi_symbol == i
-            ]$entrezgene_id_human
-        ]$PubMed_ID
-        unique(c(temp1, temp2))
-    }
+  genes_lri_mouse,
+  function(i) {
+    temp1 <- gene2pubmed_mouse_aging[
+      GeneID %in%
+        mart_lri_mouse_anno[
+          mgi_symbol == i
+        ]$entrezgene_id
+    ]$PubMed_ID
+    temp2 <- gene2pubmed_human_aging[
+      GeneID %in%
+        mart_lri_mouse_anno[
+          mgi_symbol == i
+        ]$entrezgene_id_human
+    ]$PubMed_ID
+    unique(c(temp1, temp2))
+  }
 )
 names(pmid_aging_lri) <- genes_lri_mouse
 
 table(sapply(pmid_aging_lri, length))
 
 pmid_aging_lri_n <- data.table(
-    gene = names(sapply(pmid_aging_lri, length)),
-    count = sapply(pmid_aging_lri, length)
+  gene = names(sapply(pmid_aging_lri, length)),
+  count = sapply(pmid_aging_lri, length)
 )
 
 dt_lri_mouse[
-    pmid_aging_lri_n,
-    on = "LIGAND_1==gene",
-    L1_N_agepmid := i.count
+  pmid_aging_lri_n,
+  on = "LIGAND_1==gene",
+  L1_N_agepmid := i.count
 ]
 dt_lri_mouse[
-    pmid_aging_lri_n,
-    on = "LIGAND_2==gene",
-    L2_N_agepmid := i.count
+  pmid_aging_lri_n,
+  on = "LIGAND_2==gene",
+  L2_N_agepmid := i.count
 ]
 dt_lri_mouse[
-    pmid_aging_lri_n,
-    on = "RECEPTOR_1==gene",
-    R1_N_agepmid := i.count
+  pmid_aging_lri_n,
+  on = "RECEPTOR_1==gene",
+  R1_N_agepmid := i.count
 ]
 dt_lri_mouse[
-    pmid_aging_lri_n,
-    on = "RECEPTOR_2==gene",
-    R2_N_agepmid := i.count
+  pmid_aging_lri_n,
+  on = "RECEPTOR_2==gene",
+  R2_N_agepmid := i.count
 ]
 dt_lri_mouse[
-    pmid_aging_lri_n,
-    on = "RECEPTOR_3==gene",
-    R3_N_agepmid := i.count
+  pmid_aging_lri_n,
+  on = "RECEPTOR_3==gene",
+  R3_N_agepmid := i.count
 ]
 
 pmid_colnames <- c(
-    "L1_N_agepmid", "L2_N_agepmid",
-    "R1_N_agepmid", "R2_N_agepmid", "R3_N_agepmid"
+  "L1_N_agepmid", "L2_N_agepmid",
+  "R1_N_agepmid", "R2_N_agepmid", "R3_N_agepmid"
 )
 
 ## Load HAGR data ####
@@ -271,17 +271,17 @@ hagr_genage_mouse <- fread(
   )
 )
 hagr_genage_mouse <- hagr_genage_mouse[
-    organism == "Mus musculus"
+  organism == "Mus musculus"
 ]
 hagr_genage_genes <- unique(
-    c(
-        mart_lri_mouse_anno[
-          hsapiens_homolog_associated_gene_name %in% hagr_genage_human$symbol
-        ]$mgi_symbol,
-        mart_lri_mouse_anno[
-          mgi_symbol %in% hagr_genage_mouse$symbol
-        ]$mgi_symbol
-    )
+  c(
+    mart_lri_mouse_anno[
+      hsapiens_homolog_associated_gene_name %in% hagr_genage_human$symbol
+    ]$mgi_symbol,
+    mart_lri_mouse_anno[
+      mgi_symbol %in% hagr_genage_mouse$symbol
+    ]$mgi_symbol
+  )
 )
 
 hagr_microarray <- fread(
@@ -291,15 +291,15 @@ hagr_microarray <- fread(
   )
 )
 hagr_microarray_genes <- unique(
-    c(
-        mart_lri_mouse_anno[
-          hsapiens_homolog_associated_gene_name %in%
-          hagr_microarray[Species == "human"]$Symbol
-        ]$mgi_symbol,
-        mart_lri_mouse_anno[
-          mgi_symbol %in% hagr_microarray[Species == "mouse"]$Symbol
-        ]$mgi_symbol
-    )
+  c(
+    mart_lri_mouse_anno[
+      hsapiens_homolog_associated_gene_name %in%
+        hagr_microarray[Species == "human"]$Symbol
+    ]$mgi_symbol,
+    mart_lri_mouse_anno[
+      mgi_symbol %in% hagr_microarray[Species == "mouse"]$Symbol
+    ]$mgi_symbol
+  )
 )
 
 hagr_cellage <- fread(
@@ -309,42 +309,42 @@ hagr_cellage <- fread(
   )
 )
 hagr_cellage_genes <- unique(
-    mart_lri_mouse_anno[
-          hsapiens_homolog_associated_gene_name %in%
-          hagr_cellage$gene_name
-        ]$mgi_symbol
+  mart_lri_mouse_anno[
+    hsapiens_homolog_associated_gene_name %in%
+      hagr_cellage$gene_name
+  ]$mgi_symbol
 )
 
 hagr_genes <- unique(
-    c(
-        hagr_genage_genes,
-        hagr_microarray_genes,
-        hagr_cellage_genes
-    )
+  c(
+    hagr_genage_genes,
+    hagr_microarray_genes,
+    hagr_cellage_genes
+  )
 )
 
 ## Annotate LRI with HAGR ####
 
 hagr_colnames <- c(
-    "HAGR_L1", "HAGR_L2", "HAGR_R1", "HAGR_R2", "HAGR_R3"
+  "HAGR_L1", "HAGR_L2", "HAGR_R1", "HAGR_R2", "HAGR_R3"
 )
 dt_lri_mouse[
-    ,
-    (hagr_colnames) := lapply(
-        .SD,
-        function(i) {
-            ifelse(
-                is.na(i),
-                NA,
-                ifelse(
-                    i %in% hagr_genes, TRUE, FALSE
-                )
-            )
-        }
-    ),
-    .SDcols = c(
-        "LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3"
-    )
+  ,
+  (hagr_colnames) := lapply(
+    .SD,
+    function(i) {
+      ifelse(
+        is.na(i),
+        NA,
+        ifelse(
+          i %in% hagr_genes, TRUE, FALSE
+        )
+      )
+    }
+  ),
+  .SDcols = c(
+    "LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3"
+  )
 ]
 
 ## Prepare Supplementary Data (LRI database) ####
@@ -359,8 +359,8 @@ openxlsx::write.xlsx(
   c(xlsx_lri_mouse, xlsx_lri_human),
   file = paste0(
     path_scagecom_output,
-    "Supplementary_Data_1.xlsx"
-    )
+    "Supplementary_Data_LRI_db.xlsx"
+  )
 )
 
 ## Prepare Figure 1.a for the manuscript ####
