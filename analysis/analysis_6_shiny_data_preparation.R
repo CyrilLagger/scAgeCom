@@ -2,18 +2,21 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - June 2021
+## Last update - May 2022
 ##
-## cyril.lagger@liverpool.ac.uk
+## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
-## anais.equey@etu.univ-amu.fr
+## anais.equey@gmail.com
 ##
-## collect all results for shiny
+## Process all results for the shiny app
 ##
 ####################################################
 ##
 
-## Libraries ####
+## Add libraries ####
+
+library(rrvgo)
+library(GOSemSim)
 
 ## Prepare LRI table for scAgeComShiny ####
 
@@ -38,50 +41,7 @@ setnames(
   )
 )
 
-shiny_lri_dbs <- sort(
-  unique(
-    unlist(
-      strsplit(
-        shiny_dt_lri_mouse$`Database(s) of Origin`,
-        ";")
-    )
-  )
-)
-
-shiny_dt_lri_mouse[
-  ,
-  Type := ifelse(
-    !is.na(`Ligand (2)`) | !is.na(`Receptor (2)`),
-    "Complex",
-    "Simple"
-  )
-]
-shiny_dt_lri_mouse[
-  ,
-  c(shiny_lri_dbs) := lapply(
-    shiny_lri_dbs,
-    function(i) {
-      ifelse(grepl(i, `Database(s) of Origin`), TRUE, FALSE)
-    }
-  )
-]
-
-## Save LRI table for scAgeComShiny ####
-
-shiny_ls_a2 <- list(
-  shiny_dt_lri_mouse = shiny_dt_lri_mouse,
-  shiny_lri_dbs = shiny_lri_dbs
-)
-
-saveRDS(
-  shiny_ls_a2,
-  paste0(
-    path_scagecom_output,
-    "shiny_ls_a2"
-  )
-)
-
-## Create a full CCI table for shiny ####
+## Process the full CCI table for shiny ####
 
 shiny_dt_cci_full <- copy(dt_cci_full)
 
@@ -221,12 +181,12 @@ setcolorder(
     "Total Cell-Cell Interactions",
     "Flat CCIs",
     "Down CCIs",
-    "UP CCIs", 
+    "UP CCIs",
     "NSC CCIs"
   )
 )
 
-## Create a full ORA table for shiny ####
+## Process full ORA table for shiny ####
 
 shiny_dt_ora_full <- copy(dt_ora_full)
 
@@ -292,6 +252,7 @@ setnames(
 setkey(shiny_dt_ora_full)
 
 # round numeric values
+
 shiny_dt_ora_full[, ORA_SCORE_UP := signif(ORA_SCORE_UP, 3)]
 shiny_dt_ora_full[, ORA_SCORE_DOWN := signif(ORA_SCORE_DOWN, 3)]
 shiny_dt_ora_full[, ORA_SCORE_FLAT := signif(ORA_SCORE_FLAT, 3)]
@@ -301,61 +262,6 @@ shiny_dt_ora_full[, OR_FLAT := signif(OR_FLAT, 3)]
 shiny_dt_ora_full[, BH_P_VALUE_UP := signif(BH_P_VALUE_UP, 3)]
 shiny_dt_ora_full[, BH_P_VALUE_DOWN := signif(BH_P_VALUE_DOWN, 3)]
 shiny_dt_ora_full[, BH_P_VALUE_FLAT := signif(BH_P_VALUE_FLAT, 3)]
-
-# add ORA regulation annotations
-shiny_dt_ora_full[
-  ,
-  ':='(
-    IS_UP = ifelse(
-      OR_UP >= 1 & BH_P_VALUE_UP <= 0.05,
-      TRUE,
-      FALSE
-    ),
-    IS_DOWN = ifelse(
-      OR_DOWN >= 1 & BH_P_VALUE_DOWN <= 0.05,
-      TRUE,
-      FALSE
-    ),
-    IS_FLAT = ifelse(
-      OR_FLAT >= 1 & BH_P_VALUE_FLAT <= 0.05,
-      TRUE,
-      FALSE
-    )
-  )
-]
-
-shiny_dt_ora_full[
-  ,
-  ORA_REGULATION := ifelse(
-    !IS_UP & !IS_DOWN & !IS_FLAT,
-    "Not Over-represented",
-    ifelse(
-      !IS_UP & !IS_DOWN & IS_FLAT,
-      "FLAT",
-      ifelse(
-        !IS_UP & IS_DOWN & !IS_FLAT,
-        "DOWN",
-        ifelse(
-          IS_UP & !IS_DOWN & !IS_FLAT,
-          "UP",
-          ifelse(
-            IS_UP & !IS_DOWN & IS_FLAT,
-            "UP",
-            ifelse(
-              !IS_UP & IS_DOWN & IS_FLAT,
-              "DOWN",
-              ifelse(
-                IS_UP & IS_DOWN & !IS_FLAT,
-                "UP:DOWN",
-                "UP:DOWN"
-              )
-            )
-          )
-        )
-      )
-    )
-  )
-]
 
 ## Create a ORA GO reduced table for TreeMap ####
 
@@ -491,30 +397,208 @@ shiny_dt_go_reduced <- rbindlist(
   idcol = "Dataset"
 )
 
+## Save ORA GO reduced table as it is time consuming to reproduce ####
+
 saveRDS(
   shiny_dt_go_reduced,
-  "../data_scAgeCom/analysis/outputs_data/data_4_shiny_dt_go_reduced_newINF.rds"
-)
-
-# treemapPlot(
-#   shiny_dt_go_reduced[
-#     Dataset == "TMS FACS (male)" &
-#       Tissue == "Kidney" &
-#       ASPECT == "biological_process" &
-#       REGULATION == "UP"
-#   ][, -c(1,2,3,4)]
-# )
-
-
-## create vectors to access categories in shiny ####
-
-ALL_TISSUES <- sort(
-  unique(
-    CCI_table$Tissue
+  paste0(
+    path_scagecom_output,
+    "shiny_dt_go_reducec.rds"
   )
 )
 
-ALL_CELLTYPES <- CCI_table[
+## Process the cross-tissue keyword counts table ####
+
+shiny_dt_ora_key_counts <- copy(dt_ora_key_counts)
+
+shiny_dt_ora_key_counts[
+  data.table(
+    old_category = c(
+      "LRI",
+      "LIGAND_COMPLEX",
+      "RECEPTOR_COMPLEX",
+      "ER_CELLTYPES",
+      "EMITTER_CELLTYPE",
+      "RECEIVER_CELLTYPE",
+      "GO_TERMS",
+      "KEGG_PWS",
+      "ER_CELLFAMILIES",
+      "EMITTER_CELLFAMILY",
+      "RECEIVER_CELLFAMILY"
+    ),
+    new_category = c(
+      "Ligand-Receptor Interaction",
+      "Ligand",
+      "Receptor",
+      "Emitter-Receiver Cell Type",
+      "Emitter Cell Type",
+      "Receiver Cell Type",
+      "GO Term",
+      "KEGG Pathway",
+      "Emitter-Receiver Cell Type Family",
+      "Emitter Cell Type Family",
+      "Receiver Cell Type Family"
+    )
+  ),
+  on = c("ORA_CATEGORY==old_category"),
+  ORA_CATEGORY := i.new_category
+]
+
+setcolorder(
+  shiny_dt_ora_key_counts,
+  c(
+    "ORA_CATEGORY",
+    "ORA_REGULATION",
+    "VALUE",
+    "Overall (Union)",
+    "TMS FACS (male)",
+    "TMS FACS (female)",
+    "TMS Droplet (male)",
+    "TMS Droplet (female)",
+    "Calico Droplet (male)"
+  )
+)
+
+shiny_dt_ora_key_counts[
+  unique(
+    dt_ora_full[
+      ORA_CATEGORY == "GO_TERMS",
+      c("VALUE", "ASPECT", "LEVEL")
+    ]
+  ),
+  on = "VALUE",
+  c("ASPECT", "GO Level") := mget(paste0("i.", c("ASPECT", "LEVEL")))
+]
+
+shiny_dt_ora_key_counts[, `GO Level` := factor(`GO Level`)]
+
+setkey(shiny_dt_ora_key_counts)
+setorder(
+  shiny_dt_ora_key_counts,
+  -`Overall (Union)`
+)
+
+shiny_dt_ora_key_counts[
+  ,
+  `Overall (Union)` := factor(
+    ifelse(
+      `Overall (Union)` < 10 & `Overall (Union)` > 0,
+      paste0("0", `Overall (Union)`, "/23"),
+      paste0(`Overall (Union)`, "/23")
+    )
+  ),
+]
+shiny_dt_ora_key_counts[
+  ,
+  `TMS FACS (male)` := factor(
+    ifelse(
+      `TMS FACS (male)` < 10 & `TMS FACS (male)` > 0,
+      paste0("0", `TMS FACS (male)`, "/21"),
+      paste0(`TMS FACS (male)`, "/21")
+    )
+  ),
+]
+shiny_dt_ora_key_counts[
+  ,
+  `TMS FACS (female)` := factor(
+    ifelse(
+      `TMS FACS (female)` < 10 & `TMS FACS (female)` > 0,
+      paste0("0", `TMS FACS (female)`, "/19"),
+      paste0(`TMS FACS (female)`, "/19")
+    )
+  ),
+]
+shiny_dt_ora_key_counts[
+  ,
+  `TMS Droplet (male)` := factor(
+    paste0(`TMS Droplet (male)`, "/6")
+  ),
+]
+shiny_dt_ora_key_counts[
+  ,
+  `TMS Droplet (female)` :=  factor(
+    paste0(`TMS Droplet (female)`, "/9")
+  ),
+]
+shiny_dt_ora_key_counts[
+  ,
+  `Calico Droplet (male)` := factor(
+    paste0(`Calico Droplet (male)`, "/3")
+  ),
+]
+
+## Process the cross-tissue keyword summary table ####
+
+shiny_dt_ora_key_summary <- copy(dt_ora_key_summary)
+setnames(
+  shiny_dt_ora_key_summary,
+  old = c("tissue", "dataset"),
+  new = c("Tissue", "Dataset")
+)
+
+shiny_dt_ora_key_summary[
+  data.table(
+    old_category = c(
+      "LRI",
+      "LIGAND_COMPLEX",
+      "RECEPTOR_COMPLEX",
+      "ER_CELLTYPES",
+      "EMITTER_CELLTYPE",
+      "RECEIVER_CELLTYPE",
+      "GO_TERMS",
+      "KEGG_PWS",
+      "ER_CELLFAMILIES",
+      "EMITTER_CELLFAMILY",
+      "RECEIVER_CELLFAMILY"
+    ),
+    new_category = c(
+      "Ligand-Receptor Interaction",
+      "Ligand",
+      "Receptor",
+      "Emitter-Receiver Cell Type",
+      "Emitter Cell Type",
+      "Receiver Cell Type",
+      "GO Term",
+      "KEGG Pathway",
+      "Emitter-Receiver Cell Type Family",
+      "Emitter Cell Type Family",
+      "Receiver Cell Type Family"
+    )
+  ),
+  on = c("ORA_CATEGORY==old_category"),
+  ORA_CATEGORY := i.new_category
+]
+
+shiny_dt_ora_key_summary[
+  unique(
+    dt_ora_full[
+      ORA_CATEGORY == "GO_TERMS",
+      c("VALUE", "ASPECT", "LEVEL")
+    ]
+  ),
+  on = "VALUE",
+  c("ASPECT", "GO Level") := mget(paste0("i.", c("ASPECT", "LEVEL")))
+]
+shiny_dt_ora_key_summary[, `GO Level` := factor(`GO Level`)]
+
+shiny_dt_ora_key_template <- unique(
+  shiny_dt_ora_key_summary[
+    ORA_REGULATION != "No Data"
+    ,
+    c("Tissue", "Dataset")
+  ]
+)
+
+## Create vectors to access categories in shiny ####
+
+shiny_all_tissues <- sort(
+  unique(
+    shiny_dt_cci_full$Tissue
+  )
+)
+names(shiny_all_tissues) <- shiny_all_tissues
+
+shiny_all_celltypes <- shiny_dt_cci_full[
   ,
   list(
     CELLTYPE = unique(`Emitter Cell Type`)
@@ -522,7 +606,7 @@ ALL_CELLTYPES <- CCI_table[
   by = c("Dataset", "Tissue")
 ]
 
-ALL_LRIs <- CCI_table[
+shiny_all_lris <- shiny_dt_cci_full[
   ,
   list(
     LRI = unique(`Ligand-Receptor Interaction`)
@@ -530,10 +614,10 @@ ALL_LRIs <- CCI_table[
   by = c("Dataset", "Tissue")
 ]
 
-ALL_GENES <- rbindlist(
+shiny_all_genes <- rbindlist(
   lapply(
     scds_datasets,
-    function(dataset){
+    function(dataset) {
       rbindlist(
         lapply(
           dataset,
@@ -543,7 +627,7 @@ ALL_GENES <- rbindlist(
               grepl("LIGAND|RECEPTOR", colnames(temp))
             ]
             data.table(
-              GENE =sort(
+              GENE = sort(
                 unique(
                   unlist(
                     temp[, cols_to_keep, with = FALSE]
@@ -560,13 +644,11 @@ ALL_GENES <- rbindlist(
   idcol = "Dataset"
 )
 
-names(ALL_TISSUES) <- ALL_TISSUES
-
-ALL_GO_TERMS <- rbindlist(
+shiny_all_go_terms <- rbindlist(
   lapply(
-    ALL_TISSUES,
+    shiny_all_tissues,
     function(tiss) {
-      dt <- unique(CCI_table[Tissue == tiss, c("Dataset", "GO_NAMES")])
+      dt <- unique(shiny_dt_cci_full[Tissue == tiss, c("Dataset", "GO_NAMES")])
       datasets <- sort(unique(dt$Dataset))
       names(datasets) <- datasets
       rbindlist(
@@ -594,13 +676,15 @@ ALL_GO_TERMS <- rbindlist(
   ),
   idcol = "Tissue"
 )
-ALL_GO_TERMS <- ALL_GO_TERMS[GO_NAMES != ""]
+shiny_all_go_terms <- shiny_all_go_terms[GO_NAMES != ""]
 
-ALL_KEGG_PWS <- rbindlist(
+shiny_all_kegg_pws <- rbindlist(
   lapply(
-    ALL_TISSUES,
+    shiny_all_tissues,
     function(tiss) {
-      dt <- unique(CCI_table[Tissue == tiss, c("Dataset", "KEGG_NAMES")])
+      dt <- unique(
+        shiny_dt_cci_full[Tissue == tiss, c("Dataset", "KEGG_NAMES")]
+      )
       datasets <- sort(unique(dt$Dataset))
       names(datasets) <- datasets
       rbindlist(
@@ -628,18 +712,18 @@ ALL_KEGG_PWS <- rbindlist(
   ),
   idcol = "Tissue"
 )
-ALL_KEGG_PWS <- ALL_KEGG_PWS[KEGG_NAMES != ""]
-ALL_KEGG_PWS <- ALL_KEGG_PWS[KEGG_NAMES != "NA"]
+shiny_all_kegg_pws <- shiny_all_kegg_pws[KEGG_NAMES != ""]
+shiny_all_kegg_pws <- shiny_all_kegg_pws[KEGG_NAMES != "NA"]
 
-ABBR_CELLTYPE <- lapply(
+shiny_abbr_celltype <- lapply(
   scd_dataset_names,
-  function(dataset){
+  function(dataset) {
     cell_types <- unique(
-      CCI_table[Dataset == dataset]$`Emitter Cell Type`
+      shiny_dt_cci_full[Dataset == dataset]$`Emitter Cell Type`
     )
-    dt <- meta_data_cell_types[
-      Final_annotation %in% cell_types,
-      c("Final_annotation", "Abbreviation")
+    dt <- dt_celltype_conversion[
+      cell_ontology_final %in% cell_types,
+      c("cell_ontology_final", "cell_abbreviation")
     ]
     setnames(
       dt,
@@ -650,75 +734,82 @@ ABBR_CELLTYPE <- lapply(
   }
 )
 
-ALL_ORA_CATEGORIES_SPECIFIC <- c(
+shiny_all_ora_categories_specific <- c(
   "By Cell Types",
   "By GO/KEGG",
   "By Genes"
 )
 
-ALL_ORA_TYPES <- c(
-  "UP", 
+shiny_all_ora_types <- c(
+  "UP",
   "DOWN",
   "FLAT"
 )
 
-ALL_ORA_GO_ASPECTS <- c(
+shiny_all_ora_go_aspects <- c(
   "Biological Process",
   "Molecular Function",
   "Cellular Component"
 )
 
-## removed heavly GO/KEGG column
+shiny_ora_categories_global <- c(
+  "By GO/KEGG",
+  "By Genes",
+  "By Cell Type Families"
+)
 
-CCI_table[, GO_NAMES := NULL]
-CCI_table[, KEGG_NAMES := NULL]
-colnames(CCI_table)
+shiny_ora_categories_keyword <- c(
+  "Ligand-Receptor Interaction",
+  "Ligand",
+  "Receptor",
+  "GO Term",
+  "KEGG Pathway",
+  "Emitter-Receiver Cell Type Family",
+  "Emitter Cell Type Family",
+  "Receiver Cell Type Family"
+)
 
-## save all results for shiny ####
+## Remove heavy GO/KEGG column ####
 
-data_4_tissue_specific_results <- list(
-  CCI_table = CCI_table,
-  ORA_table = ORA_table,
-  shiny_tissue_counts_summary = shiny_tissue_counts_summary,
-  shiny_dt_go_reduced = shiny_dt_go_reduced,
-  ALL_TISSUES = ALL_TISSUES,
-  ALL_CELLTYPES = ALL_CELLTYPES,
-  ALL_LRIs = ALL_LRIs,
-  ALL_GENES = ALL_GENES,
-  ALL_GO_TERMS = ALL_GO_TERMS,
-  ALL_KEGG_PWS = ALL_KEGG_PWS,
-  ALL_ORA_CATEGORIES_SPECIFIC = ALL_ORA_CATEGORIES_SPECIFIC,
-  ALL_ORA_GO_ASPECTS = ALL_ORA_GO_ASPECTS,
-  ALL_ORA_TYPES = ALL_ORA_TYPES,
-  ABBR_CELLTYPE = ABBR_CELLTYPE,
-  REFERENCE_GO_TERMS = scDiffCom::LRI_mouse$LRI_curated_GO[, c(1, 3)],
-  REFERENCE_KEGG_PWS = scDiffCom::LRI_mouse$LRI_curated_KEGG[, c(1, 3)]
+shiny_dt_cci_full[, GO_NAMES := NULL]
+shiny_dt_cci_full[, KEGG_NAMES := NULL]
+
+## Combine all shiny data and save them ####
+
+shiny_list_full <- list(
+  LRI_mouse_curated = shiny_dt_lri_mouse,
+  LRI_DATABASES = lri_dbs,
+  CCI_table = shiny_dt_cci_full,
+  ORA_table = shiny_dt_ora_full,
+  TISSUE_COUNTS_SUMMARY = shiny_tissue_counts_summary,
+  GO_REDUCED_table = shiny_dt_go_reduced,
+  ALL_TISSUES = shiny_all_tissues,
+  ALL_CELLTYPES = shiny_all_celltypes,
+  ALL_LRIs = shiny_all_lris,
+  ALL_GENES = shiny_all_genes,
+  ALL_GO_TERMS = shiny_all_go_terms,
+  ALL_KEGG_PWS = shiny_all_kegg_pws,
+  ALL_ORA_CATEGORIES_SPECIFIC = shiny_all_ora_categories_specific,
+  ALL_ORA_GO_ASPECTS = shiny_all_ora_go_aspects,
+  ALL_ORA_TYPES = shiny_all_ora_types,
+  ABBR_CELLTYPE = shiny_abbr_celltype,
+  REFERENCE_GO_TERMS = copy(scDiffCom::LRI_mouse$LRI_curated_GO)[
+    unique(scDiffCom::gene_ontology_level[, c("ID", "NAME")]),
+    on = "GO_ID==ID",
+    GO_NAME := i.NAME
+  ][, c(1, 3)],
+  REFERENCE_KEGG_PWS = scDiffCom::LRI_mouse$LRI_curated_KEGG[, c(1, 3)],
+  ORA_KEYWORD_COUNTS = dt_ora_key_counts,
+  ORA_KEYWORD_SUMMARY = dt_ora_key_summary,
+  ORA_KEYWORD_TEMPLATE = shiny_dt_ora_key_template,
+  ALL_ORA_CATEGORIES_GLOBAL = shiny_ora_categories_global,
+  ALL_ORA_CATEGORIES_KEYWORD = shiny_ora_categories_keyword
 )
 
 saveRDS(
-  data_4_tissue_specific_results,
-  "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
-)
-
-
-
-
-## save all previous results ####
-
-scAgeCom_shiny_data <- c(
-  readRDS(
-    "../data_scAgeCom/analysis/outputs_data/data_2_LRI_data_preparation.rds"
-  ),
-  readRDS(
-    "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
-  ),
-  readRDS(
-    "../data_scAgeCom/analysis/outputs_data/data_5_tissue_shared_results.rds"
+  shiny_list_full,
+  paste0(
+    path_scagecom_output,
+    "scAgeComShiny_data.rds"
   )
 )
-
-saveRDS(
-  scAgeCom_shiny_data,
-  "../data_scAgeCom/analysis/outputs_data/scAgeCom_shiny_data.rds"
-)
-
