@@ -363,11 +363,47 @@ openxlsx::write.xlsx(
   )
 )
 
-## Prepare Figure 1.a for the manuscript ####
+## Prepare Figure LRI distribution ####
+
+dt_lri_mouse_fig <- copy(dt_lri_mouse)
+dt_lri_mouse_fig <- dt_lri_mouse_fig[
+  ,
+  c(
+    "LIGAND_1", "LIGAND_2",
+    "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
+    "DATABASE"
+  )
+]
+dt_lri_mouse_fig[
+  ,
+  Type := ifelse(
+    !is.na(LIGAND_2) | !is.na(RECEPTOR_2),
+    "Complex",
+    "Simple"
+  )
+]
+lri_dbs <- sort(
+  unique(
+    unlist(
+      strsplit(
+        dt_lri_mouse_fig$DATABASE,
+        ";")
+    )
+  )
+)
+dt_lri_mouse_fig[
+  ,
+  c(lri_dbs) := lapply(
+    lri_dbs,
+    function(i) {
+      ifelse(grepl(i, DATABASE), TRUE, FALSE)
+    }
+  )
+]
 
 fig_lri_upset_mouse <- ComplexUpset::upset(
-  as.data.frame(shiny_dt_lri_mouse),
-  shiny_lri_dbs,
+  as.data.frame(dt_lri_mouse_fig),
+  lri_dbs,
   name = "Database Groupings by Frequency",
   set_sizes = ComplexUpset::upset_set_size()
   + ylab("Database Size"),
