@@ -13,10 +13,6 @@
 ####################################################
 ##
 
-## Add libraries ####
-
-library(openxlsx)
-
 ## Retrieve scDiffCom results ####
 
 paths_scd_results <- list.dirs(

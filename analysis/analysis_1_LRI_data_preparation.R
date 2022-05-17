@@ -21,6 +21,7 @@ library(biomaRt)
 library(rentrez)
 library(ggplot2)
 library(kableExtra)
+library(openxlsx)
 
 ## Specific paths ####
 
