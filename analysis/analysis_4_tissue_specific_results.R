@@ -581,7 +581,7 @@ fig_datasets_summary <- ggplot(
   )
 ) + scale_y_discrete(
   limits = sort(
-    unique(dt_fig_3$tissue),
+    unique(dt_datasets_summary$tissue),
     decreasing = TRUE
   )
 ) + xlab(
