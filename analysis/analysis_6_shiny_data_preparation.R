@@ -220,7 +220,11 @@ shiny_ora_cols_informative <- c(
   "ASPECT",
   "LEVEL",
   "EMITTER_CELLTYPE",
-  "RECEIVER_CELLTYPE"
+  "RECEIVER_CELLTYPE",
+  "IS_UP",
+  "IS_DOWN",
+  "IS_FLAT",
+  "ORA_REGULATION"
 )
 shiny_new_ora_cols_informative <- c(
   "Dataset",
@@ -243,7 +247,11 @@ shiny_new_ora_cols_informative <- c(
   "ASPECT",
   "GO Level",
   "EMITTER_CELLTYPE",
-  "RECEIVER_CELLTYPE"
+  "RECEIVER_CELLTYPE",
+  "IS_UP",
+  "IS_DOWN",
+  "IS_FLAT",
+  "ORA_REGULATION"
 )
 shiny_dt_ora_full <- shiny_dt_ora_full[
   ,
@@ -409,7 +417,7 @@ saveRDS(
   shiny_dt_go_reduced,
   paste0(
     path_scagecom_output,
-    "shiny_dt_go_reducec.rds"
+    "shiny_dt_go_reduced.rds"
   )
 )
 
@@ -556,8 +564,8 @@ shiny_dt_ora_key_counts[
 shiny_dt_ora_key_summary <- copy(dt_ora_key_summary)
 setnames(
   shiny_dt_ora_key_summary,
-  old = c("tissue", "dataset"),
-  new = c("Tissue", "Dataset")
+  old = c("tissue", "dataset", "dataset_tissue"),
+  new = c("Tissue", "Dataset", "Dataset_Tissue")
 )
 
 shiny_dt_ora_key_summary[
@@ -673,6 +681,9 @@ shiny_all_genes <- rbindlist(
   ),
   idcol = "Dataset"
 )
+shiny_all_genes <- shiny_all_genes[
+  !grepl("mixed", Dataset)
+]
 
 shiny_all_go_terms <- rbindlist(
   lapply(
@@ -746,7 +757,9 @@ shiny_all_kegg_pws <- shiny_all_kegg_pws[KEGG_NAMES != ""]
 shiny_all_kegg_pws <- shiny_all_kegg_pws[KEGG_NAMES != "NA"]
 
 shiny_abbr_celltype <- lapply(
-  scd_dataset_names,
+  scd_dataset_names[
+    !grepl("mixed", scd_dataset_names)
+  ],
   function(dataset) {
     cell_types <- unique(
       shiny_dt_cci_full[Dataset == dataset]$`Emitter Cell Type`
@@ -829,8 +842,8 @@ shiny_list_full <- list(
     GO_NAME := i.NAME
   ][, c(1, 3)],
   REFERENCE_KEGG_PWS = scDiffCom::LRI_mouse$LRI_curated_KEGG[, c(1, 3)],
-  ORA_KEYWORD_COUNTS = dt_ora_key_counts,
-  ORA_KEYWORD_SUMMARY = dt_ora_key_summary,
+  ORA_KEYWORD_COUNTS = shiny_dt_ora_key_counts,
+  ORA_KEYWORD_SUMMARY = shiny_dt_ora_key_summary,
   ORA_KEYWORD_TEMPLATE = shiny_dt_ora_key_template,
   ALL_ORA_CATEGORIES_GLOBAL = shiny_ora_categories_global,
   ALL_ORA_CATEGORIES_KEYWORD = shiny_ora_categories_keyword
