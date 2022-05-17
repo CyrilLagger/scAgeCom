@@ -179,11 +179,6 @@ scds_datasets <- lapply(
 )
 names(scds_datasets) <- scd_dataset_names
 
-saveRDS(
-  scds_datasets,
-  "data_scAgeCom_11_04_2022_processed/scAgeCom_results_processed.rds"
-)
-
 ## Create full CCI tables and add information ####
 
 dt_cci_full <- rbindlist(
