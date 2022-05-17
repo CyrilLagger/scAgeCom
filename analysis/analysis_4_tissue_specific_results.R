@@ -437,6 +437,18 @@ dt_ora_full[
   )
 ]
 
+# Clean KEGG names if built with previous scDiffCom version
+
+dt_ora_full[
+  ORA_CATEGORY == "KEGG_PWS",
+  VALUE := gsub(
+    " - Mus musculus (house mouse)",
+    "",
+    VALUE,
+    fixed = TRUE
+  )
+]
+
 ## Prepare Figure "dataset summary" for the manuscript ####
 
 fun_process_md <- function(
