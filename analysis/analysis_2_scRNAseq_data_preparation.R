@@ -399,7 +399,7 @@ seurats_processed <- list(
 
 ## Mapping gene names to MGI ####
 
-genes_seurat <- lapply(
+genes_seurat_unmapped <- lapply(
   seurats_processed,
   rownames
 )
@@ -412,7 +412,7 @@ mart_seurats <- biomaRt::getBM(
   ),
   filters = "mgi_symbol",
   mart = mart_db_mouse,
-  values = unique(c(unlist(genes_seurat), genes_lri_mouse))
+  values = unique(c(unlist(genes_seurat_unmapped), genes_lri_mouse))
 )
 setDT(mart_seurats)
 
@@ -427,11 +427,11 @@ setDT(dt_org_mm)
 table(genes_lri_mouse %in% dt_org_mm$SYMBOL)
 table(genes_lri_mouse %in% dt_org_mm$ALIAS)
 
-table(genes_seurat$tms_facs %in% dt_org_mm$ALIAS)
+table(genes_seurat_unmapped$tms_facs %in% dt_org_mm$ALIAS)
 
 dt_genes_seurat <- rbindlist(
   l = lapply(
-    genes_seurat,
+    genes_seurat_unmapped,
     function(i) {
       data.table(gene_orig = i)
     }
@@ -534,12 +534,12 @@ fun_map_genes <- function(dt) {
 }
 
 genes_seurat_mapped <- lapply(
-  names(genes_seurat),
+  names(genes_seurat_unmapped),
   function(dat) {
     fun_map_genes(dt_seurat_org[dataset == dat])
   }
 )
-names(genes_seurat_mapped) <- names(genes_seurat)
+names(genes_seurat_mapped) <- names(genes_seurat_unmapped)
 
 ## Function inspired from Seurat.utils to rename genes ####
 
@@ -562,16 +562,16 @@ seurats_processed_renamed <- list()
 ## Check and change gene names for TMS FACS ####
 
 table(
-  genes_seurat$tms_facs %in% genes_seurat_mapped$tms_facs$gene_orig
+  genes_seurat_unmapped$tms_facs %in% genes_seurat_mapped$tms_facs$gene_orig
 )
 table(
-  genes_seurat_mapped$tms_facs$gene_orig %in% genes_seurat$tms_facs
+  genes_seurat_mapped$tms_facs$gene_orig %in% genes_seurat_unmapped$tms_facs
 )
 any(duplicated(genes_seurat_mapped$tms_facs$gene_orig))
 any(duplicated(genes_seurat_mapped$tms_facs$gene_res))
 anyNA(genes_seurat_mapped$tms_facs$gene_res)
 
-table(genes_seurat$tms_facs %in% genes_lri_mouse)
+table(genes_seurat_unmapped$tms_facs %in% genes_lri_mouse)
 table(genes_seurat_mapped$tms_facs$gene_orig %in% genes_lri_mouse)
 table(genes_seurat_mapped$tms_facs$gene_res %in% genes_lri_mouse)
 
@@ -596,16 +596,16 @@ identical(
 ## Check and change gene names for TMS Droplet ####
 
 table(
-  genes_seurat$tms_droplet %in% genes_seurat_mapped$tms_droplet$gene_orig
+  genes_seurat_unmapped$tms_droplet %in% genes_seurat_mapped$tms_droplet$gene_orig
 )
 table(
-  genes_seurat_mapped$tms_droplet$gene_orig %in% genes_seurat$tms_droplet
+  genes_seurat_mapped$tms_droplet$gene_orig %in% genes_seurat_unmapped$tms_droplet
 )
 any(duplicated(genes_seurat_mapped$tms_droplet$gene_orig))
 any(duplicated(genes_seurat_mapped$tms_droplet$gene_res))
 anyNA(genes_seurat_mapped$tms_droplet$gene_res)
 
-table(genes_seurat$tms_droplet %in% genes_lri_mouse)
+table(genes_seurat_unmapped$tms_droplet %in% genes_lri_mouse)
 table(genes_seurat_mapped$tms_droplet$gene_orig %in% genes_lri_mouse)
 table(genes_seurat_mapped$tms_droplet$gene_res %in% genes_lri_mouse)
 
@@ -630,16 +630,16 @@ identical(
 ## Check and change gene names for Calico kidney ####
 
 table(
-  genes_seurat$calico_kidney %in% genes_seurat_mapped$calico_kidney$gene_orig
+  genes_seurat_unmapped$calico_kidney %in% genes_seurat_mapped$calico_kidney$gene_orig
 )
 table(
-  genes_seurat_mapped$calico_kidney$gene_orig %in% genes_seurat$calico_kidney
+  genes_seurat_mapped$calico_kidney$gene_orig %in% genes_seurat_unmapped$calico_kidney
 )
 any(duplicated(genes_seurat_mapped$calico_kidney$gene_orig))
 any(duplicated(genes_seurat_mapped$calico_kidney$gene_res))
 anyNA(genes_seurat_mapped$calico_kidney$gene_res)
 
-table(genes_seurat$calico_kidney %in% genes_lri_mouse)
+table(genes_seurat_unmapped$calico_kidney %in% genes_lri_mouse)
 table(genes_seurat_mapped$calico_kidney$gene_orig %in% genes_lri_mouse)
 table(genes_seurat_mapped$calico_kidney$gene_res %in% genes_lri_mouse)
 
@@ -664,16 +664,16 @@ identical(
 ## Check and change gene names for Calico lung ####
 
 table(
-  genes_seurat$calico_lung %in% genes_seurat_mapped$calico_lung$gene_orig
+  genes_seurat_unmapped$calico_lung %in% genes_seurat_mapped$calico_lung$gene_orig
 )
 table(
-  genes_seurat_mapped$calico_lung$gene_orig %in% genes_seurat$calico_lung
+  genes_seurat_mapped$calico_lung$gene_orig %in% genes_seurat_unmapped$calico_lung
 )
 any(duplicated(genes_seurat_mapped$calico_lung$gene_orig))
 any(duplicated(genes_seurat_mapped$calico_lung$gene_res))
 anyNA(genes_seurat_mapped$calico_lung$gene_res)
 
-table(genes_seurat$calico_lung %in% genes_lri_mouse)
+table(genes_seurat_unmapped$calico_lung %in% genes_lri_mouse)
 table(genes_seurat_mapped$calico_lung$gene_orig %in% genes_lri_mouse)
 table(genes_seurat_mapped$calico_lung$gene_res %in% genes_lri_mouse)
 
@@ -698,16 +698,16 @@ identical(
 ## Check and change gene names for Calico spleen ####
 
 table(
-  genes_seurat$calico_spleen %in% genes_seurat_mapped$calico_spleen$gene_orig
+  genes_seurat_unmapped$calico_spleen %in% genes_seurat_mapped$calico_spleen$gene_orig
 )
 table(
-  genes_seurat_mapped$calico_spleen$gene_orig %in% genes_seurat$calico_spleen
+  genes_seurat_mapped$calico_spleen$gene_orig %in% genes_seurat_unmapped$calico_spleen
 )
 any(duplicated(genes_seurat_mapped$calico_spleen$gene_orig))
 any(duplicated(genes_seurat_mapped$calico_spleen$gene_res))
 anyNA(genes_seurat_mapped$calico_spleen$gene_res)
 
-table(genes_seurat$calico_spleen %in% genes_lri_mouse)
+table(genes_seurat_unmapped$calico_spleen %in% genes_lri_mouse)
 table(genes_seurat_mapped$calico_spleen$gene_orig %in% genes_lri_mouse)
 table(genes_seurat_mapped$calico_spleen$gene_res %in% genes_lri_mouse)
 
