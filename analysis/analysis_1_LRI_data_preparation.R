@@ -15,13 +15,10 @@
 
 ## Add libraries ####
 
-library(data.table)
 library(scDiffCom)
+library(data.table)
 library(biomaRt)
 library(rentrez)
-library(ggplot2)
-library(kableExtra)
-library(openxlsx)
 
 ## Specific paths ####
 
@@ -58,6 +55,16 @@ genes_lri_mouse <- unique(
   )
 )
 genes_lri_mouse <- genes_lri_mouse[!is.na(genes_lri_mouse)]
+
+lri_dbs <- sort(
+  unique(
+    unlist(
+      strsplit(
+        dt_lri_mouse$DATABASE,
+        ";")
+    )
+  )
+)
 
 ## Aging annotation strategy ####
 
@@ -347,100 +354,3 @@ dt_lri_mouse[
     "LIGAND_1", "LIGAND_2", "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3"
   )
 ]
-
-## Prepare Supplementary Data (LRI database) ####
-
-xlsx_lri_human <- scDiffCom::LRI_human[c(1, 2, 3)]
-names(xlsx_lri_human) <- paste0(names(xlsx_lri_human), "_human")
-xlsx_lri_mouse <- scDiffCom::LRI_mouse[c(1, 2, 3)]
-names(xlsx_lri_mouse) <- paste0(names(xlsx_lri_mouse), "_mouse")
-xlsx_lri_mouse$LRI_curated_mouse <- dt_lri_mouse
-
-openxlsx::write.xlsx(
-  c(xlsx_lri_mouse, xlsx_lri_human),
-  file = paste0(
-    path_scagecom_output,
-    "Supplementary_Data_LRI_db.xlsx"
-  )
-)
-
-## Prepare Figure LRI distribution ####
-
-dt_lri_mouse_fig <- copy(dt_lri_mouse)
-dt_lri_mouse_fig <- dt_lri_mouse_fig[
-  ,
-  c(
-    "LIGAND_1", "LIGAND_2",
-    "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
-    "DATABASE"
-  )
-]
-dt_lri_mouse_fig[
-  ,
-  Type := ifelse(
-    !is.na(LIGAND_2) | !is.na(RECEPTOR_2),
-    "Complex",
-    "Simple"
-  )
-]
-lri_dbs <- sort(
-  unique(
-    unlist(
-      strsplit(
-        dt_lri_mouse_fig$DATABASE,
-        ";")
-    )
-  )
-)
-dt_lri_mouse_fig[
-  ,
-  c(lri_dbs) := lapply(
-    lri_dbs,
-    function(i) {
-      ifelse(grepl(i, DATABASE), TRUE, FALSE)
-    }
-  )
-]
-
-fig_lri_upset_mouse <- ComplexUpset::upset(
-  as.data.frame(dt_lri_mouse_fig),
-  lri_dbs,
-  name = "Database Groupings by Frequency",
-  set_sizes = ComplexUpset::upset_set_size()
-  + ylab("Database Size"),
-  base_annotations = list(
-    "Intersection Size" = ComplexUpset::intersection_size(
-      mapping = ggplot2::aes(fill = Type),
-      counts = TRUE,
-      bar_number_threshold = 100,
-      text = list(size = 8)
-    ) + scale_fill_manual(
-      values = c("purple", "coral")
-    ) + theme(
-      axis.title.y = element_text(
-        margin = margin(t = 0, r = -200, b = 0, l = 0)
-      ),
-      legend.position = c(0.8, 0.85)
-    )
-  ),
-  themes = ComplexUpset::upset_default_themes(
-    text = ggplot2::element_text(size = 40),
-    plot.title = element_text(size = 34)
-  ),
-  min_size = 40
-) + ggplot2::ggtitle(
-  "Origin of curated mouse ligand-receptor interactions"
-)
-fig_lri_upset_mouse
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_lri_upset_mouse.png"
-  ),
-  plot = fig_lri_upset_mouse,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 3
-)
-#manual save: 2100x1200
