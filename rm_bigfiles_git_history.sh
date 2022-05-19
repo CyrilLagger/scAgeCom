@@ -15,11 +15,6 @@
 # 1d4124ef055f   58MiB shinyApp/data/a4_data_diffcom_all_filtered.rds
 # e6d7641768a9   83MiB GEOmetadb.sqlite
 
-# FILE="GEOmetadb.sqlite"
-FILE="shinyApp/data/a4_data_diffcom_all_filtered.rds"
-
-# Removal command
+# To remove files use BFG-Repo-Cleaner!
 # https://stackoverflow.com/questions/2100907/how-to-remove-delete-a-large-file-from-commit-history-in-the-git-repository
-git filter-branch --prune-empty -d /dev/shm/scratch \
-  --index-filter "git rm --cached -f --ignore-unmatch $FILE" \
-  --tag-name-filter cat -- --all
+# https://rtyley.github.io/bfg-repo-cleaner/#usage
