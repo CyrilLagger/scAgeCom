@@ -2,24 +2,63 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - June 2021
+## Last update - May 2022
 ##
-## cyril.lagger@liverpool.ac.uk
+## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
-## anais.equey@etu.univ-amu.fr
+## anais.equey@gmail.com
 ##
-## general statistics
+## Process all results for the shiny app
 ##
 ####################################################
 ##
 
-## libraries ####
-library(data.table)
-library(ggplot2)
+## Prepare Supplementary Data (LRI database) ####
+
+xlsx_lri_human <- scDiffCom::LRI_human[c(1, 2, 3)]
+names(xlsx_lri_human) <- paste0(names(xlsx_lri_human), "_human")
+xlsx_lri_mouse <- scDiffCom::LRI_mouse[c(1, 2, 3)]
+names(xlsx_lri_mouse) <- paste0(names(xlsx_lri_mouse), "_mouse")
+xlsx_lri_mouse$LRI_curated_mouse <- dt_lri_mouse
+
+openxlsx::write.xlsx(
+  c(xlsx_lri_mouse, xlsx_lri_human),
+  file = paste0(
+    path_scagecom_output,
+    "Supplementary_Data_LRI_db.xlsx"
+  )
+)
+
+
+## Number of detected CCIs ####
+
+# total
+dt_cci_full[, .N]
+dt_cci_full[!grepl("mixed", dataset), .N]
+
+# by datasets
+dt_cci_full[, .N, by = c("dataset")]
+
+# by regulation
+dt_cci_full[, .N, by = c("REGULATION")]
+dt_cci_full[, .N, by = c("REGULATION")][, N / sum(N) * 100]
+dt_cci_full[!grepl("mixed", dataset), .N, by = c("REGULATION")]
+dt_cci_full[!grepl("mixed", dataset), .N, by = c("REGULATION")][
+  , N / sum(N) * 100
+]
+
+
+#########################################################
+dt_cci_full[, .N, by = c("LRI", "dataset")][order(-N)]
 
 ## load results ####
 
-cci_stat_table <- readRDS("../data_scAgeCom/analysis/outputs_data/data_4_CCI_table_unprocessed.rds")
+#cci_stat_table <- readRDS("data_scAgeCom/analysis/outputs_data/data_4_CCI_table_unprocessed.rds")
+cci_stat_table <- copy(CCI_table)
+cci_stat_table <- cci_stat_table[
+  !grepl("mixed", Dataset)
+]
+
 shiny_results <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_shiny_data.rds")
 
 
@@ -28,17 +67,16 @@ shiny_results <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_shiny_
 regulation_table <- cci_stat_table[
   ,
   .N,
-  by = c("IS_CCI_EXPRESSED_YOUNG", "IS_CCI_SPECIFIC_YOUNG", "IS_CCI_SCORE_YOUNG",
+  by = c(
+    "IS_CCI_EXPRESSED_YOUNG", "IS_CCI_SPECIFIC_YOUNG", "IS_CCI_SCORE_YOUNG",
          "IS_CCI_EXPRESSED_OLD", "IS_CCI_SPECIFIC_OLD", "IS_CCI_SCORE_OLD",
          "IS_DE_LOGFC", "IS_DE_SIGNIFICANT", "DE_DIRECTION",
          "IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD", "IS_CCI_DE",
-         "REGULATION")
+         "REGULATION"
+         )
 ]
 
 ## summary statistics ####
-
-cci_stat_table[, .N]
-cci_stat_table[, .N, by = "REGULATION"][, N/sum(N)*100]
 
 regulation_table[
   REGULATION == "NSC",
@@ -52,29 +90,50 @@ regulation_table[
   by = c("IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD")
 ]
 
-## number of LRI per ER ####
+## number of LRI per ER / Extended Data Fi. 1 ####
 
-cci_stat_table[, DTER_CELLTYPES := paste(Dataset, Tissue, EMITTER_CELLTYPE, RECEIVER_CELLTYPE, sep = "_")]
-NLRI_table <- cci_stat_table[, .N, by = c("Dataset", "DTER_CELLTYPES")]
-
-ggplot(
-  data = NLRI_table
-) + geom_histogram(
-  aes(
-    x = N,
-    fill = Dataset,
-    color = Dataset
-  ),
-  bins = 100,
-  position = "identity",
-  alpha = 0.3
-)
+cci_stat_table[
+  ,
+   DTER_CELLTYPES := paste(
+    Dataset,
+    Tissue,
+    EMITTER_CELLTYPE,
+    RECEIVER_CELLTYPE,
+    sep = "_"
+    )
+]
+NLRI_table <- cci_stat_table[, .N, by = c("Dataset", "Tissue", "DTER_CELLTYPES")]
+NLRI_table[, DataTissue := paste(Dataset, Tissue, sep = "_")]
+NLRI_table[
+  ,
+  Dataset := factor(
+    Dataset,
+    c("TMS FACS (male)", "TMS FACS (female)", "TMS Droplet (male)", "TMS Droplet (female)", "Calico Droplet (male)")
+  )
+]
 
 
 distr_LRI <- c(NLRI_table$N, rep(0, sum(cci_stat_table[, uniqueN(EMITTER_CELLTYPE), by = c("Dataset", "Tissue")][, V1^2]) - nrow(NLRI_table) ))
 mean(distr_LRI)
 sd(distr_LRI)
 hist(distr_LRI, breaks = 100)
+
+
+## Number of ER for each LRI ####
+
+NER_by_LRI <- cci_stat_table[, .N, by = c("LRI", "Dataset")][order(-N)]
+
+ggplot(
+  data = NER_by_LRI
+) + geom_histogram(
+  aes(
+    x = N
+  ),
+  bins = 50,
+  position = "identity",
+  alpha = 0.3
+) + facet_wrap(~Dataset)
+
 
 ## regulation distribution per tissue ####
 
@@ -426,8 +485,32 @@ ggplot(
 )
 #manual save 3000x1800
 
+## Extended Data Fi. 1 ####
 
+ExtFig1 <- ggplot(
+  data = NLRI_table,
+  aes(
+    y = Tissue,
+    x = N
+  )
+) + geom_boxplot(
+) + facet_wrap(
+  ~ Dataset,
+  ncol = 5
+) + ggplot2::scale_y_discrete(
+    limits = sort(
+      unique(NLRI_table$Tissue),
+      decreasing = TRUE
+    )
+) + xlab(
+  "Number of detected LRIs per cell-type pair"
+) + theme(
+  text = element_text(size = 40, face = "bold"),
+  axis.text.x = element_text(size = 30),
+  axis.text.y = element_text(size = 36, face = "bold"),
+  axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0)),
+  panel.spacing = unit(2, "lines")
+)
+#add points with jitter
 
-
-
-
+ggsave("data_scAgeCom_11_04_2022_processed/ExtFig1.png", ExtFig1, scale = 3.5)

@@ -2,314 +2,143 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - May 2022
+## Last update - June 2021
 ##
-## lagger.cyril@gmail.com
+## cyril.lagger@liverpool.ac.uk
 ## ursu_eugen@hotmail.com
-## anais.equey@gmail.com
+## anais.equey@etu.univ-amu.fr
 ##
-## Create main figures for manuscript
+## additional figure preparation
 ##
 ####################################################
 ##
 
-## Add libraries ####
+## Libraries ####
 
+library(Seurat)
+library(data.table)
+library(scDiffCom)
 library(ggplot2)
+library(plotly)
+library(shiny)
 library(kableExtra)
 
-## Prepare Figure LRI distribution (Fig.1a) ####
+## Fig.2.1Data-preprocessing table ####
 
-fig_dt_lri_mouse <- copy(dt_lri_mouse)
-fig_dt_lri_mouse <- fig_dt_lri_mouse[
-  ,
-  c(
-    "LIGAND_1", "LIGAND_2",
-    "RECEPTOR_1", "RECEPTOR_2", "RECEPTOR_3",
-    "DATABASE"
-  )
-]
-fig_dt_lri_mouse[
-  ,
-  Type := ifelse(
-    !is.na(LIGAND_2) | !is.na(RECEPTOR_2),
-    "Complex",
-    "Simple"
-  )
-]
-fig_dt_lri_mouse[
-  ,
-  c(lri_dbs) := lapply(
-    lri_dbs,
-    function(i) {
-      ifelse(grepl(i, DATABASE), TRUE, FALSE)
-    }
-  )
-]
-
-figp_lri_upset_mouse <- ComplexUpset::upset(
-  as.data.frame(fig_dt_lri_mouse),
-  lri_dbs,
-  name = "Database Groupings by Frequency",
-  set_sizes = ComplexUpset::upset_set_size()
-  + ylab("Database Size"),
-  base_annotations = list(
-    "Intersection Size" = ComplexUpset::intersection_size(
-      mapping = ggplot2::aes(fill = Type),
-      counts = TRUE,
-      bar_number_threshold = 100,
-      text = list(size = 8)
-    ) + scale_fill_manual(
-      values = c("purple", "coral")
-    ) + theme(
-      axis.title.y = element_text(
-        margin = margin(t = 0, r = -200, b = 0, l = 0)
-      ),
-      legend.position = c(0.8, 0.85)
-    )
-  ),
-  themes = ComplexUpset::upset_default_themes(
-    text = ggplot2::element_text(size = 40),
-    plot.title = element_text(size = 34)
-  ),
-  min_size = 40
-) + ggplot2::ggtitle(
-  "Origin of curated mouse ligand-receptor interactions"
-)
-figp_lri_upset_mouse
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_lri_upset_mouse.png"
-  ),
-  plot = figp_lri_upset_mouse,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 3
-)
-#manual save: 2100x1200
-
-## Prepare Figure LRI functional annotation (Fig.1b) ####
-
-#in BioRender directly
-
-## Prepare Figure Workflow tSNE/UMAP (Fig.2.1) ####
-
-fig_seurat_mammary <- readRDS(
-  paste0(
-    path_scagecom_input,
-    "seurat_testing_tms_facs_mammary_gland.rds"
-  )
-)
-fig_seurat_mammary$age_group <- ifelse(
-  fig_seurat_mammary$age_group == "YOUNG",
-  "Cond1",
-  "Cond2"
-)
-fig_seurat_mammary$cell_ontology_final <- ifelse(
-  fig_seurat_mammary$cell_ontology_final == "basal cell",
-  "Cell Type 1",
-  ifelse(
-    fig_seurat_mammary$cell_ontology_final == "stromal cell",
-    "Cell Type 3",
-    ifelse(
-      fig_seurat_mammary$cell_ontology_final == "endothelial cell",
-      "Cell Type 4",
-      "Cell Type 2"
-    )
-  )
-)
-
-fig_seurat_mammary <- RunTSNE(fig_seurat_mammary, reduction = "PCA")
-Idents(fig_seurat_mammary) <- fig_seurat_mammary$cell_ontology_final
-
-DimPlot(
-  fig_seurat_mammary,
-  reduction = "tshe",
-  pt.size = 1
-) + theme(text = element_text(size = 40))
-
-fig_tsne_celltype <- Seurat::DimPlot(
-  fig_seurat_mammary,
-  reduction = "tsne",
-  pt.size = 3
-) + theme(text = element_text(size = 40))
-
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_tsne_celltype.png"
-  ),
-  fig_tsne_celltype,
-  scale = 1
-)
-
-Idents(fig_seurat_mammary) <- fig_seurat_mammary$age_group
-
-fig_tsne_cond <- Seurat::DimPlot(
-  fig_seurat_mammary,
-  reduction = "tsne",
-  pt.size = 1
-) + theme(text = element_text(size = 40))
-
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_tsne_cond.png"
-  ),
-  fig_tsne_cond,
-  scale = 1
-)
-
-## Prepare Figure Workflow pre-processing (Fig.2.1) ####
-
-fig_sc_data <- expm1(
+fig2_sc_data <- expm1(
   scDiffCom::seurat_sample_tms_liver$RNA@data[1:4, 1:4]
 )
-fig_sc_data <- as.data.frame(
+fig2_sc_data <- as.data.frame(
   as.matrix(
-    fig_sc_data
+    fig2_sc_data
   )
 )
-fig_sc_data <- round(
-  fig_sc_data,
+fig2_sc_data <- round(
+  fig2_sc_data,
   1
 )
-fig_sc_data <- data.frame(
+fig2_sc_data <- data.frame(
   lapply(
-    fig_sc_data,
+    fig2_sc_data,
     as.character
   ),
   stringsAsFactors = FALSE
 )
-colnames(fig_sc_data) <- c(
+colnames(fig2_sc_data) <- c(
   paste(
     "Cell",
-    1:(ncol(fig_sc_data)-2)
+    1:(ncol(fig2_sc_data)-2)
   ),
   "...", "Cell N"
 )
-rownames(fig_sc_data) <- c(
+rownames(fig2_sc_data) <- c(
   paste(
     "Gene",
-    1:(nrow(fig_sc_data)-2)
+    1:(nrow(fig2_sc_data)-2)
   ),
   "...", "Gene M"
 )
-fig_sc_data$... <- "..."
-fig_sc_data[3, 1:4] <- "..."
+fig2_sc_data$... <- "..."
+fig2_sc_data[3, 1:4] <- "..."
 
-fig_aggr_group <- paste(
+group <- paste(
   seurat_sample_tms_liver$cell_type,
   seurat_sample_tms_liver$age_group,
   sep = "_"
 )
 
-fig_sc_aggr <- t(
+fig2_sc_aggr <- t(
   DelayedArray::rowsum(
     Matrix::t(scDiffCom::seurat_sample_tms_liver$RNA@data),
-    group = fig_aggr_group
-  ) / as.vector(table(fig_aggr_group))
+    group = group
+  ) / as.vector(table(group))
 )
-fig_sc_aggr <- fig_sc_aggr[1:4, c(1,2,3,7,8)]
-fig_sc_aggr <- round(
-  fig_sc_aggr,
+fig2_sc_aggr <- fig2_sc_aggr[1:4, c(1,2,3,7,8)]
+fig2_sc_aggr <- round(
+  fig2_sc_aggr,
   1
 )
-colnames(fig_sc_aggr) <- c("Cond1", "Cond2", "...", "Cond1", "Cond2")
-rownames(fig_sc_aggr ) <- c(
+colnames(fig2_sc_aggr) <- c("Cond1", "Cond2", "...", "Cond1", "Cond2")
+rownames(fig2_sc_aggr ) <- c(
   paste(
     "Gene",
-    1:(nrow(fig_sc_aggr)-2)
+    1:(nrow(fig2_sc_aggr)-2)
   ),
   "...",
   "Gene M"
 )
-fig_sc_aggr[3,] <- "..."
-fig_sc_aggr[, 3] <- "..."
+fig2_sc_aggr[3,] <- "..."
+fig2_sc_aggr[, 3] <- "..."
 
 cbind(
-  fig_sc_data,
-  fig_sc_aggr
-) %>%
- kbl(
-  caption = paste0(
-    "<span style = 'font-size: 50px;",
-    "font-weight: bold;'>Averaged expression</span>"
-  ),
+  fig2_sc_data,
+  fig2_sc_aggr
+) %>% kbl(
+  caption = "<span style = 'font-size: 50px;font-weight: bold;'>Averaged expression</span>",
   align = rep("c", 5)
-) %>%
- kable_styling(
+) %>% kable_styling(
   "striped",
   full_width = FALSE
-) %>%
- add_header_above(
+) %>% add_header_above(
   c(" " = 5, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)
-) %>%
- kable_styling(
+) %>% kable_styling(
   font_size = 50
 )
 
-fig_sc_aggr %>%
+fig2_sc_aggr %>%
   kbl(
-    caption = paste0(
-      "<span style = 'font-size: 70px;",
-      "font-weight: bold;'>Averaged expression</span>"
-    ),
+    caption = "<span style = 'font-size: 70px;font-weight: bold;'>Averaged expression</span>",
     align = rep("c", 5)
   ) %>%
   kable_styling("striped", full_width = FALSE) %>%
-  add_header_above(
-    c(" " = 1, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)
-  ) %>%
+  add_header_above(c(" " = 1, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)) %>%
   kable_styling(font_size = 60) %>%
   column_spec(1:6, bold = T) %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_sc_aggr.png"
-    ),
-    zoom = 2,
-    vwidth = 1200
-  )
+  save_kable(file = "../data_scAgeCom/figures/fig2_sc_aggr.png", zoom = 2, vwidth = 1200)
 
-fig_sc_data %>%
+
+fig2_sc_data %>%
   kbl(
-    caption = paste0(
-      "<span style = 'font-size: 70px; ",
-      "font-weight: bold;'>Normalized counts</span>"
-    ),
+    caption = "<span style = 'font-size: 70px; font-weight: bold;'>Normalized counts</span>",
     align = rep("c", 4)
   ) %>%
   kable_styling("striped", full_width = FALSE) %>%
   kable_styling(font_size = 60) %>%
   column_spec(1:5, bold = T) %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_sc_data.png"
-    ),
-    zoom = 2,
-    vwidth = 1200
-  )
+  save_kable(file = "../data_scAgeCom/figures/fig2_sc_data.png",  zoom = 2, vwidth = 1200)
 
-## Prepare Figure Workflow LRI (Fig.2.2) ####
+## Fig.2.2 LRI table  ####
 
-fig_LRI_rd_data <- as.data.frame(
-  scDiffCom::LRI_mouse$LRI_curated[c(1, 643, 2, 3573), c(2, 3, 1, 4, 5, 6)]
-)
-fig_LRI_rd_data[is.na(fig_LRI_rd_data)] <- ""
-fig_LRI_rd_data[c(1,3),] <- "..."
-fig_LRI_rd_data[, 3] <- "\u00A0 \u00A0"
-colnames(fig_LRI_rd_data) <- c("L1", "L2", "\u00A0 \u00A0  ", "R1", "R2", "R3")
+fig2_LRI_data <- as.data.frame(scDiffCom::LRI_mouse$LRI_curated[c(1, 643, 2, 3573), c(2, 3, 1, 4,5, 6)])
+fig2_LRI_data[is.na(fig2_LRI_data)] <- ""
+fig2_LRI_data[c(1,3),] <- "..."
+fig2_LRI_data[, 3] <- "\u00A0 \u00A0"
+colnames(fig2_LRI_data) <- c("L1", "L2", "\u00A0 \u00A0  ", "R1", "R2", "R3")
 
-fig_LRI_rd_data %>%
+
+fig2_LRI_data %>% 
   kbl(
-    caption = paste0(
-      "<span style = 'font-size: 50px; ",
-      "font-weight: bold'>Ligand-Receptor Interactions</span>"
-    ),
+    caption = "<span style = 'font-size: 50px; font-weight: bold'>Ligand-Receptor Interactions</span>",
     align = rep("l", 5)
   ) %>%
   kable_styling("striped", full_width = FALSE) %>%
@@ -317,95 +146,108 @@ fig_LRI_rd_data %>%
   kable_styling(font_size = 50) %>%
   column_spec(1:5, bold = T) %>%
   column_spec(3, width = "5cm") %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_lri_rd_data.png"
-    ),
-    zoom = 3
-  )
+  save_kable(file = "../data_scAgeCom/figures/fig2_LRI_data.png", zoom = 3)
 
-## Prepare Figure Workflow potential CCIs (Fig.2.3) ####
+## Fig.2.3 Potential CCI table ####
 
-fig_cci_pot <- copy(
-  dt_cci_full
-)[dataset == "TMS FACS (female)" & tissue == "Mammary_Gland"]
-fig_cci_pot[
+fig2_cci_table_pot <- copy(readRDS( "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")$CCI_table)[Dataset == "TMS FACS (female)" & Tissue == "Mammary_Gland"]
+fig2_cci_table_pot[
   data.table(
-    old_ct = unique(fig_cci_pot$EMITTER_CELLTYPE),
-    new_ct = paste0(
-      "Cell Type ",
-      1:length(unique(fig_cci_pot$EMITTER_CELLTYPE))
-    )
+    old_ct = unique(fig2_cci_table_pot$`Emitter Cell Type`),
+    new_ct = paste0("Cell Type ", 1:length( unique(fig2_cci_table_pot$`Emitter Cell Type`)))
   ),
-  on = "EMITTER_CELLTYPE==old_ct",
+  on = "`Emitter Cell Type`==old_ct",
   emitter_cell_type := new_ct
 ]
-fig_cci_pot[
+fig2_cci_table_pot[
   data.table(
-    old_ct = unique(fig_cci_pot$RECEIVER_CELLTYPE),
-    new_ct = paste0(
-      "Cell Type ",
-      1:length( unique(fig_cci_pot$RECEIVER_CELLTYPE))
-    )
+    old_ct = unique(fig2_cci_table_pot$`Receiver Cell Type`),
+    new_ct = paste0("Cell Type ", 1:length( unique(fig2_cci_table_pot$`Receiver Cell Type`)))
   ),
-  on = "RECEIVER_CELLTYPE==old_ct",
+  on = "`Receiver Cell Type`==old_ct",
   receiver_cell_type := new_ct
 ]
-fig_cci_pot <- fig_cci_pot[
-  sample(1:nrow(fig_cci_pot), 10),
-  c(
-    "emitter_cell_type",
-    "receiver_cell_type",
-    "LRI",
-    "CCI_SCORE_YOUNG",
-    "CCI_SCORE_OLD",
-    "LOGFC"
-  )
-]
+fig2_cci_table_pot <- fig2_cci_table_pot[sample(1:nrow(fig2_cci_table_pot), 10), c(24, 25, 3, 9, 10, 6)]
 setorder(
-  fig_cci_pot,
+  fig2_cci_table_pot,
   emitter_cell_type,
   receiver_cell_type
 )
 
-fig_cci_pot <- fig_cci_pot[c(1, 2, 6, 7, 10)]
-fig_cci_pot$LOGFC <- fig_cci_pot$LOGFC/log2(exp(1))
-fig_cci_pot[, 4:6] <- round(fig_cci_pot[, 4:6] , 1)
-fig_cci_pot <- data.frame(
-  lapply(fig_cci_pot, as.character),
-  stringsAsFactors = FALSE
-)
-fig_cci_pot[c(1,3,5), ] <- "..."
-colnames(fig_cci_pot) <- c(
-  "Emitter", "Receiver", "LRI",
-  "Score Cond1", "Score Cond2", "Log FC"
-)
-fig_cci_pot
+fig2_cci_table_pot <- fig2_cci_table_pot[c(1,2,6,7,10)]
+fig2_cci_table_pot$`Log2 FC` <- fig2_cci_table_pot$`Log2 FC`/log2(exp(1))
+fig2_cci_table_pot[, 4:6] <- round(fig2_cci_table_pot[, 4:6] , 1)
+fig2_cci_table_pot <- data.frame(lapply(fig2_cci_table_pot, as.character), stringsAsFactors = FALSE)
+fig2_cci_table_pot[c(1,3,5), ] <- "..."
+colnames(fig2_cci_table_pot) <- c("Emitter", "Receiver", "LRI", "Score Cond1", "Score Cond2", "Log FC")
 
-fig_cci_pot %>%
+fig2_cci_table_pot
+
+fig2_cci_table_pot %>%
   kbl(
-    caption = paste0(
-      "<span style = 'font-size: 70px;font-weight: bold;",
-      "'>Hypothetic cell-cell interactions</span>"
-    ),
+    caption = "<span style = 'font-size: 70px;font-weight: bold;'>Hypothetic cell-cell interactions</span>",
     align = rep("c", 6)
   ) %>%
   kable_styling("striped", full_width = FALSE) %>%
   kable_styling(font_size = 55) %>%
   column_spec(1:6, bold = T) %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_cci_pot.png"
-    ),
-    zoom = 2,
-    vwidth = 2200
+  save_kable(file = "../data_scAgeCom/figures/fig2_cci_table_pot.png", zoom = 2, vwidth = 2200)
+
+
+## Fig.2.1 tsne plots by cell types and age ####
+
+seurat_mg <- readRDS("../data_scAgeCom/analysis/inputs_data/seurat_testing_tms_facs_mammary_gland.rds")
+seurat_mg$age_group <- ifelse(
+  seurat_mg$age_group == "YOUNG",
+  "Cond1",
+  "Cond2"
+)
+seurat_mg$cell_ontology_final <- ifelse(
+  seurat_mg$cell_ontology_final == "basal cell",
+  "Cell Type 1",
+  ifelse(
+    seurat_mg$cell_ontology_final == "stromal cell",
+    "Cell Type 3",
+    ifelse(
+      seurat_mg$cell_ontology_final == "endothelial cell",
+      "Cell Type 4",
+      "Cell Type 2"
+    )
   )
+)
 
-## Prepare Figure Workflow permutations (Fig.2.4) ####
 
-fig_aging_example <- run_interaction_analysis(
+seurat_mg <- Seurat::RunTSNE(seurat_mg, reduction = "PCA")
+
+Idents(seurat_mg) <- seurat_mg$cell_ontology_final
+
+Seurat::DimPlot(
+  seurat_mg,
+  reduction = "tsne",
+  pt.size = 1
+) + theme(text=element_text(size=40))
+
+fig2_tsne_celltype <- Seurat::DimPlot(
+  seurat_mg,
+  reduction = "tsne",
+  pt.size = 3
+) + theme(text=element_text(size=40))
+
+ggsave("../data_scAgeCom/figures/fig2_tsne_celltype.png", fig2_tsne_celltype, scale = 1)
+
+Idents(seurat_mg) <- seurat_mg$age_group
+
+fig2_tsne_cond <- Seurat::DimPlot(
+  seurat_mg,
+  reduction = "tsne",
+  pt.size = 1
+) + theme(text=element_text(size=40))
+
+ggsave("../data_scAgeCom/figures/fig2_tsne_cond.png", fig2_tsne_cond)
+
+## Toy model simulation for distributions #####
+
+aging_example <- run_interaction_analysis(
   seurat_object = seurat_sample_tms_liver,
   LRI_species = "mouse",
   seurat_celltype_id = "cell_type",
@@ -417,15 +259,15 @@ fig_aging_example <- run_interaction_analysis(
   return_distributions = TRUE
 )
 
-
+## Fig.2.4 Differential permutations ####
 
 distr_de <- data.frame(
-  counts = GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[235, ]
+  counts = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, ]
 )
 hist(distr_de$counts)
 
 distr_de$is_above <- ifelse(
-  abs(distr_de$counts) >= GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[235, 1001],
+  abs(distr_de$counts) >= GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001],
   TRUE,
   FALSE
 )
@@ -445,15 +287,15 @@ fig2_distr_de <- ggplot(
   values = c("blue", "red")
 ) + annotate(
   "segment",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[235, 1001],
-  xend = GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[235, 1001],
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001],
+  xend = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001],
   y = 38,
   yend = 0.5,
   size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[235, 1001]+0.8,
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_DE[235, 1001]+0.8,
   y = 42,
   label = "True Difference",
   size = 22
@@ -473,13 +315,13 @@ fig2_distr_de
 ## Fig.2.4 Cond1 permutations ####
 
 distr_cond1 <- data.frame(
-  counts = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[235, ]
+  counts = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, ]
 )
 hist(distr_cond1$counts)
 distr_cond1$counts[1001]
 
 distr_cond1$is_above <- ifelse(
-  abs(distr_cond1$counts) >= GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
+  abs(distr_cond1$counts) >= GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
   TRUE,
   FALSE
 )
@@ -499,15 +341,15 @@ fig2_distr_cond1 <- ggplot(
   values = c("blue", "red")
 ) + annotate(
   "segment",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
-  xend = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
+  xend = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
   y = 22,
   yend = 0.5,
   size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_YOUNG[235, 1001],
   y = 25,
   label = "True Score 1",
   size = 22
@@ -529,11 +371,11 @@ fig2_distr_cond1
 ## Fig.2.4 Cond2 permutations ####
 
 distr_cond2 <- data.frame(
-  counts = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[235, ]
+  counts = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, ]
 )
 
 distr_cond2$is_above <- ifelse(
-  abs(distr_cond2$counts) >= GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[235, 1001],
+  abs(distr_cond2$counts) >= GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, 1001],
   TRUE,
   FALSE
 )
@@ -553,15 +395,15 @@ fig2_distr_cond2 <- ggplot(
   values = c("blue", "red")
 ) + annotate(
   "segment",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[235, 1001],
-  xend = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[235, 1001],
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, 1001],
+  xend = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, 1001],
   y = 22,
   yend = 0.5,
   size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[235, 1001]-0.3,
+  x = GetDistributions(aging_example)$DISTRIBUTIONS_OLD[235, 1001]-0.3,
   y = 25,
   label = "True Score 2",
   size = 22
@@ -626,394 +468,6 @@ fig2_cci_table_final %>%
   kable_styling(font_size = 55) %>%
   column_spec(1:6, bold = T) %>%
   save_kable(file = "../data_scAgeCom/figures/fig2_cci_table_final.png", zoom = 2, vwidth = 2100)
-
-
-
-
-## Prepare Figure "dataset summary" for the manuscript ####
-
-fun_process_md <- function(
-  md_path
-) {
-  # retrieve and load each object in the dataset
-  tissues <- gsub(".*md_(.+)\\.rds.*", "\\1", list.files(md_path))
-  tissues <- tissues[!grepl("scdiffcom_", tissues)]
-  print(tissues)
-  mds <- lapply(
-    X = tissues,
-    FUN = function(
-      tiss
-    ) {
-      res <- readRDS(paste0(md_path, "/md_", tiss, ".rds"))
-      sort(unique(res$age))
-    }
-  )
-  # change some tissue names
-  tissues[tissues == "BAT"] <- "Adipose_Brown"
-  tissues[tissues == "GAT"] <- "Adipose_Gonadal"
-  tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
-  tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
-  names(mds) <- tissues
-  return(mds)
-}
-
-mds_processed <- lapply(
-  paths_scd_results,
-  function(path) {
-    fun_process_md(path)
-  }
-)
-names(mds_processed) <- scd_dataset_names
-
-mds_age <- rbindlist(
-  lapply(
-    mds_processed,
-    function(dataset) {
-      rbindlist(
-        lapply(
-          dataset,
-          function(tissue) {
-            data.table(
-              age_group = tissue
-            )
-          }
-        ),
-        idcol = "tissue"
-      )
-    }
-  ),
-  idcol = "dataset"
-)
-
-dt_datasets_summary <- dt_cci_full[!grepl("mixed", dataset)][
-  ,
-  c("dataset", "tissue", "EMITTER_CELLTYPE")
-][
-  ,
-  uniqueN(EMITTER_CELLTYPE),
-  by = c("dataset", "tissue")
-][
-  dcast.data.table(
-    mds_age,
-    dataset + tissue ~ age_group,
-    value.var = "age_group"
-  )[
-    ,
-    age_group := ifelse(
-      !is.na(young),
-      "7-8m vs 22-23m",
-      ifelse(
-        is.na(`18m`),
-        "3m vs 24m",
-        ifelse(
-          is.na(`21m`) & is.na(`24m`),
-          "3m vs 18m",
-          ifelse(
-            is.na(`21m`),
-            "3m vs 18/24m",
-            "3m vs 18/21m"
-          )
-        )
-      )
-    )
-  ][
-    ,
-    age_group2 := ifelse(
-      dataset == "TMS FACS (female)" & tissue == "Mammary_Gland",
-      "(3m vs 18/21m)",
-      ifelse(
-        dataset == "TMS Droplet (male)" & tissue %in% c("Liver", "Spleen"),
-        "(3m vs 24m)",
-        ifelse(
-          dataset == "TMS Droplet (male)" & tissue %in% c("Lung"),
-          "(3m vs 18m)",
-          ""
-        )
-      )
-    )
-  ],
-  on = c("dataset", "tissue"),
-  age_group2 := i.age_group2
-]
-
-fig_datasets_summary <- ggplot(
-  dt_datasets_summary,
-  aes(
-    dataset,
-    tissue
-  )
-) + geom_tile(
-  aes(
-    width = 0.9,
-    height = 0.9
-  ),
-  colour = "black",
-  fill = "coral",
-  alpha = 1
-) + ggtitle(
-  "Number of cell types per dataset (additional age information)"
-) + geom_text(
-  #aes(label = paste(V1, "Cell Types", age_group2)),
-  aes(label = paste(V1, age_group2)),
-  size = 8,
-  fontface = "bold"
-) + scale_x_discrete(
-  limits = c(
-    "TMS FACS (male)",
-    "TMS FACS (female)",
-    "TMS Droplet (male)",
-    "TMS Droplet (female)",
-    "Calico Droplet (male)"
-  ),
-  labels = c(
-    "TMS\nFACS\n(male)\n3m vs 18/24m",
-    "TMS\nFACS\n(female)\n3m vs 18m",
-    "TMS\nDroplet\n(male)\n3m vs 18/24m",
-    "TMS\nDroplet\n(female)\n3m vs 18/21m",
-    "Calico\nDroplet\n(male)\n7-8m vs 22-23m"
-  )
-) + scale_y_discrete(
-  limits = sort(
-    unique(dt_datasets_summary$tissue),
-    decreasing = TRUE
-  )
-) + xlab(
-  ""
-) + ylab(
-  ""
-) + theme(
-  text = element_text(size = 28),
-  axis.text = element_text(size = 28, colour = "black")
-)
-fig_datasets_summary
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_datasets_summary.png"
-  ),
-  plot = fig_datasets_summary,
-  width = 2100,
-  height = 1400,
-  units = "px",
-  scale = 3
-)
-#manual save 2000x1400
-
-## Prepare Supplementary Data (CCI classification) ####
-
-dt_cci_classification <- lapply(
-  paths_scd_results,
-  function(path) {
-    tissues <- gsub(".*scdiffcom_(.+)\\.rds.*", "\\1", list.files(path))
-    tissues <- tissues[!grepl("md_", tissues)]
-    print(tissues)
-    dataset <- lapply(
-      X = tissues,
-      FUN = function(
-        tiss
-      ) {
-        res <- readRDS(paste0(path, "/scdiffcom_", tiss, ".rds"))
-      }
-    )
-    tissues[tissues == "BAT"] <- "Adipose_Brown"
-    tissues[tissues == "GAT"] <- "Adipose_Gonadal"
-    tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
-    tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
-    dataset <- lapply(
-      seq_along(dataset),
-      function(i) {
-        dataset[[i]]@parameters$object_name <- tissues[[i]]
-        dataset[[i]]
-      }
-    )
-    names(dataset) <- tissues
-    regulation_dt <- rbindlist(
-      lapply(
-        dataset,
-        function(i) {
-          cci_dt <- copy(i@cci_table_raw)
-          dt <- cci_dt[
-            IS_CCI_EXPRESSED_YOUNG == TRUE | IS_CCI_EXPRESSED_OLD == TRUE
-          ]
-          dt[
-            ,
-            c(
-              "BH_P_VALUE_YOUNG",
-              "BH_P_VALUE_OLD",
-              "BH_P_VALUE_DE"
-            ) := list(
-              stats::p.adjust(P_VALUE_YOUNG, method = "BH"),
-              stats::p.adjust(P_VALUE_OLD, method = "BH"),
-              stats::p.adjust(P_VALUE_DE, method = "BH")
-            )
-          ]
-          dt[
-            ,
-            c(
-              "IS_CCI_SCORE_YOUNG",
-              "IS_CCI_SCORE_OLD",
-              "IS_CCI_SPECIFIC_YOUNG",
-              "IS_CCI_SPECIFIC_OLD",
-              "IS_DE_LOGFC",
-              "IS_DE_SIGNIFICANT",
-              "DE_DIRECTION",
-              "IS_CCI_DETECTED_YOUNG",
-              "IS_CCI_DETECTED_OLD",
-              "IS_CCI_DE"
-            ) := {
-              threshold_score_temp <- stats::quantile(
-                x = c(
-                  .SD[IS_CCI_EXPRESSED_YOUNG == TRUE][["CCI_SCORE_YOUNG"]],
-                  .SD[IS_CCI_EXPRESSED_OLD == TRUE][["CCI_SCORE_OLD"]]
-                ),
-                probs = 0.2
-              )
-              is_cci_score_1 <- (CCI_SCORE_YOUNG >= threshold_score_temp)
-              is_cci_score_2 <- (CCI_SCORE_OLD >= threshold_score_temp)
-              is_cci_specific_1 <- BH_P_VALUE_YOUNG <= 0.05
-              is_cci_specific_2 <- BH_P_VALUE_OLD <= 0.05
-              is_de_logfc <- LOGFC_ABS >= log(1.5)
-              is_de_significant <- BH_P_VALUE_DE <= 0.05
-              de_direction <- fifelse(LOGFC > 0, "UP", "DOWN")
-              is_cci_detected_1 <- (IS_CCI_EXPRESSED_YOUNG == TRUE) &
-                is_cci_score_1 & is_cci_specific_1
-              is_cci_detected_2 <- (IS_CCI_EXPRESSED_OLD == TRUE) &
-                is_cci_score_2 & is_cci_specific_2
-              is_cci_de <- is_de_logfc & is_de_significant
-              list(
-                is_cci_score_1, is_cci_score_2,
-                is_cci_specific_1, is_cci_specific_2,
-                is_de_logfc, is_de_significant, de_direction,
-                is_cci_detected_1, is_cci_detected_2,
-                is_cci_de
-              )
-            }
-          ]
-          dt[
-            ,
-            REGULATION :=
-              ifelse(
-                !IS_CCI_DETECTED_YOUNG & !IS_CCI_DETECTED_OLD,
-                "NOT_DETECTED",
-                ifelse(
-                  IS_DE_LOGFC & IS_DE_SIGNIFICANT & DE_DIRECTION == "UP",
-                  "UP",
-                  ifelse(
-                    IS_DE_LOGFC & IS_DE_SIGNIFICANT & DE_DIRECTION == "DOWN",
-                    "DOWN",
-                    ifelse(
-                      !IS_DE_LOGFC,
-                      "FLAT",
-                      ifelse(
-                        IS_DE_LOGFC & !IS_DE_SIGNIFICANT,
-                        "NSC",
-                        "There is a problem here!"
-                      )
-                    )
-                  )
-                )
-              )
-          ]
-          dt <- dt[
-            ,
-            c(
-              "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LRI",
-              "IS_CCI_EXPRESSED_YOUNG",
-              "IS_CCI_EXPRESSED_OLD",
-              "IS_CCI_SCORE_YOUNG",
-              "IS_CCI_SCORE_OLD",
-              "IS_CCI_SPECIFIC_YOUNG",
-              "IS_CCI_SPECIFIC_OLD",
-              "IS_DE_LOGFC",
-              "IS_DE_SIGNIFICANT",
-              "DE_DIRECTION",
-              "IS_CCI_DETECTED_YOUNG",
-              "IS_CCI_DETECTED_OLD",
-              "IS_CCI_DE",
-              "REGULATION"
-            )
-          ]
-          cci_dt <- cci_dt[
-            ,
-            c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LRI")
-          ]
-          cci_dt <- merge.data.table(
-            cci_dt,
-            dt,
-            by = c("EMITTER_CELLTYPE", "RECEIVER_CELLTYPE", "LRI"),
-            all.x = TRUE,
-            sort = FALSE
-          )
-          cci_dt[
-            ,
-            ER_CELLTYPES := paste(
-              EMITTER_CELLTYPE,
-              RECEIVER_CELLTYPE,
-              sep = "_")]
-          cci_dt[, CCI := paste(ER_CELLTYPES, LRI, sep = "_")]
-          cci_dt[
-            ,
-            DE_DIRECTION := ifelse(is.na(DE_DIRECTION), "NONE", DE_DIRECTION)
-          ]
-          cci_dt[
-            ,
-            REGULATION := ifelse(is.na(REGULATION), "NOT_DETECTED", REGULATION)
-          ]
-          cci_dt[is.na(cci_dt)] <- FALSE
-          cci_dt[
-            ,
-            .N,
-            by =  c(
-              "IS_CCI_EXPRESSED_YOUNG",
-              "IS_CCI_SCORE_YOUNG",
-              "IS_CCI_SPECIFIC_YOUNG",
-              "IS_CCI_EXPRESSED_OLD",
-              "IS_CCI_SCORE_OLD",
-              "IS_CCI_SPECIFIC_OLD",
-              "IS_DE_LOGFC",
-              "IS_DE_SIGNIFICANT",
-              "DE_DIRECTION",
-              "IS_CCI_DETECTED_YOUNG",
-              "IS_CCI_DETECTED_OLD",
-              "IS_CCI_DE",
-              "REGULATION"
-            )
-          ]
-        }
-      ),
-      idcol = "tissue"
-    )
-  }
-)
-names(dt_cci_classification) <- scd_dataset_names
-dt_cci_classification <- rbindlist(
-  dt_cci_classification,
-  idcol = "dataset"
-)
-dt_cci_classification[REGULATION == "NOT_DETECTED"]
-dt_cci_classification <- dt_cci_classification[REGULATION != "NOT_DETECTED"]
-dt_cci_classification[
-  ,
-  PCT := N / sum(N) * 100,
-  by = c("dataset", "tissue")
-]
-dt_cci_classification <- dt_cci_classification[
-  !grepl("mixed", dataset)
-]
-
-fwrite(
-  dt_cci_classification,
-  paste0(
-    path_scagecom_output,
-    "Supplementary_Data_cci_classification.csv"
-  )
-)
-
-## Libraries ####
-
-
-
-
 
 
 
