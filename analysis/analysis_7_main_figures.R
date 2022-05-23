@@ -233,23 +233,23 @@ cbind(
   fig_sc_data,
   fig_sc_aggr
 ) %>%
- kbl(
-  caption = paste0(
-    "<span style = 'font-size: 50px;",
-    "font-weight: bold;'>Averaged expression</span>"
-  ),
-  align = rep("c", 5)
-) %>%
- kable_styling(
-  "striped",
-  full_width = FALSE
-) %>%
- add_header_above(
-  c(" " = 5, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)
-) %>%
- kable_styling(
-  font_size = 50
-)
+  kbl(
+    caption = paste0(
+      "<span style = 'font-size: 50px;",
+      "font-weight: bold;'>Averaged expression</span>"
+    ),
+    align = rep("c", 5)
+  ) %>%
+  kable_styling(
+    "striped",
+    full_width = FALSE
+  ) %>%
+  add_header_above(
+    c(" " = 5, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)
+  ) %>%
+  kable_styling(
+    font_size = 50
+  )
 
 fig_sc_aggr %>%
   kbl(
@@ -424,7 +424,7 @@ hist(fig_distr_de$counts)
 
 fig_distr_de$is_above <- ifelse(
   abs(fig_distr_de$counts) >=
-  GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[55, 1001],
+    GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[55, 1001],
   TRUE,
   FALSE
 )
@@ -484,7 +484,7 @@ fig_distr_cond1$counts[1001]
 
 fig_distr_cond1$is_above <- ifelse(
   abs(fig_distr_cond1$counts) >=
-  GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[55, 1001],
+    GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[55, 1001],
   TRUE,
   FALSE
 )
@@ -543,7 +543,7 @@ hist(fig_distr_cond2$counts)
 
 fig_distr_cond2$is_above <- ifelse(
   abs(fig_distr_cond2$counts) >=
-  GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[55, 1001],
+    GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[55, 1001],
   TRUE,
   FALSE
 )
@@ -671,9 +671,9 @@ fig_cci_table_final %>%
       path_scagecom_output,
       "fig_cci_table_final.png"
     ),
-   zoom = 2,
-   vwidth = 2100
-)
+    zoom = 2,
+    vwidth = 2100
+  )
 
 ## Prepare Figure Dataset summary (Fig.3) ####
 
@@ -845,48 +845,44 @@ ggsave(
 #manual save 2000x1400
 
 
-## Figure 4 ####
+## Prepare Figure Tissue Specific volcano (Fig. 4.a) ####
 
-CCI_table <- readRDS( "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")$CCI_table
-ORA_table <- readRDS( "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")$ORA_table
-ABBR_CELLTYPE <- readRDS( "../data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds")$ABBR_CELLTYPE
-
-fig4_cci <- CCI_table[
-  Dataset == "TMS Droplet (male)" &
-    Tissue == "Bladder"
-]
-
-plot_volcano_CCI <- function(
-  CCI_table
+plot_volcano_cci <- function(
+  cci_table
 ) {
-  dt <- CCI_table[
-    ,
-    3:12
-  ]
+  dt <- copy(
+    cci_table[
+      ,
+      c(
+        "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",
+        "LRI", "REGULATION", "LOG2FC", "BH_P_VALUE_DE"
+      )
+    ]
+  )
   vline <- function(x = 0, color = "black") {
     list(
-      type = "line", 
-      y0 = 0, 
-      y1 = 1, 
+      type = "line",
+      y0 = 0,
+      y1 = 1,
       yref = "paper",
-      x0 = x, 
-      x1 = x, 
+      x0 = x,
+      x1 = x,
       line = list(color = color)
     )
   }
   hline <- function(y = 0, color = "black") {
     list(
-      type = "line", 
-      x0 = 0, 
-      x1 = 1, 
+      type = "line",
+      x0 = 0,
+      x1 = 1,
       xref = "paper",
-      y0 = y, 
-      y1 = y, 
+      y0 = y,
+      y1 = y,
       line = list(color = color)
     )
   }
-  dt$`Age Regulation` <- factor(
-    dt$`Age Regulation`,
+  dt$REGULATION <- factor(
+    dt$REGULATION,
     levels = c("UP", "DOWN", "FLAT", "NSC")
   )
   m <- list(
@@ -900,17 +896,17 @@ plot_volcano_CCI <- function(
     data = dt,
     type = "scatter",
     mode = "markers",
-    x = ~`Log2 FC`,
-    y = ~-log10(`Adj. p-value` + 1E-4),
+    x = ~LOG2FC,
+    y = ~-log10(BH_P_VALUE_DE + 1E-4),
     text = ~paste(
       "LRI: ",
-      `Ligand-Receptor Interaction`, 
+      LRI,
       '<br>Emitter:',
       EMITTER_CELLTYPE,
       '<br>Receiver:',
       RECEIVER_CELLTYPE
     ),
-    color = ~`Age Regulation`,
+    color = ~REGULATION,
     colors = stats::setNames(
       c("red", "blue", "green", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
@@ -956,10 +952,15 @@ plot_volcano_CCI <- function(
       font = list(size = 34)
     ),
     margin = m
-  ) 
+  )
 }
 
-plot_volcano_CCI(fig4_cci)
+plot_volcano_cci(
+  dt_cci_full[
+    dataset == "TMS Droplet (male)" &
+      tissue == "Bladder"
+  ]
+)
 
 plot_scores_CCI <- function(
   CCI_table
@@ -969,8 +970,8 @@ plot_scores_CCI <- function(
     ,
     3:12
   ]
-  dt$`Age Regulation` <- factor(
-    dt$`Age Regulation`,
+  dt$REGULATION <- factor(
+    dt$REGULATION,
     levels = c("UP", "DOWN", "FLAT", "NSC")
   )
   min_score <-  10^(floor(
@@ -1002,7 +1003,7 @@ plot_scores_CCI <- function(
       '<br>Receiver:',
       RECEIVER_CELLTYPE
     ),
-    color = ~`Age Regulation`,
+    color = ~REGULATION,
     colors = stats::setNames(
       c("red", "blue", "green", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
@@ -1055,8 +1056,8 @@ plot_lrfc_CCI <- function(
     ,
     3:12
   ]
-  dt$`Age Regulation` <- factor(
-    dt$`Age Regulation`,
+  dt$REGULATION <- factor(
+    dt$REGULATION,
     levels = c("UP", "DOWN", "FLAT", "NSC")
   )
   m <- list(
@@ -1080,7 +1081,7 @@ plot_lrfc_CCI <- function(
       '<br>Receiver:',
       RECEIVER_CELLTYPE
     ),
-    color = ~`Age Regulation`,
+    color = ~REGULATION,
     colors = stats::setNames(
       c("red", "blue", "green", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
@@ -1580,8 +1581,8 @@ plot_ORA_GO_treemap_local <- function(
       x = 0.0
     ),
     uniformtext = list(
-     minsize = min_size,
-     mode = "hide"
+      minsize = min_size,
+      mode = "hide"
     ),
     margin = m
   )
