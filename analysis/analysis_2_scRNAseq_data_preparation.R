@@ -501,7 +501,7 @@ fun_map_genes <- function(dt) {
               data.table(gene_orig = orig, gene_res = orig)
             )
           )
-        } else if(length(symbs) == 1) {
+        } else if (length(symbs) == 1) {
           dt_res <- rbindlist(
             l = list(
               dt_res,
@@ -596,10 +596,12 @@ identical(
 ## Check and change gene names for TMS Droplet ####
 
 table(
-  genes_seurat_unmapped$tms_droplet %in% genes_seurat_mapped$tms_droplet$gene_orig
+  genes_seurat_unmapped$tms_droplet %in%
+   genes_seurat_mapped$tms_droplet$gene_orig
 )
 table(
-  genes_seurat_mapped$tms_droplet$gene_orig %in% genes_seurat_unmapped$tms_droplet
+  genes_seurat_mapped$tms_droplet$gene_orig %in%
+   genes_seurat_unmapped$tms_droplet
 )
 any(duplicated(genes_seurat_mapped$tms_droplet$gene_orig))
 any(duplicated(genes_seurat_mapped$tms_droplet$gene_res))
@@ -630,10 +632,12 @@ identical(
 ## Check and change gene names for Calico kidney ####
 
 table(
-  genes_seurat_unmapped$calico_kidney %in% genes_seurat_mapped$calico_kidney$gene_orig
+  genes_seurat_unmapped$calico_kidney %in%
+  genes_seurat_mapped$calico_kidney$gene_orig
 )
 table(
-  genes_seurat_mapped$calico_kidney$gene_orig %in% genes_seurat_unmapped$calico_kidney
+  genes_seurat_mapped$calico_kidney$gene_orig %in%
+  genes_seurat_unmapped$calico_kidney
 )
 any(duplicated(genes_seurat_mapped$calico_kidney$gene_orig))
 any(duplicated(genes_seurat_mapped$calico_kidney$gene_res))
@@ -664,10 +668,12 @@ identical(
 ## Check and change gene names for Calico lung ####
 
 table(
-  genes_seurat_unmapped$calico_lung %in% genes_seurat_mapped$calico_lung$gene_orig
+  genes_seurat_unmapped$calico_lung %in%
+  genes_seurat_mapped$calico_lung$gene_orig
 )
 table(
-  genes_seurat_mapped$calico_lung$gene_orig %in% genes_seurat_unmapped$calico_lung
+  genes_seurat_mapped$calico_lung$gene_orig %in%
+  genes_seurat_unmapped$calico_lung
 )
 any(duplicated(genes_seurat_mapped$calico_lung$gene_orig))
 any(duplicated(genes_seurat_mapped$calico_lung$gene_res))
@@ -698,10 +704,12 @@ identical(
 ## Check and change gene names for Calico spleen ####
 
 table(
-  genes_seurat_unmapped$calico_spleen %in% genes_seurat_mapped$calico_spleen$gene_orig
+  genes_seurat_unmapped$calico_spleen %in%
+  genes_seurat_mapped$calico_spleen$gene_orig
 )
 table(
-  genes_seurat_mapped$calico_spleen$gene_orig %in% genes_seurat_unmapped$calico_spleen
+  genes_seurat_mapped$calico_spleen$gene_orig %in%
+  genes_seurat_unmapped$calico_spleen
 )
 any(duplicated(genes_seurat_mapped$calico_spleen$gene_orig))
 any(duplicated(genes_seurat_mapped$calico_spleen$gene_res))
