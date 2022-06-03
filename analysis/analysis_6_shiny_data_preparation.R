@@ -18,6 +18,22 @@
 library(rrvgo)
 library(GOSemSim)
 
+## Shortcut (read saved data) ####
+
+shiny_list_full <- readRDS(
+  paste0(
+    path_scagecom_output,
+    "scAgeComShiny_data.rds"
+  )
+)
+
+shiny_dt_go_reduced <- readRDS(
+  paste0(
+    path_scagecom_output,
+    "shiny_dt_go_reduced.rds"
+  )
+)
+
 ## Prepare LRI table for scAgeComShiny ####
 
 shiny_dt_lri_mouse <- copy(dt_lri_mouse)
