@@ -17,6 +17,9 @@
 
 library(ggplot2)
 library(kableExtra)
+library(webshot2)
+library(htmlwidgets)
+library(shiny)
 
 ## Prepare Figure LRI distribution (Fig.1a) ####
 
@@ -55,7 +58,7 @@ figp_lri_upset_mouse <- ComplexUpset::upset(
   + ylab("Database Size"),
   base_annotations = list(
     "Intersection Size" = ComplexUpset::intersection_size(
-      mapping = ggplot2::aes(fill = Type),
+      mapping = aes(fill = Type),
       counts = TRUE,
       bar_number_threshold = 100,
       text = list(size = 8)
@@ -69,11 +72,11 @@ figp_lri_upset_mouse <- ComplexUpset::upset(
     )
   ),
   themes = ComplexUpset::upset_default_themes(
-    text = ggplot2::element_text(size = 40),
+    text = element_text(size = 40),
     plot.title = element_text(size = 34)
   ),
   min_size = 40
-) + ggplot2::ggtitle(
+) + ggtitle(
   "Origin of curated mouse ligand-receptor interactions"
 )
 figp_lri_upset_mouse
@@ -124,16 +127,11 @@ fig_seurat_mammary$cell_ontology_final <- ifelse(
 fig_seurat_mammary <- RunTSNE(fig_seurat_mammary, reduction = "PCA")
 Idents(fig_seurat_mammary) <- fig_seurat_mammary$cell_ontology_final
 
-DimPlot(
-  fig_seurat_mammary,
-  reduction = "tshe",
-  pt.size = 1
-) + theme(text = element_text(size = 40))
-
-fig_tsne_celltype <- Seurat::DimPlot(
+fig_tsne_celltype <- DimPlot(
   fig_seurat_mammary,
   reduction = "tsne",
-  pt.size = 3
+  pt.size = 3,
+  cols = c("grey", "blue", "brown", "red"),
 ) + theme(text = element_text(size = 40))
 
 ggsave(
@@ -186,14 +184,14 @@ fig_sc_data <- data.frame(
 colnames(fig_sc_data) <- c(
   paste(
     "Cell",
-    1:(ncol(fig_sc_data)-2)
+    1:(ncol(fig_sc_data) - 2)
   ),
   "...", "Cell N"
 )
 rownames(fig_sc_data) <- c(
   paste(
     "Gene",
-    1:(nrow(fig_sc_data)-2)
+    1:(nrow(fig_sc_data) - 2)
   ),
   "...", "Gene M"
 )
@@ -212,21 +210,21 @@ fig_sc_aggr <- t(
     group = fig_aggr_group
   ) / as.vector(table(fig_aggr_group))
 )
-fig_sc_aggr <- fig_sc_aggr[1:4, c(1,2,3,7,8)]
+fig_sc_aggr <- fig_sc_aggr[1:4, c(1, 2, 3, 7, 8)]
 fig_sc_aggr <- round(
   fig_sc_aggr,
   1
 )
 colnames(fig_sc_aggr) <- c("Cond1", "Cond2", "...", "Cond1", "Cond2")
-rownames(fig_sc_aggr ) <- c(
+rownames(fig_sc_aggr) <- c(
   paste(
     "Gene",
-    1:(nrow(fig_sc_aggr)-2)
+    1:(nrow(fig_sc_aggr) - 2)
   ),
   "...",
   "Gene M"
 )
-fig_sc_aggr[3,] <- "..."
+fig_sc_aggr[3, ] <- "..."
 fig_sc_aggr[, 3] <- "..."
 
 cbind(
@@ -300,7 +298,7 @@ fig_LRI_rd_data <- as.data.frame(
   scDiffCom::LRI_mouse$LRI_curated[c(1, 643, 2, 3573), c(2, 3, 1, 4, 5, 6)]
 )
 fig_LRI_rd_data[is.na(fig_LRI_rd_data)] <- ""
-fig_LRI_rd_data[c(1,3),] <- "..."
+fig_LRI_rd_data[c(1, 3), ] <- "..."
 fig_LRI_rd_data[, 3] <- "\u00A0 \u00A0"
 colnames(fig_LRI_rd_data) <- c("L1", "L2", "\u00A0 \u00A0  ", "R1", "R2", "R3")
 
@@ -335,7 +333,7 @@ fig_cci_pot[
     old_ct = unique(fig_cci_pot$EMITTER_CELLTYPE),
     new_ct = paste0(
       "Cell Type ",
-      1:length(unique(fig_cci_pot$EMITTER_CELLTYPE))
+      seq_along(unique(fig_cci_pot$EMITTER_CELLTYPE))
     )
   ),
   on = "EMITTER_CELLTYPE==old_ct",
@@ -346,14 +344,14 @@ fig_cci_pot[
     old_ct = unique(fig_cci_pot$RECEIVER_CELLTYPE),
     new_ct = paste0(
       "Cell Type ",
-      1:length( unique(fig_cci_pot$RECEIVER_CELLTYPE))
+      seq_along(unique(fig_cci_pot$RECEIVER_CELLTYPE))
     )
   ),
   on = "RECEIVER_CELLTYPE==old_ct",
   receiver_cell_type := new_ct
 ]
 fig_cci_pot <- fig_cci_pot[
-  sample(1:nrow(fig_cci_pot), 10),
+  sample(seq_len(nrow(fig_cci_pot)), 10),
   c(
     "emitter_cell_type",
     "receiver_cell_type",
@@ -370,13 +368,13 @@ setorder(
 )
 
 fig_cci_pot <- fig_cci_pot[c(1, 2, 6, 7, 10)]
-fig_cci_pot$LOGFC <- fig_cci_pot$LOGFC/log2(exp(1))
-fig_cci_pot[, 4:6] <- round(fig_cci_pot[, 4:6] , 1)
+fig_cci_pot$LOGFC <- fig_cci_pot$LOGFC / log2(exp(1))
+fig_cci_pot[, 4:6] <- round(fig_cci_pot[, 4:6], 1)
 fig_cci_pot <- data.frame(
   lapply(fig_cci_pot, as.character),
   stringsAsFactors = FALSE
 )
-fig_cci_pot[c(1,3,5), ] <- "..."
+fig_cci_pot[c(1, 3, 5), ] <- "..."
 colnames(fig_cci_pot) <- c(
   "Emitter", "Receiver", "LRI",
   "Score Cond1", "Score Cond2", "Log FC"
@@ -571,7 +569,7 @@ figp_distr_cond2 <- ggplot(
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[55, 1001]-0.3,
+  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[55, 1001] - 0.3,
   y = 25,
   label = "True Score 2",
   size = 22
@@ -605,7 +603,7 @@ fig_cci_table_final[
     old_ct = unique(fig_cci_table_final$EMITTER_CELLTYPE),
     new_ct = paste0(
       "Cell Type ",
-      1:length(unique(fig_cci_table_final$EMITTER_CELLTYPE))
+      seq_along(unique(fig_cci_table_final$EMITTER_CELLTYPE))
     )
   ),
   on = "EMITTER_CELLTYPE==old_ct",
@@ -616,14 +614,14 @@ fig_cci_table_final[
     old_ct = unique(fig_cci_table_final$RECEIVER_CELLTYPE),
     new_ct = paste0(
       "Cell Type ",
-      1:length(unique(fig_cci_table_final$RECEIVER_CELLTYPE))
+      seq_along(unique(fig_cci_table_final$RECEIVER_CELLTYPE))
     )
   ),
   on = "RECEIVER_CELLTYPE==old_ct",
   receiver_cell_type := new_ct
 ]
 fig_cci_table_final <- fig_cci_table_final[
-  sample(1:nrow(fig_cci_table_final), 10),
+  sample(seq_len(nrow(fig_cci_table_final)), 10),
   c(
     "emitter_cell_type",
     "receiver_cell_type",
@@ -638,16 +636,16 @@ setorder(
   emitter_cell_type,
   receiver_cell_type
 )
-fig_cci_table_final$LOGFC <- fig_cci_table_final$LOGFC/log2(exp(1))
+fig_cci_table_final$LOGFC <- fig_cci_table_final$LOGFC / log2(exp(1))
 fig_cci_table_final[, 4] <- round(fig_cci_table_final[, 4], 1)
 fig_cci_table_final[, 5] <- round(fig_cci_table_final[, 5], 2)
 fig_cci_table_final <- data.frame(
   lapply(fig_cci_table_final, as.character), stringsAsFactors = FALSE
 )
 
-fig_cci_table_final <- fig_cci_table_final[c(1,4,5,9,10),]
+fig_cci_table_final <- fig_cci_table_final[c(1, 4, 5, 9, 10), ]
 
-fig_cci_table_final[c(1,3,5), ] <- "..."
+fig_cci_table_final[c(1, 3, 5), ] <- "..."
 colnames(fig_cci_table_final) <- c(
   "Emitter", "Receiver", "LRI", "Log FC", "Adj. p-value", "Regulation"
 )
@@ -847,7 +845,7 @@ ggsave(
 
 ## Prepare Figure Tissue Specific volcano (Fig. 4.a) ####
 
-plot_volcano_cci <- function(
+fun_plot_volcano_cci <- function(
   cci_table
 ) {
   dt <- copy(
@@ -901,14 +899,14 @@ plot_volcano_cci <- function(
     text = ~paste(
       "LRI: ",
       LRI,
-      '<br>Emitter:',
+      "<br>Emitter:",
       EMITTER_CELLTYPE,
-      '<br>Receiver:',
+      "<br>Receiver:",
       RECEIVER_CELLTYPE
     ),
     color = ~REGULATION,
     colors = stats::setNames(
-      c("red", "blue", "green", "gray"),
+      c("red", "blue", "beige", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
     marker = list(size = 10)
@@ -955,7 +953,7 @@ plot_volcano_cci <- function(
   )
 }
 
-plot_volcano_cci(
+fun_plot_volcano_cci(
   dt_cci_full[
     dataset == "TMS Droplet (male)" &
       tissue == "Bladder"
@@ -964,10 +962,9 @@ plot_volcano_cci(
 
 ## Prepare Figure Tissue Specific scores (Fig. 4.b) ####
 
-plot_scores_cci <- function(
+fun_plot_scores_cci <- function(
   cci_table
 ) {
-  CCI_SCORE_YOUNG <- CCI_SCORE_OLD <- NULL
   dt <- copy(
     cci_table[
       ,
@@ -981,7 +978,7 @@ plot_scores_cci <- function(
     dt$REGULATION,
     levels = c("UP", "DOWN", "FLAT", "NSC")
   )
-  min_score <-  10^(floor(
+  min_score <-  10 ^ (floor(
     log10(
       min(
         min(dt[CCI_SCORE_YOUNG > 0]$CCI_SCORE_YOUNG),
@@ -1054,7 +1051,7 @@ plot_scores_cci <- function(
   )
 }
 
-plot_scores_cci(
+fun_plot_scores_cci(
   dt_cci_full[
     dataset == "TMS Droplet (male)" &
       tissue == "Bladder"
@@ -1063,7 +1060,7 @@ plot_scores_cci(
 
 ## Prepare Figure Tissue Specific lrfc (Fig. 4.c) ####
 
-plot_lrfc_cci <- function(
+fun_plot_lrfc_cci <- function(
   cci_table
 ) {
   dt <- copy(
@@ -1144,7 +1141,7 @@ plot_lrfc_cci <- function(
   )
 }
 
-plot_lrfc_cci(
+fun_plot_lrfc_cci(
   dt_cci_full[
     dataset == "TMS Droplet (male)" &
       tissue == "Bladder"
@@ -1153,14 +1150,14 @@ plot_lrfc_cci(
 
 ## Prepare Figure Tissue Specific visnetwork (Fig. 4.d) ####
 
-plot_ora_visnetwork <- function(
+fun_plot_ora_visnetwork <- function(
   cci_table,
   ora_table,
   tissue_choice,
   dataset_choice,
   abbr_celltype
 ) {
-  cci_dt <- copy(cci_table)
+  cci_dt <- data.table::copy(cci_table)
   ora_table_er <- ora_table[
     dataset == dataset_choice &
       tissue == tissue_choice &
@@ -1253,7 +1250,7 @@ plot_ora_visnetwork <- function(
   )
 }
 
-plot_ora_visnetwork(
+fun_plot_ora_visnetwork(
   dt_cci_full,
   dt_ora_full,
   "Bladder",
@@ -1263,7 +1260,7 @@ plot_ora_visnetwork(
 
 ## Prepare Figure Tissue Specific go treemap (Fig. 4.e) ####
 
-plot_ora_go_treemap_local <- function(
+fun_plot_ora_go_treemap <- function(
   go_reduced_table,
   tissue_choice,
   dataset_choice,
@@ -1295,7 +1292,7 @@ plot_ora_go_treemap_local <- function(
   new_data[
     ,
     ids := sapply(
-      1:nrow(.SD),
+      seq_len(nrow(.SD)),
       function(i) {
         if (labels[[i]] == parents[[i]]) {
           res <- paste(labels[[i]], parents[[i]], sep = " - ")
@@ -1309,7 +1306,7 @@ plot_ora_go_treemap_local <- function(
   new_data[
     ,
     score := sapply(
-      1:nrow(.SD),
+      seq_len(nrow(.SD)),
       function(i) {
         if (parents[[i]] == "") {
           res <- sum(ex_data[parentTerm == labels[[i]]]$score)
@@ -1363,7 +1360,7 @@ plot_ora_go_treemap_local <- function(
   )
 }
 
-plot_ora_go_treemap_local(
+fun_plot_ora_go_treemap(
   go_reduced_table = shiny_dt_go_reduced[
   Dataset ==  "TMS Droplet (male)" &
     Tissue == "Bladder" &
@@ -1386,7 +1383,238 @@ plot_ora_go_treemap_local(
 
 #TODO
 
+## Prepare Figure Cross Tissue GO table (Fig. 5.a) ####
+
+fun_display_keyword_counts <- function(
+  ora_keyword_counts,
+  category,
+  regulation,
+  go_aspect = NULL
+) {
+  dt <- ora_keyword_counts[
+    ORA_CATEGORY == category &
+      ORA_REGULATION == regulation
+  ]
+  data.table::setnames(dt, old = "VALUE", new = category)
+  if (category == "GO Term") {
+    temp_aspect <- ifelse(
+      go_aspect == "Biological Process",
+      "biological_process",
+      ifelse(
+        go_aspect == "Molecular Function",
+        "molecular_function",
+        "cellular_component"
+      )
+    )
+    dt <- dt[ASPECT == temp_aspect]
+    dt <- dt[, -c(1,2,10)]
+    if (go_aspect == "Biological Process") {
+      category_label <- paste0("GO ", go_aspect, "es")
+    } else {
+      category_label <- paste0("GO ", go_aspect, "s")
+    }
+  } else {
+    dt <- dt[, -c(1,2,10,11)]
+    if(grepl("Family", category)){
+      category_label <- sub("Family", "Families", category)
+    } else {
+      category_label <- paste0(category, "s")
+    }
+  }
+  DT <- DT::datatable(
+    data = dt,
+    filter = list(
+      position ="top",
+      clear = FALSE,
+      plain = FALSE
+    ),
+    class = "display compact",
+    options =list(
+      pageLength = 5,
+      dom = '<"top"f>rt<"bottom"lip><"clear">',
+      columnDefs = list(
+        list(width = '300px', targets = c(1))
+      )
+    ),
+    caption = tags$caption(
+      style = paste0(
+        "caption-side: top; ",
+        "text-align: center; ",
+        "color: black; ",
+        "font-size: 120%;"
+      ),
+      paste0(
+        "Number of tissues in which ",
+        category_label,
+        " are over-represented among ",
+        regulation,
+        "-regulated cell-cell interactions"
+      )
+    )
+  ) %>% DT::formatStyle(
+    colnames(dt)[-1],
+    `text-align` = "center"
+  )
+  if (category == "GO Term") {
+    DT <- DT %>% DT::formatStyle(c(7), `border-right` = "solid 2px")
+  }
+  DT
+}
+
+fig_table_bp_up <- fun_display_keyword_counts(
+  shiny_dt_ora_key_counts,
+  category = "GO Term",
+  regulation = "UP",
+  go_aspect = "Biological Process"
+)
+fig_table_bp_up$width <- "650px"
+
+fig_table_bp_up_html <- "fig_table_BP_up.html"
+saveWidget(fig_table_bp_up, fig_table_bp_up_html)
+webshot(
+  fig_table_bp_up_html,
+  paste0(
+    path_scagecom_output,
+    "fig_table_BP_up.png"
+  ),
+  zoom = 3
+)
+
+
+
+
+table_LRI_down <- display_KEYWORD_counts(
+  shiny_results$ORA_KEYWORD_COUNTS,
+  category = "Ligand-Receptor Interaction",
+  regulation = "DOWN"
+)
+table_LRI_down$width <- "600px"
+
+table_LRI_down_html <- "table_LRI_down.html"
+saveWidget(table_LRI_down, table_LRI_down_html)
+webshot(
+  table_LRI_down_html,
+  "../../../../../table_LRI_down.png",
+  zoom = 3
+)
+
+table_L_down <- display_KEYWORD_counts(
+  shiny_results$ORA_KEYWORD_COUNTS,
+  category = "Receptor",
+  regulation = "DOWN"
+)
+table_L_down$width <- "600px"
+
+table_LRI_down_html <- "table_LRI_down.html"
+saveWidget(table_LRI_down, table_LRI_down_html)
+webshot(
+  table_LRI_down_html,
+  "../../../../../table_LRI_down.png",
+  zoom = 3
+)
+
+
+
+
+
+
+
+
+plot_keyword_summary <- function(
+  ora_keyword_summary,
+  ora_keyword_template,
+  category,
+  keyword
+) {
+  dt <- copy(ora_keyword_summary)[
+    ORA_CATEGORY == category
+  ]
+  if (!(keyword %in% dt$VALUE)) {
+    stop("`keyword` not found")
+  }
+  dt <- dt[
+    VALUE == keyword
+  ]
+  dt <- copy(ora_keyword_template)[
+    dt,
+    on = c("Tissue", "Dataset"),
+    Regulation := i.ORA_REGULATION
+  ]
+  dt[is.na(dt)] <- "Not Detected"
+  print(dt)
+  p <- ggplot(dt) +
+    geom_tile(
+      aes(
+        Dataset,
+        Tissue,
+        fill = Regulation,
+        width = 0.9,
+        height = 0.9
+      ),
+      colour = "black"
+    ) +
+    scale_fill_manual(
+      name = NULL,
+      values = c(
+        "Not Over-represented" = "white",
+        "Not Detected" = "gray",
+        "UP" = "red"
+      ),
+      drop = FALSE
+    ) +
+    ggtitle(
+      stringr::str_trunc(
+        paste0(
+          "Over-representation of ",
+          keyword
+        ),
+        70,
+        "right"
+      )
+    ) +
+    scale_x_discrete(
+      limits = c(
+        "TMS FACS (male)",
+        "TMS FACS (female)",
+        "TMS Droplet (male)",
+        "TMS Droplet (female)",
+        "Calico Droplet (male)"
+      ),
+      labels = c(
+        "TMS\nFACS\n(male)",
+        "TMS\nFACS\n(female)",
+        "TMS\nDroplet\n(male)",
+        "TMS\nDroplet\n(female)",
+        "Calico\nDroplet\n(male)"
+      )
+    ) +
+    scale_y_discrete(
+      limits = sort(
+        unique(dt$Tissue),
+        decreasing = TRUE
+      )
+    ) +
+    xlab("") +
+    ylab("") +
+    theme(text = element_text(size = 32)) +
+    theme(
+      axis.text = element_text(size = 32, face = "bold")
+    ) +
+    theme(legend.position = c(0.8, 0.8))
+  p
+}
+
+plot_keyword_summary(
+  shiny_dt_ora_key_summary,
+  shiny_dt_ora_key_template,
+  "Ligand-Receptor Interaction",
+  "Lgals3:Lag3"
+)
+
 ## Figure 5 ####
+
+
+
 
 plot_KEYWORD_summary <- function(
   ora_keyword_summary,
@@ -1411,7 +1639,6 @@ plot_KEYWORD_summary <- function(
     Regulation := i.ORA_REGULATION
   ]
   dt[is.na(dt)] <- "Not Detected"
-  print(dt)
   p <- ggplot2::ggplot(dt) +
     ggplot2::geom_tile(
       ggplot2::aes(
@@ -1429,17 +1656,16 @@ plot_KEYWORD_summary <- function(
         #"No Data" = "transparent",
         "Not Over-represented" = "white",
         "Not Detected" = "gray",
-        "UP" = "red"#,
-        #"DOWN" = "blue",
-        #"FLAT" = "green",
+        "UP" = "red",
+        "DOWN" = "blue",
+        "FLAT" = "green"#,
         #"UP:DOWN" = "yellow"
-      ),
-      drop = FALSE
+      )
     ) +
     ggplot2::ggtitle(
       stringr::str_trunc(
         paste0(
-          "Over-representation of ",
+          "Over-representation with age of ",
           keyword
         ),
         70, 
@@ -1470,39 +1696,103 @@ plot_KEYWORD_summary <- function(
     ) +
     ggplot2::xlab("") +
     ggplot2::ylab("") +
-    ggplot2::theme(text=ggplot2::element_text(size = 32)) +
-    ggplot2::theme(axis.text = ggplot2::element_text(size = 32, face = "bold")) +
-    ggplot2::theme(legend.position = c(0.8, 0.8))
+    #theme(plot.title = element_text(hjust = 0.5)) +
+    ggplot2::theme(text=ggplot2::element_text(size = 30)) +
+    ggplot2::theme(
+      axis.text=ggplot2::element_text(size = 30),
+      legend.position = c(0.85, 0.8)
+      )# +
+  #ggplot2::theme(legend.position = c(0.8, 0.8))
   p
+  #plotly::ggplotly(
+  #  p,
+  #  source = "TCA_PLOT_KEYWORD_SUMMARY",
+  #  tooltip = c("Dataset", "Tissue", "Regulation")
+  #) #%>% plotly::layout(
+  #  legend = list(
+  #    title = list(text = "")
+  #  ) 
+  # )
 }
 
 plot_KEYWORD_summary(
-  fig5_data$ORA_KEYWORD_SUMMARY,
-  fig5_data$ORA_KEYWORD_TEMPLATE,
-  "Ligand-Receptor Interaction",
-  "Lgals3:Lag3"
+  ora_keyword_summary = shiny_results$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_results$ORA_KEYWORD_TEMPLATE,
+  category = "GO Term",
+  keyword = "T cell differentiation"
+)
+#2000x1400
+
+plot_KEYWORD_summary(
+  ora_keyword_summary = shiny_results$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_results$ORA_KEYWORD_TEMPLATE,
+  category = "Ligand-Receptor Interaction",
+  keyword = "B2m:Cd3g"
 )
 
-## To remove@ #####
+plot_KEYWORD_summary(
+  ora_keyword_summary = shiny_results$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_results$ORA_KEYWORD_TEMPLATE,
+  category = "Ligand-Receptor Interaction",
+  keyword = "Gpi1:Amfr"
+)
 
-display_CCI_table <- function(
-  CCI_table
+## Figure 6 ####
+
+ggplot(
+  data = regulation_distr_long,
+  aes(
+    y = Tissue,
+    x = pct,
+    fill = REGULATION
+  )
+) + geom_bar(
+  stat = "identity",
+  position = "fill",
+  alpha = 0.8
+) + scale_fill_manual(
+  "Age-Regulation",
+  values = c("UP" = "red", "DOWN" = "blue", "FLAT" = "green", "NSC" = "grey")
+) + facet_wrap(
+  ~ Dataset,
+  ncol = 5
+) + ggplot2::scale_y_discrete(
+    limits = sort(
+      unique(regulation_distr_long$Tissue),
+      decreasing = TRUE
+    )
+) + xlab(
+  "Fraction of CCIs per regulation group"
+) + theme(
+  text = element_text(size = 40, face = "bold"),
+  axis.text.x = element_text(size = 30),
+  axis.text.y = element_text(size = 36, face = "bold"),
+  axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0)),
+  panel.spacing = unit(2, "lines"),
+  legend.position = c(0.905, 0.8)
+)
+#manual save 3000x1800
+
+## To remove? #####
+
+display_cci_table <- function(
+  cci_table
 ) {
-  dt <- CCI_table[
+  dt <- cci_table[
     ,
     3:12
   ]
   CCI_DT <- DT::datatable(
     data = dt[, -c(9, 10)],
     class = "display compact",
-    options =list(
+    options = list(
       pageLength = 10,
       dom = '<"top"f>rt<"bottom"lip><"clear">'
     ),
     caption = tags$caption(
       style = paste0(
-        'caption-side: top; text-align: center; ',
-        'color:black; font-size:120% ;'
+        "caption-side: top; text-align: center; ",
+        "color:black; font-size:120% ;"
       ),
       "Table of Cell-Cell Interactions"
     ),
@@ -1510,7 +1800,7 @@ display_CCI_table <- function(
     extensions = c("Buttons")
   ) %>% DT::formatStyle(
     colnames(dt[, -c(9, 10)])[4:8],
-    `text-align` = 'center'
+    `text-align` = "center"
   )
 }
 
@@ -1546,19 +1836,19 @@ plot_ora_local <- function(
       "'bh_p_value_threshold' must be smaller than 0.05"
     )
   }
-  dt <- copy(ora_dt)
+  dt <- data.table::copy(ora_dt)
   if(regulation == "UP") {
     dt[, OR := OR_UP]
     dt[, BH_PVAL := BH_P_VALUE_UP]
-    dt[, ORA_SCORE := ORA_SCORE_UP ]
-  } else if(regulation == "DOWN") {
+    dt[, ORA_SCORE := ORA_SCORE_UP]
+  } else if (regulation == "DOWN") {
     dt[, OR := OR_DOWN]
     dt[, BH_PVAL := BH_P_VALUE_DOWN]
-    dt[, ORA_SCORE := ORA_SCORE_DOWN ]
-  } else if(regulation == "FLAT") {
+    dt[, ORA_SCORE := ORA_SCORE_DOWN]
+  } else if (regulation == "FLAT") {
     dt[, OR := OR_FLAT]
     dt[, BH_PVAL := BH_P_VALUE_FLAT]
-    dt[, ORA_SCORE := ORA_SCORE_FLAT ]
+    dt[, ORA_SCORE := ORA_SCORE_FLAT]
   } else {
     stop("Can't find 'regulation' type")
   }
@@ -1619,15 +1909,15 @@ plot_ora_local <- function(
       words <- strsplit(i, " ")[[1]]
       n_words <- length(words)
       if (n_words >= 5) {
-        if (n_words%%2 == 0) {
-          mid <- n_words/2
+        if (n_words %% 2 == 0) {
+          mid <- n_words / 2
         } else {
-          mid <- (n_words+1)/2
+          mid <- (n_words + 1) / 2
         }
         res <- paste0(
           paste0(words[1:mid], collapse = " "),
           "\n",
-          paste0(words[(mid+1):length(words)], collapse = " ")
+          paste0(words[(mid + 1):length(words)], collapse = " ")
         )
       } else {
         res <- i
@@ -1676,34 +1966,34 @@ plot_ora_local <- function(
       )
     )
   )
-  ggplot2::ggplot(
+  ggplot(
     dt,
-    ggplot2::aes(
+    aes(
       ORA_SCORE,
       stats::reorder(VALUE, ORA_SCORE)
     )
   ) +
-    ggplot2::geom_point(
-      ggplot2::aes(
+    geom_point(
+      aes(
         size = -log10(BH_PVAL),
         color = log2(OR)
       )
     ) +
-    ggplot2::scale_color_gradient(low = "orange", high = "red") +
-    ggplot2::scale_size_continuous(range = c(8, 10)) +
-    ggplot2::xlab(paste0("ORA score ", regulation)) +
-    ggplot2::ylab("") +
-    ggplot2::labs(
+    scale_color_gradient(low = "orange", high = "red") +
+    scale_size_continuous(range = c(8, 10)) +
+    xlab(paste0("ORA score ", regulation)) +
+    ylab("") +
+    labs(
       size = "-log10(Adj. P-Value)",
       color = "log2(Odds Ratio)",
       caption = extra_label_annotation
     ) +
-    ggplot2::theme(text = ggplot2::element_text(size = 40)) +
-    ggplot2::theme(legend.position = c(0.8, 0.3)) +
-    ggplot2::theme(legend.title = ggplot2::element_text(size = 34)) +
-    ggplot2::theme(legend.text = ggplot2::element_text(size = 26)) +
-    ggplot2::theme(plot.title.position = "plot") +
-    ggplot2::ggtitle(
+    theme(text = element_text(size = 40)) +
+    theme(legend.position = c(0.8, 0.3)) +
+    theme(legend.title = element_text(size = 34)) +
+    theme(legend.text = element_text(size = 26)) +
+    theme(plot.title.position = "plot") +
+    ggtitle(
       paste0(
         "Top ",
         n_row_tokeep,
