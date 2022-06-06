@@ -2,8 +2,6 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - May 2022
-##
 ## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
 ## anais.equey@gmail.com
