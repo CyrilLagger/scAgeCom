@@ -187,9 +187,10 @@ pmid_aging <- rentrez::entrez_search(
   paste0(
     "aging[TIAB] OR longevity[TIAB] OR senescence[TIAB]",
     " OR age-related[TIAB] OR dementia[TIAB] OR alzheimer[TIAB]",
-    " OR atherosclerosis[TIAB] OR parkinson[TIAB] OR stroke[TIAB]"
+    " OR parkinson[TIAB] OR atherosclerosis[TIAB] OR stroke[TIAB]",
+    " OR arthritis[TIAB] or osteoporosis[TIAB] or cataract[TIAB]"
   ),
-  retmax = 1000001
+  retmax = 10000001
 )
 any(duplicated(pmid_aging$ids))
 
