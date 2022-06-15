@@ -322,11 +322,26 @@ hagr_cellage_genes <- unique(
   ]$mgi_symbol
 )
 
+hagr_longevity_map <- fread(
+  paste0(
+    path_scagecom_input,
+    "hagr/longevity_map.csv"
+  )
+)
+hagr_longevity_map <- hagr_longevity_map[Association == "significant"]
+hagr_longevity_map_genes <- unique(
+  mart_lri_mouse_anno[
+    hsapiens_homolog_associated_gene_name %in%
+    unique(unlist(strsplit(hagr_longevity_map[["Gene(s)"]], ",")))
+  ]$mgi_symbol
+)
+
 hagr_genes <- unique(
   c(
     hagr_genage_genes,
     hagr_microarray_genes,
-    hagr_cellage_genes
+    hagr_cellage_genes,
+    hagr_longevity_map_genes
   )
 )
 
