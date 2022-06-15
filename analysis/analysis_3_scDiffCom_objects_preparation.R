@@ -33,13 +33,13 @@ path_scagecom_output_scdiffcom <- paste0(
 ## List of analysis to do over datasets and sex ####
 
 analysis_list <- list(
-  "calico_male",
-  "facs_female",
-  "facs_male",
-  "facs_mixed",
-  "droplet_female",
-  "droplet_male",
-  "droplet_mixed"
+  "calico_diffage_male",
+  "facs_diffage_female",
+  "facs_diffage_male",
+  "facs_diffage_mixed",
+  "droplet_diffage_female",
+  "droplet_diffage_male",
+  "droplet_diffage_mixed"
 )
 
 ## Do the analysis ####
@@ -56,7 +56,7 @@ for (analysis in analysis_list) {
     dir.create(output_dir)
   }
   message("Reading seurat object.")
-  if (analysis == "calico_male") {
+  if (analysis == "calico_diffage_male") {
     seurat_kidney <- seurats_analysis$calico_kidney
     seurat_kidney$age_group <- ifelse(
       seurat_kidney$age == "young",
@@ -82,7 +82,7 @@ for (analysis in analysis_list) {
       Spleen = seurat_spleen
     )
     n_tissue <- 3
-  } else if (analysis == "facs_female") {
+  } else if (analysis == "facs_diffage_female") {
     seurat_obj <- seurats_analysis$tms_facs
     seurat_obj <- subset(seurat_obj, subset = sex == "female")
     seurat_obj$age_group <- ifelse(
@@ -98,7 +98,7 @@ for (analysis in analysis_list) {
       "Tongue", "Trachea"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "facs_male") {
+  } else if (analysis == "facs_diffage_male") {
     seurat_obj <- seurats_analysis$tms_facs
     seurat_obj <- subset(seurat_obj, subset = sex == "male")
     seurat_obj$age_group <- ifelse(
@@ -115,7 +115,7 @@ for (analysis in analysis_list) {
       "Tongue", "Trachea"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "facs_mixed") {
+  } else if (analysis == "facs_diffage_mixed") {
     seurat_obj <- seurats_analysis$tms_facs
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
@@ -131,7 +131,7 @@ for (analysis in analysis_list) {
       "Tongue", "Trachea"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_female") {
+  } else if (analysis == "droplet_diffage_female") {
     seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
@@ -149,7 +149,7 @@ for (analysis in analysis_list) {
       "Spleen", "Thymus"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_male") {
+  } else if (analysis == "droplet_diffage_male") {
     seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
@@ -166,7 +166,7 @@ for (analysis in analysis_list) {
       "Spleen", "Tongue"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_mixed") {
+  } else if (analysis == "droplet_diffage_mixed") {
     seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
@@ -195,7 +195,7 @@ for (analysis in analysis_list) {
       n_tissue,
       "."
     ))
-    if (analysis == "calico_male") {
+    if (analysis == "calico_diffage_male") {
       seurat_tiss <- seurat_list[[tiss]]
     } else {
       if (tiss == "Brain") {
@@ -257,12 +257,12 @@ for (analysis in analysis_list) {
 ## Perform ICC differential analysis between male and female #####
 
 analysis_list_sex <- list(
-  "facs_young",
-  "facs_old",
-  "facs_all",
-  "droplet_young",
-  "droplet_old",
-  "droplet_all"
+  "facs_diffsex_young",
+  "facs_diffsex_old",
+  "facs_diffsex_combined",
+  "droplet_diffsex_young",
+  "droplet_diffsex_old",
+  "droplet_diffsex_all"
 )
 
 dt_metadata[
@@ -302,7 +302,7 @@ for (analysis in analysis_list_sex) {
     dir.create(output_dir)
   }
   message("Reading seurat object.")
-  if (analysis == "facs_young") {
+  if (analysis == "facs_diffsex_young") {
     seurat_obj <- seurats_analysis$tms_facs
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
@@ -318,7 +318,7 @@ for (analysis in analysis_list_sex) {
       "Pancreas", "SCAT", "Skin", "Spleen", "Thymus", "Trachea"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "facs_old") {
+  } else if (analysis == "facs_diffsex_old") {
     seurat_obj <- seurats_analysis$tms_facs
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
@@ -335,7 +335,7 @@ for (analysis in analysis_list_sex) {
       "Tongue", "Trachea"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "facs_all") {
+  } else if (analysis == "facs_diffsex_combined") {
     seurat_obj <- seurats_analysis$tms_facs
     seurat_obj$age_group <- ifelse(
       seurat_obj$age %in% c("3m"),
@@ -351,7 +351,7 @@ for (analysis in analysis_list_sex) {
       "Tongue", "Trachea"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_young") {
+  } else if (analysis == "droplet_diffsex_young") {
     seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
@@ -369,7 +369,7 @@ for (analysis in analysis_list_sex) {
       "Spleen", "Tongue"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_old") {
+  } else if (analysis == "droplet_diffsex_old") {
     seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
@@ -387,7 +387,7 @@ for (analysis in analysis_list_sex) {
       "Spleen", "Thymus"
     )
     n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_all") {
+  } else if (analysis == "droplet_diffsex_all") {
     seurat_obj <- seurats_analysis$tms_droplet
     seurat_obj <- subset(
       seurat_obj,
