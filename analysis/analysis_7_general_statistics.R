@@ -2,8 +2,6 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - May 2022
-##
 ## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
 ## anais.equey@gmail.com
@@ -13,741 +11,11 @@
 ####################################################
 ##
 
-## Prepare Supplementary Data (LRI database) ####
+## Keep only relevant CCIs for analysis ####
 
-xlsx_lri_human <- scDiffCom::LRI_human[c(1, 2, 3)]
-names(xlsx_lri_human) <- paste0(names(xlsx_lri_human), "_human")
-xlsx_lri_mouse <- scDiffCom::LRI_mouse[c(1, 2, 3)]
-names(xlsx_lri_mouse) <- paste0(names(xlsx_lri_mouse), "_mouse")
-xlsx_lri_mouse$LRI_curated_mouse <- dt_lri_mouse
+dt_cci_rel <- dt_cci_full[!grepl("mixed", dataset)]
 
-openxlsx::write.xlsx(
-  c(xlsx_lri_mouse, xlsx_lri_human),
-  file = paste0(
-    path_scagecom_output,
-    "Supplementary_Data_LRI_db.xlsx"
-  )
-)
-
-
-## Number of detected CCIs ####
-
-# total
-dt_cci_full[, .N]
-dt_cci_full[!grepl("mixed", dataset), .N]
-
-# by datasets
-dt_cci_full[, .N, by = c("dataset")]
-
-# by regulation
-dt_cci_full[, .N, by = c("REGULATION")]
-dt_cci_full[, .N, by = c("REGULATION")][, N / sum(N) * 100]
-dt_cci_full[!grepl("mixed", dataset), .N, by = c("REGULATION")]
-dt_cci_full[!grepl("mixed", dataset), .N, by = c("REGULATION")][
-  , N / sum(N) * 100
-]
-
-
-#########################################################
-dt_cci_full[, .N, by = c("LRI", "dataset")][order(-N)]
-
-## load results ####
-
-#cci_stat_table <- readRDS("data_scAgeCom/analysis/outputs_data/data_4_CCI_table_unprocessed.rds")
-cci_stat_table <- copy(CCI_table)
-cci_stat_table <- cci_stat_table[
-  !grepl("mixed", Dataset)
-]
-
-shiny_results <- readRDS("../data_scAgeCom/analysis/outputs_data/scAgeCom_shiny_data.rds")
-
-
-## create regulation table for supplemental data and stat ####
-
-regulation_table <- cci_stat_table[
-  ,
-  .N,
-  by = c(
-    "IS_CCI_EXPRESSED_YOUNG", "IS_CCI_SPECIFIC_YOUNG", "IS_CCI_SCORE_YOUNG",
-         "IS_CCI_EXPRESSED_OLD", "IS_CCI_SPECIFIC_OLD", "IS_CCI_SCORE_OLD",
-         "IS_DE_LOGFC", "IS_DE_SIGNIFICANT", "DE_DIRECTION",
-         "IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD", "IS_CCI_DE",
-         "REGULATION"
-         )
-]
-
-## summary statistics ####
-
-regulation_table[
-  REGULATION == "NSC",
-  sum(N),
-  by = c("IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD")
-][, V1/sum(V1)*100]
-
-regulation_table[
-  REGULATION %in% c("UP", "DOWN"),
-  sum(N),
-  by = c("IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD")
-]
-
-## number of LRI per ER / Extended Data Fi. 1 ####
-
-cci_stat_table[
-  ,
-   DTER_CELLTYPES := paste(
-    Dataset,
-    Tissue,
-    EMITTER_CELLTYPE,
-    RECEIVER_CELLTYPE,
-    sep = "_"
-    )
-]
-NLRI_table <- cci_stat_table[, .N, by = c("Dataset", "Tissue", "DTER_CELLTYPES")]
-NLRI_table[, DataTissue := paste(Dataset, Tissue, sep = "_")]
-NLRI_table[
-  ,
-  Dataset := factor(
-    Dataset,
-    c("TMS FACS (male)", "TMS FACS (female)", "TMS Droplet (male)", "TMS Droplet (female)", "Calico Droplet (male)")
-  )
-]
-
-
-distr_LRI <- c(NLRI_table$N, rep(0, sum(cci_stat_table[, uniqueN(EMITTER_CELLTYPE), by = c("Dataset", "Tissue")][, V1^2]) - nrow(NLRI_table) ))
-mean(distr_LRI)
-sd(distr_LRI)
-hist(distr_LRI, breaks = 100)
-
-
-## Number of ER for each LRI ####
-
-NER_by_LRI <- cci_stat_table[, .N, by = c("LRI", "Dataset")][order(-N)]
-
-ggplot(
-  data = NER_by_LRI
-) + geom_histogram(
-  aes(
-    x = N
-  ),
-  bins = 50,
-  position = "identity",
-  alpha = 0.3
-) + facet_wrap(~Dataset)
-
-
-## regulation distribution per tissue ####
-
-regulation_distr <- cci_stat_table[, .N, by = c("Dataset", "Tissue", "REGULATION")]
-regulation_distr <- dcast.data.table(
-  regulation_distr,
-  Dataset + Tissue ~ REGULATION,
-  value.var = "N"
-)
-regulation_distr[is.na(regulation_distr)] <- 0
-
-regulation_distr[
-  ,
-  total := UP + DOWN + FLAT + NSC
-]
-regulation_distr[
-  ,
-  c(
-    "UP",
-    "DOWN",
-    "FLAT",
-    "NSC"
-  ) :=
-    list(
-      UP/total,
-      DOWN/total,
-      FLAT/total,
-      NSC/total
-    )
-]
-regulation_distr_long <- melt.data.table(
-  regulation_distr,
-  id.vars = c("Dataset", "Tissue"),
-  measure.vars = c("UP", "DOWN", "FLAT", "NSC"),
-  variable.name = "REGULATION",
-  value.name = "pct"
-)
-regulation_distr_long[, id := paste(Dataset, Tissue, sep = "_")]
-
-regulation_distr_long[
-  ,
-  Dataset := factor(
-    Dataset,
-    c("TMS FACS (male)", "TMS FACS (female)", "TMS Droplet (male)", "TMS Droplet (female)", "Calico Droplet (male)")
-  )
-]
-
-
-
-
-## Extended Data Fi. 1 ####
-
-ExtFig1 <- ggplot(
-  data = NLRI_table,
-  aes(
-    y = Tissue,
-    x = N
-  )
-) + geom_boxplot(
-) + facet_wrap(
-  ~ Dataset,
-  ncol = 5
-) + ggplot2::scale_y_discrete(
-    limits = sort(
-      unique(NLRI_table$Tissue),
-      decreasing = TRUE
-    )
-) + xlab(
-  "Number of detected LRIs per cell-type pair"
-) + theme(
-  text = element_text(size = 40, face = "bold"),
-  axis.text.x = element_text(size = 30),
-  axis.text.y = element_text(size = 36, face = "bold"),
-  axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0)),
-  panel.spacing = unit(2, "lines")
-)
-#add points with jitter
-
-ggsave("data_scAgeCom_11_04_2022_processed/ExtFig1.png", ExtFig1, scale = 3.5)
-
-
-####################################################
-##
-## Project: scAgeCom
-##
-## Last update - April 2022
-##
-## cyril.lagger@liverpool.ac.uk
-## ursu_eugen@hotmail.com
-## anais.equey@etu.univ-amu.fr
-##
-## Perform DEG analysis on TMS data
-## that match scAgeCom cell types and conditions
-##
-####################################################
-##
-
-## Libraries ####
-
-library(Seurat)
-library(scDiffCom)
-library(future)
-library(future.apply)
-library(data.table)
-library(ggplot2)
-
-options(future.globals.maxSize = 15 * 1024^3)
-
-## Dataset path on Server ####
-
-server_path <- "/workspace/lcyril_data/scRNA_seq/seurat_processed/"
-
-dataset_path <- c(
-  tms_facs = paste0(server_path, "seurat_final_tms_facs.rds"),
-  tms_droplet = paste0(server_path, "seurat_final_tms_droplet.rds"),
-  calico_kidney = paste0(server_path, "seurat_final_calico_kidney.rds"),
-  calico_lung = paste0(server_path, "seurat_final_calico_lung.rds"),
-  calico_spleen = paste0(server_path, "seurat_final_calico_spleen.rds")
-)
-
-## Output path ####
-
-dir_deg_output <- paste0(getwd(), "/data_deg_wilcox_aging")
-
-## List of analyses to do over datasets and sex ####
-
-analysis_list <- list(
-  "calico_male",
-  "facs_female",
-  "facs_male",
-  "facs_mixed",
-  "droplet_female",
-  "droplet_male",
-  "droplet_mixed"
-)
-
-## Do the DEG analysis ####
-
-for (analysis in analysis_list) {
-  message(paste0("Starting DEG analysis of ", analysis))
-  output_dir <- paste0(
-    dir_deg_output,
-    "/deg_",
-    analysis
-  )
-  if (!dir.exists(output_dir)) {
-    message("Create output directory.")
-    dir.create(output_dir)
-  }
-  message("Reading seurat object.")
-  if (analysis == "calico_male") {
-    seurat_kidney <- readRDS(dataset_path[["calico_kidney"]])
-    seurat_kidney$age_group <- ifelse(
-      seurat_kidney$age == "young",
-      "YOUNG",
-      "OLD"
-    )
-    seurat_lung <- readRDS(dataset_path[["calico_lung"]])
-    seurat_lung$age_group <- ifelse(
-      seurat_lung$age == "young",
-      "YOUNG",
-      "OLD"
-    )
-    seurat_spleen <- readRDS(dataset_path[["calico_spleen"]])
-    seurat_spleen$age_group <- ifelse(
-      seurat_spleen$age == "young",
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c("Kidney", "Lung", "Spleen")
-    seurat_list <- list(
-      Kidney = seurat_kidney,
-      Lung = seurat_lung,
-      Spleen = seurat_spleen
-    )
-    n_tissue <- 3
-  } else if (analysis == "facs_female") {
-    seurat_obj <- readRDS(dataset_path[["tms_facs"]])
-    seurat_obj <- subset(seurat_obj, subset = sex == "female")
-    seurat_obj$age_group <- ifelse(
-      seurat_obj$age %in% c("3m"),
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c(
-      "BAT", "Bladder", "Brain", "GAT", "Heart", "Kidney",
-      "Large_Intestine", "Limb_Muscle",
-      "Lung", "MAT", "Mammary_Gland", "Marrow",
-      "Pancreas", "SCAT", "Skin", "Spleen", "Thymus",
-      "Tongue", "Trachea"
-    )
-    n_tissue <- length(tissue_list)
-  } else if (analysis == "facs_male") {
-    seurat_obj <- readRDS(dataset_path[["tms_facs"]])
-    seurat_obj <- subset(seurat_obj, subset = sex == "male")
-    seurat_obj$age_group <- ifelse(
-      seurat_obj$age %in% c("3m"),
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c(
-      "Aorta", "BAT", "Bladder", "Brain", "Diaphragm",
-      "GAT", "Heart", "Kidney",
-      "Large_Intestine", "Limb_Muscle", "Liver",
-      "Lung", "MAT", "Marrow",
-      "Pancreas", "SCAT", "Skin", "Spleen", "Thymus",
-      "Tongue", "Trachea"
-    )
-    n_tissue <- length(tissue_list)
-  } else if (analysis == "facs_mixed") {
-    seurat_obj <- readRDS(dataset_path[["tms_facs"]])
-    seurat_obj$age_group <- ifelse(
-      seurat_obj$age %in% c("3m"),
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c(
-      "Aorta", "BAT", "Bladder", "Brain", "Diaphragm",
-      "GAT", "Heart", "Kidney",
-      "Large_Intestine", "Limb_Muscle", "Liver",
-      "Lung", "Mammary_Gland", "MAT", "Marrow",
-      "Pancreas", "SCAT", "Skin", "Spleen", "Thymus",
-      "Tongue", "Trachea"
-    )
-    n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_female") {
-    seurat_obj <- readRDS(dataset_path[["tms_droplet"]])
-    seurat_obj <- subset(
-      seurat_obj,
-      subset = age %in% c("3m", "18m", "21m", "24m")
-    )
-    seurat_obj <- subset(seurat_obj, subset = sex == "female")
-    seurat_obj$age_group <- ifelse(
-      seurat_obj$age %in% c("3m"),
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c(
-      "Heart_and_Aorta", "Kidney", "Limb_Muscle",
-      "Liver", "Lung", "Mammary_Gland", "Marrow",
-      "Spleen", "Thymus"
-    )
-    n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_male") {
-    seurat_obj <- readRDS(dataset_path[["tms_droplet"]])
-    seurat_obj <- subset(
-      seurat_obj,
-      subset = age %in% c("3m", "18m", "21m", "24m")
-    )
-    seurat_obj <- subset(seurat_obj, subset = sex == "male")
-    seurat_obj$age_group <- ifelse(
-      seurat_obj$age %in% c("3m"),
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c(
-      "Bladder", "Kidney", "Liver", "Lung",
-      "Spleen", "Tongue"
-    )
-    n_tissue <- length(tissue_list)
-  } else if (analysis == "droplet_mixed") {
-    seurat_obj <- readRDS(dataset_path[["tms_droplet"]])
-    seurat_obj <- subset(
-      seurat_obj,
-      subset = age %in% c("3m", "18m", "21m", "24m")
-    )
-    seurat_obj$age_group <- ifelse(
-      seurat_obj$age %in% c("3m"),
-      "YOUNG",
-      "OLD"
-    )
-    tissue_list <- c(
-      "Bladder", "Heart_and_Aorta", "Kidney", "Liver", "Limb_Muscle",
-      "Liver", "Lung", "Mammary_Gland", "Marrow",
-      "Spleen", "Tongue", "Thymus"
-    )
-    n_tissue <- length(tissue_list)
-  }
-  for (i in 1:n_tissue) {
-    tiss <- tissue_list[i]
-    message(paste0(
-      "DEG analysis of the ",
-      tiss,
-      ". Tissue ",
-      i,
-      " out of ",
-      n_tissue,
-      "."
-    ))
-    if (analysis == "calico_male") {
-      seurat_tiss <- seurat_list[[tiss]]
-    } else {
-      if (tiss == "Brain") {
-        seurat_tiss <- subset(
-          seurat_obj,
-          subset = tissue %in% c(
-            "Brain_Myeloid",
-            "Brain_Non-Myeloid"
-          )
-        )
-      } else {
-        cells_tiss <- colnames(seurat_obj)[which(seurat_obj$tissue == tiss)]
-        seurat_tiss <- subset(seurat_obj, cells = cells_tiss)
-      }
-    }
-    cell_type_id <- "cell_ontology_final"
-    n_ct <- length(unique(seurat_tiss[[cell_type_id]][[1]]))
-    DefaultAssay(seurat_tiss) <- "RNA"
-    if (n_ct > 1) {
-      message("Size-factor normalization:")
-      seurat_tiss <- NormalizeData(seurat_tiss, assay = "RNA")
-      Idents(seurat_tiss) <- seurat_tiss[[cell_type_id]]
-      saveRDS(seurat_tiss[[]], file = paste0(output_dir, "/md_", tiss, ".rds"))
-      future::plan(multicore, workers = 24)
-      deg_res <- lapply(
-        levels(seurat_tiss),
-        function(ct_temp) {
-          tryCatch(
-            FindMarkers(
-              object = seurat_tiss,
-              ident.1 = "OLD",
-              ident.2 = "YOUNG",
-              group.by = "age_group",
-              subset.ident = ct_temp,
-              logfc.threshold = log2(1.2),
-              test.use = "wilcox",
-              min.pct = 0.1,
-              min.cells.feature = 5,
-              min.cells.group = 5,
-              pseudocount.use = 0.001
-            ),
-            error = function(e) e,
-            warning = function(w) w
-          )
-        }
-      )
-      names(deg_res) <- levels(seurat_tiss)
-      message(paste0("Saving results for the ", tiss, "."))
-      saveRDS(deg_res, file = paste0(output_dir, "/deg_", tiss, ".rds"))
-    } else {
-      message("Not enough cell types, not performing the analysis.")
-    }
-    future::plan(sequential)
-  }
-}
-
-## Path of MAST/wilcox results ####
-
-MAST_path <- "data_deg_mast_aging"
-MAST_dataset_paths <- list.dirs(MAST_path, recursive = FALSE)
-MAST_dataset_names <- c(
-  "Calico Droplet (male)",
-  "TMS Droplet (female)",
-  "TMS Droplet (male)",
-  "TMS Droplet (mixed)",
-  "TMS FACS (female)",
-  "TMS FACS (male)",
-  "TMS FACS (mixed)"
-)
-names(MAST_dataset_names) <- MAST_dataset_names
-
-wilcox_path <- "data_deg_wilcox_aging"
-wilcox_dataset_paths <- list.dirs(wilcox_path, recursive = FALSE)
-wilcox_dataset_names <- c(
-  "Calico Droplet (male)",
-  "TMS Droplet (female)",
-  "TMS Droplet (male)",
-  "TMS Droplet (mixed)",
-  "TMS FACS (female)",
-  "TMS FACS (male)",
-  "TMS FACS (mixed)"
-)
-names(wilcox_dataset_names) <- wilcox_dataset_names
-
-## Clean MAST/wilcox results in a single data.table ####
-
-process_deg_dataset <- function(
-  deg_dataset_path
-) {
-  # retrieve and load each object in the dataset
-  tissues <- gsub(".*deg_(.+)\\.rds.*", "\\1", list.files(deg_dataset_path))
-  tissues <- tissues[!grepl("md_", tissues)]
-  dataset <- lapply(
-    X = tissues,
-    FUN = function(
-      tiss
-    ) {
-      readRDS(paste0(deg_dataset_path, "/deg_", tiss, ".rds"))
-    }
-  )
-  tissues[tissues == "BAT"] <- "Adipose_Brown"
-  tissues[tissues == "GAT"] <- "Adipose_Gonadal"
-  tissues[tissues == "MAT"] <- "Adipose_Mesenteric"
-  tissues[tissues == "SCAT"] <- "Adipose_Subcutaneous"
-  names(dataset) <- tissues
-  # remove potential errors and transform to data.table
-  dataset <- rbindlist(
-    l = lapply(
-      dataset,
-      function(tiss) {
-        rbindlist(
-          l = lapply(
-            tiss,
-            function(ct) {
-              if (!is.data.frame(ct)) {
-                return(NULL)
-              } else {
-                as.data.table(ct, keep.rownames = "gene")
-              }
-            }
-          ),
-          idcol = "cell_type"
-        )
-      }
-    ),
-    idcol = "tissue"
-  )
-  return(dataset)
-}
-
-MAST_results <- rbindlist(
-  l = lapply(
-    setNames(
-      MAST_dataset_paths,
-      MAST_dataset_names
-    ),
-    process_deg_dataset
-  ),
-  idcol = "dataset"
-)
-setnames(
-  MAST_results,
-  old = c("pct.1", "pct.2"),
-  new = c("pct_old", "pct_young")
-)
-saveRDS(MAST_results, "data_deg_mast_aging/MAST_results_dt.rds")
-
-wilcox_results <- rbindlist(
-  l = lapply(
-    setNames(
-      wilcox_dataset_paths,
-      wilcox_dataset_names
-    ),
-    process_deg_dataset
-  ),
-  idcol = "dataset"
-)
-setnames(
-  wilcox_results,
-  old = c("pct.1", "pct.2"),
-  new = c("pct_old", "pct_young")
-)
-saveRDS(wilcox_results, "data_deg_wilcox_aging/wilcox_results_dt.rds")
-
-## Perform FDR correction by tissue-cell-type ####
-
-wilcox_results[
-  ,
-  p_val_bh := p.adjust(p_val, method = "BH"),
-  by = c("dataset", "tissue", "cell_type")
-]
-
-## DEG regulation ####
-
-MAST_results[
-  ,
-  regulation := ifelse(
-    p_val <= 0.05 & avg_log2FC > log2(1.5),
-    "UP",
-    ifelse(
-      p_val <= 0.05 & avg_log2FC < -log2(1.5),
-      "DOWN",
-      "NO"
-    )
-  )
-]
-table(MAST_results$regulation)
-
-wilcox_results[
-  ,
-  regulation := ifelse(
-    p_val_bh <= 0.05 & avg_log2FC > log2(1.5),
-    "UP",
-    ifelse(
-      p_val_bh <= 0.05 & avg_log2FC < -log2(1.5),
-      "DOWN",
-      "NO"
-    )
-  )
-]
-table(wilcox_results$regulation)
-
-## Load scAgeCom results ####
-
-scAgeCom_results <- readRDS(
-  "data_scAgeCom_11_04_2022_processed/scAgeCom_results_processed.rds"
-)
-
-CCI_results <- rbindlist(
-  lapply(
-    scAgeCom_results,
-    function(dataset) {
-      rbindlist(
-        lapply(
-          dataset,
-          function(tissue) {
-            GetTableCCI(
-              object = tissue,
-              type = "detected",
-              simplified = FALSE
-            )
-          }
-        ),
-        fill = TRUE,
-        idcol = "Tissue"
-      )
-    }
-  ),
-  idcol = "Dataset"
-)
-
-## Comparing wilcox DEG with scAgeCom ####
-
-CCI_results[
-  wilcox_results,
-  on = c(
-    "Dataset==dataset", "Tissue==tissue",
-    "EMITTER_CELLTYPE==cell_type", "LIGAND_1==gene"
-  ),
-  l1_deg_reg := i.regulation
-]
-CCI_results[
-  ,
-  l1_deg_reg := ifelse(
-    is.na(l1_deg_reg),
-    "NO",
-    l1_deg_reg
-  )
-]
-CCI_results[
-  wilcox_results,
-  on = c(
-    "Dataset==dataset", "Tissue==tissue",
-    "EMITTER_CELLTYPE==cell_type", "LIGAND_2==gene"
-  ),
-  l2_deg_reg := i.regulation
-]
-CCI_results[
-  ,
-  l2_deg_reg := ifelse(
-    is.na(l2_deg_reg) & !is.na(LIGAND_2),
-    "NO",
-    l2_deg_reg
-  )
-]
-CCI_results[
-  wilcox_results,
-  on = c(
-    "Dataset==dataset", "Tissue==tissue",
-    "RECEIVER_CELLTYPE==cell_type", "RECEPTOR_1==gene"
-  ),
-  r1_deg_reg := i.regulation
-]
-CCI_results[
-  ,
-  r1_deg_reg := ifelse(
-    is.na(r1_deg_reg),
-    "NO",
-    r1_deg_reg
-  )
-]
-CCI_results[
-  wilcox_results,
-  on = c(
-    "Dataset==dataset", "Tissue==tissue",
-    "RECEIVER_CELLTYPE==cell_type", "RECEPTOR_2==gene"
-  ),
-  r2_deg_reg := i.regulation
-]
-CCI_results[
-  ,
-  r2_deg_reg := ifelse(
-    is.na(r2_deg_reg) & !is.na(RECEPTOR_2),
-    "NO",
-    r2_deg_reg
-  )
-]
-CCI_results[
-  wilcox_results,
-  on = c(
-    "Dataset==dataset", "Tissue==tissue",
-    "RECEIVER_CELLTYPE==cell_type", "RECEPTOR_3==gene"
-  ),
-  r3_deg_reg := i.regulation
-]
-CCI_results[
-  ,
-  r3_deg_reg := ifelse(
-    is.na(r3_deg_reg) & !is.na(RECEPTOR_3),
-    "NO",
-    r3_deg_reg
-  )
-]
-
-table(CCI_results$l1_deg_reg)
-table(CCI_results$l2_deg_reg)
-table(CCI_results$r1_deg_reg)
-table(CCI_results$r2_deg_reg)
-table(CCI_results$r3_deg_reg)
-anyNA(CCI_results$r3_deg_reg)
-
-## Summary Wilcox comparison table ####
-
-CCI_results[
+dt_cci_rel[
   ,
   scDiffCom_regulation := ifelse(
     !REGULATION %in% c("UP", "DOWN"),
@@ -756,230 +24,138 @@ CCI_results[
   )
 ]
 
-deg_comp_wilcox <- CCI_results[, .N, by = c(
-  "scDiffCom_regulation",
-  "l1_deg_reg",
-  "l2_deg_reg",
-  "r1_deg_reg",
-  "r2_deg_reg",
-  "r3_deg_reg"
-)
-]
-deg_comp_wilcox[
+## General LRI statistics ####
+
+dt_lri_human
+dt_lri_human[
   ,
-  pct := N / sum(N) * 100
+  Type := ifelse(
+    !is.na(LIGAND_2) | !is.na(RECEPTOR_2),
+    "Complex",
+    "Simple"
+  )
+]
+table(dt_lri_human$Type)
+
+dt_lri_mouse
+dt_lri_mouse[
+  ,
+  Type := ifelse(
+    !is.na(LIGAND_2) | !is.na(RECEPTOR_2),
+    "Complex",
+    "Simple"
+  )
+]
+table(dt_lri_mouse$Type)
+
+## Aging LRI statistics ####
+
+top10_lr_aging <- pmid_aging_lri_n[order(-count)][1:10]$gene
+top10_lr_aging
+top10_lr_aging[top10_lr_aging %in% hagr_genes]
+
+## Number of detected CCIs ####
+
+# total
+dt_cci_full[, .N]
+dt_cci_rel[, .N]
+
+# by datasets
+dt_cci_full[, .N, by = c("dataset")]
+
+# by regulation
+dt_cci_full[, .N, by = c("REGULATION")]
+dt_cci_full[, .N, by = c("REGULATION")][, N / sum(N) * 100]
+dt_cci_rel[, .N, by = c("REGULATION")]
+dt_cci_rel[, .N, by = c("REGULATION")][
+  , N / sum(N) * 100
 ]
 
-fwrite(deg_comp_wilcox, "data_deg_wilcox_aging/deg_comparison.csv")
+## Average LRI per ER_CELLTYPES ####
 
-## Compare permutation DEG with CCIs ####
-
-CCI_results[
+dt_cci_rel[
   ,
-  l1_deg_perm :=  ifelse(
-    L1_BH_P_VALUE_DE <= 0.05 & L1_LOGFC > log(1.5),
-    "UP",
-    ifelse(
-      L1_BH_P_VALUE_DE <= 0.05 & L1_LOGFC < -log(1.5),
-      "DOWN",
-      "NO"
+   DTER_CELLTYPES := paste(
+    dataset,
+    tissue,
+    EMITTER_CELLTYPE,
+    RECEIVER_CELLTYPE,
+    sep = "_"
     )
-  )
-]
-table(CCI_results$l1_deg_perm)
-table(CCI_results$l1_deg_perm, CCI_results$l1_deg_reg)
-
-CCI_results[
-  ,
-  l2_deg_perm :=  ifelse(
-    is.na(L2_BH_P_VALUE_DE),
-    NA,
-    ifelse(
-      L2_BH_P_VALUE_DE <= 0.05 & L2_LOGFC > log(1.5),
-      "UP",
-      ifelse(
-        L2_BH_P_VALUE_DE <= 0.05 & L2_LOGFC < -log(1.5),
-        "DOWN",
-        "NO"
-      )
-    )
-  )
-]
-table(CCI_results$l2_deg_perm)
-table(CCI_results$l2_deg_perm, CCI_results$l2_deg_reg)
-
-CCI_results[
-  ,
-  r1_deg_perm :=  ifelse(
-    R1_BH_P_VALUE_DE <= 0.05 & R1_LOGFC > log(1.5),
-    "UP",
-    ifelse(
-      R1_BH_P_VALUE_DE <= 0.05 & R1_LOGFC < -log(1.5),
-      "DOWN",
-      "NO"
-    )
-  )
-]
-table(CCI_results$r1_deg_perm)
-table(CCI_results$r1_deg_perm, CCI_results$r1_deg_reg)
-
-CCI_results[
-  ,
-  r2_deg_perm :=  ifelse(
-    is.na(R2_BH_P_VALUE_DE),
-    NA,
-    ifelse(
-      R2_BH_P_VALUE_DE <= 0.05 & R2_LOGFC > log(1.5),
-      "UP",
-      ifelse(
-        R2_BH_P_VALUE_DE <= 0.05 & R2_LOGFC < -log(1.5),
-        "DOWN",
-        "NO"
-      )
-    )
-  )
-]
-table(CCI_results$r2_deg_perm)
-table(CCI_results$r2_deg_perm, CCI_results$r2_deg_reg)
-
-CCI_results[
-  ,
-  r3_deg_perm :=  ifelse(
-    is.na(R3_BH_P_VALUE_DE),
-    NA,
-    ifelse(
-      R3_BH_P_VALUE_DE <= 0.05 & R3_LOGFC > log(1.5),
-      "UP",
-      ifelse(
-        R3_BH_P_VALUE_DE <= 0.05 & R3_LOGFC < -log(1.5),
-        "DOWN",
-        "NO"
-      )
-    )
-  )
-]
-table(CCI_results$r3_deg_perm)
-table(CCI_results$r3_deg_perm, CCI_results$r3_deg_reg)
-
-## DEG permutation comparison ####
-
-cci_deg_comp <- CCI_results[
-  ,
-  c(
-  "Dataset",
-  "scDiffCom_regulation",
-  "l1_deg_perm",
-  "l2_deg_perm",
-  "r1_deg_perm",
-  "r2_deg_perm",
-  "r3_deg_perm"
-  )
 ]
 
-cci_deg_comp[
-  ,
-  ligand_deg_perm := ifelse(
-    is.na(l2_deg_perm),
-    l1_deg_perm,
-    ifelse(
-      l1_deg_perm == l2_deg_perm,
-      l1_deg_perm,
-      ifelse(
-        l1_deg_perm == "NO",
-        l2_deg_perm,
-        ifelse(
-          l2_deg_perm == "NO",
-          l1_deg_perm,
-          "NO"
+NLRI_template <- rbindlist(
+  lapply(
+    unique(dt_cci_rel$dataset),
+    function(data) {
+      rbindlist(
+        lapply(
+          unique(dt_cci_rel[dataset == data]$tissue),
+          function(tiss) {
+            dt_temp <- CJ(
+              unique(
+                dt_cci_rel[
+                  dataset == data & tissue == tiss
+                ]$EMITTER_CELLTYPE
+              ),
+              unique(
+                dt_cci_rel[
+                  dataset == data & tissue == tiss
+                ]$RECEIVER_CELLTYPE
+              )
+            )
+            dt_temp[, dataset := data]
+            dt_temp[, tissue := tiss]
+            dt_temp[
+              ,
+              DTER_CELLTYPES := paste(
+                dataset,
+                tissue,
+                V1,
+                V2,
+                sep = "_"
+                )
+            ]
+          }
         )
       )
-    )
+    }
   )
-]
-
-cci_deg_comp[
-  ,
-  receptor_deg_perm := ifelse(
-    is.na(r2_deg_perm),
-    r1_deg_perm,
-    ifelse(
-      r1_deg_perm == r2_deg_perm,
-      r1_deg_perm,
-      ifelse(
-        r1_deg_perm == "NO",
-        r2_deg_perm,
-        ifelse(
-          r2_deg_perm == "NO",
-          r1_deg_perm,
-          "NO"
-        )
-      )
-    )
-  )
-]
-
-table(cci_deg_comp$ligand_deg_perm)
-table(cci_deg_comp$receptor_deg_perm)
-anyNA(cci_deg_comp$receptor_deg_perm)
-
-deg_comp_perm <- cci_deg_comp[, .N, by = c(
-  "Dataset",
-  "scDiffCom_regulation",
-  "ligand_deg_perm",
-  "receptor_deg_perm"
 )
-]
-deg_comp_perm[
-  ,
-  pct := N / sum(N) * 100,
-  by = c("Dataset")
-]
+NLRI_template[, V1 := NULL]
+NLRI_template[, V2 := NULL]
 
-fwrite(
-  deg_comp_perm,
-   "data_scAgeCom_11_04_2022_processed/deg_comparison_perm.csv"
-)
-deg_comp_perm <- fread("data_scAgeCom_11_04_2022_processed/deg_comparison_perm.csv")
-
-## Comparison plot SDEA vs scDiffCom ####
-
-deg_comp_perm_test <- deg_comp_perm[
-  Dataset == "TMS FACS (male)"
-]
-
-cci_deg_comp[, scdiffcom_up := scDiffCom_regulation == "UP"]
-cci_deg_comp[, scdiffcom_down := scDiffCom_regulation == "DOWN"]
-cci_deg_comp[, scdiffcom_no := scDiffCom_regulation == "NO"]
-cci_deg_comp[, ligand_up := ligand_deg_perm == "UP"]
-cci_deg_comp[, ligand_down := ligand_deg_perm == "DOWN"]
-cci_deg_comp[, ligand_no := ligand_deg_perm == "NO"]
-cci_deg_comp[, receptor_up := receptor_deg_perm == "UP"]
-cci_deg_comp[, receptor_down := receptor_deg_perm == "DOWN"]
-cci_deg_comp[, receptor_no := receptor_deg_perm == "NO"]
-
-ComplexUpset::upset(
-  cci_deg_comp[
-    Dataset == "TMS Droplet (male)"
+NLRI_template[
+  dt_cci_rel[
+    ,
+    .N,
+    by = c("dataset", "tissue", "DTER_CELLTYPES")
   ],
-  c("scdiffcom_up", "scdiffcom_down", "scdiffcom_no",
-  "ligand_up", "ligand_down", "ligand_no",
-  "receptor_up", "receptor_down", "receptor_no")
-)
+  on = c("dataset", "tissue", "DTER_CELLTYPES"),
+  N := i.N
+]
+NLRI_template[is.na(NLRI_template)] <- 0
+NLRI_template[
+  ,
+  dataset := factor(
+    dataset,
+    c(
+      "TMS FACS (male)",
+      "TMS FACS (female)",
+      "TMS Droplet (male)",
+      "TMS Droplet (female)",
+      "Calico Droplet (male)")
+  )
+]
 
-
-
-
-
-
-## Extract specific examples to discuss ####
+NLRI_template[, mean(N)]
+NLRI_template[, sd(N)]
 
 ## LRI not detected at all and counts of detection for each LRI per dataset ####
 
 seurat_genes <- lapply(
-  dataset_path,
-  function(i) {
-    rownames(readRDS(i))
-  }
+  seurats_analysis,
+  rownames
 )
 seurat_genes$calico <- unique(
   c(seurat_genes$calico_kidney,
@@ -989,7 +165,6 @@ seurat_genes$calico <- unique(
 )
 
 LRI_template <- LRI_mouse$LRI_curated[, 1:6]
-
 
 LRI_in_seurat <- lapply(
   seurat_genes,
@@ -1007,24 +182,8 @@ LRI_in_seurat <- unique(
   rbindlist(LRI_in_seurat)
 )
 
-nrow(LRI_template) - nrow(LRI_in_seurat)
-(nrow(LRI_template) - nrow(LRI_in_seurat))/nrow(LRI_template)*100
-
-(nrow(LRI_template) - nrow(LRI_in_seurat)) +
-  sum(!LRI_in_seurat$LRI %in% unique(CCI_results$LRI))
-
-((nrow(LRI_template) - nrow(LRI_in_seurat)) +
-  sum(!LRI_in_seurat$LRI %in% unique(CCI_results$LRI))) /
-  nrow(LRI_template)*100
-
-table(LRI_in_seurat$LRI %in% unique(CCI_results$LRI))
-table(LRI_in_seurat$LRI %in% unique(CCI_results$LRI))/
-  nrow(LRI_template)*100
-
-
-
 LRI_not_detected <- LRI_in_seurat[
-  !LRI %in% unique(CCI_results$LRI)
+  !LRI %in% unique(dt_cci_rel$LRI)
 ]
 
 LRI_not_detected_genes <- sort(unique(
@@ -1037,307 +196,170 @@ LRI_not_detected_genes <- sort(unique(
 ))
 LRI_not_detected_genes <- LRI_not_detected_genes[!is.na(LRI_not_detected_genes)]
 
-# example of LRI not detected that could have been DEG
+## Compare SDEA with scDiffCom ####
 
-wilcox_results[
-  gene == "Agtr2"
+dt_cci_rel[
+  ,
+  l1_deg :=  ifelse(
+    L1_BH_P_VALUE_DE <= 0.05 & L1_LOGFC >= log(1.5),
+    "UP",
+    ifelse(
+      L1_BH_P_VALUE_DE <= 0.05 & L1_LOGFC <= -log(1.5),
+      "DOWN",
+      "NO"
+    )
+  )
 ]
-
-LRI_not_detected_deg_up <- rbindlist(
-  lapply(
-    unique(CCI_results$Dataset),
-    function(i) {
-      rbindlist(
-        lapply(
-          unique(CCI_results[Dataset == i]$Tissue),
-          function(j) {
-            temp <- wilcox_results[
-              dataset == i &
-                tissue == j
-            ]
-            temp2 <- copy(LRI_not_detected)[, c("LIGAND_1", "RECEPTOR_1")]
-            temp2[
-              unique(
-                temp[regulation == "UP"][, c("gene", "cell_type")]
-              ),
-              on = "LIGAND_1==gene",
-              emitter := i.cell_type
-            ]
-            temp2[
-              unique(
-                temp[regulation == "UP"][, c("gene", "cell_type")]
-              ),
-              on = "RECEPTOR_1==gene",
-              receiver := i.cell_type
-            ]
-            na.omit(temp2)
-          }
-        ),
-        idcol = "Tissue"
+dt_cci_rel[
+  ,
+  l2_deg :=  ifelse(
+    is.na(L2_BH_P_VALUE_DE),
+    NA,
+    ifelse(
+      L2_BH_P_VALUE_DE <= 0.05 & L2_LOGFC >= log(1.5),
+      "UP",
+      ifelse(
+        L2_BH_P_VALUE_DE <= 0.05 & L2_LOGFC <= -log(1.5),
+        "DOWN",
+        "NO"
       )
-    }
-  ),
-  idcol = "Dataset"
-)
-
-LRI_not_detected_deg_down <- rbindlist(
-  lapply(
-    unique(CCI_results$Dataset),
-    function(i) {
-      rbindlist(
-        lapply(
-          unique(CCI_results[Dataset == i]$Tissue),
-          function(j) {
-            temp <- CCI_results[
-              Dataset == i &
-                Tissue == j
-            ]
-            temp2 <- copy(LRI_not_detected)[, c("LIGAND_1", "RECEPTOR_1")]
-            temp2[
-              unique(
-                temp[l1_deg_reg == "DOWN"][, c("LIGAND_1", "EMITTER_CELLTYPE")]
-              ),
-              on = "LIGAND_1",
-              emitter := i.EMITTER_CELLTYPE
-            ]
-            temp2[
-              unique(
-                temp[r1_deg_reg == "DOWN"][, c("RECEPTOR_1", "RECEIVER_CELLTYPE")]
-              ),
-              on = "RECEPTOR_1",
-              receiver := i.RECEIVER_CELLTYPE
-            ]
-            na.omit(temp2)
-          }
-        ),
-        idcol = "Tissue"
+    )
+  )
+]
+dt_cci_rel[
+  ,
+  r1_deg :=  ifelse(
+    R1_BH_P_VALUE_DE <= 0.05 & R1_LOGFC >= log(1.5),
+    "UP",
+    ifelse(
+      R1_BH_P_VALUE_DE <= 0.05 & R1_LOGFC <= -log(1.5),
+      "DOWN",
+      "NO"
+    )
+  )
+]
+dt_cci_rel[
+  ,
+  r2_deg :=  ifelse(
+    is.na(R2_BH_P_VALUE_DE),
+    NA,
+    ifelse(
+      R2_BH_P_VALUE_DE <= 0.05 & R2_LOGFC >= log(1.5),
+      "UP",
+      ifelse(
+        R2_BH_P_VALUE_DE <= 0.05 & R2_LOGFC <= -log(1.5),
+        "DOWN",
+        "NO"
       )
-    }
-  ),
-  idcol = "Dataset"
+    )
+  )
+]
+dt_cci_rel[
+  ,
+  r3_deg :=  ifelse(
+    is.na(R3_BH_P_VALUE_DE),
+    NA,
+    ifelse(
+      R3_BH_P_VALUE_DE <= 0.05 & R3_LOGFC >= log(1.5),
+      "UP",
+      ifelse(
+        R3_BH_P_VALUE_DE <= 0.05 & R3_LOGFC <= -log(1.5),
+        "DOWN",
+        "NO"
+      )
+    )
+  )
+]
+
+table(dt_cci_rel$l1_deg)
+table(dt_cci_rel$l2_deg)
+table(dt_cci_rel$r1_deg)
+table(dt_cci_rel$r2_deg)
+table(dt_cci_rel$r3_deg)
+
+dt_cci_sdea_comp <- dt_cci_rel[
+  ,
+  c(
+  "dataset",
+  "scDiffCom_regulation",
+  "l1_deg",
+  "l2_deg",
+  "r1_deg",
+  "r2_deg",
+  "r3_deg"
+  )
+]
+dt_cci_sdea_comp[
+  ,
+  ligand_deg := ifelse(
+    is.na(l2_deg),
+    l1_deg,
+    ifelse(
+      l1_deg == l2_deg,
+      l1_deg,
+      ifelse(
+        l1_deg == "NO",
+        l2_deg,
+        ifelse(
+          l2_deg == "NO",
+          l1_deg,
+          "NO"
+        )
+      )
+    )
+  )
+]
+dt_cci_sdea_comp[
+  ,
+  receptor_deg := ifelse(
+    is.na(r2_deg),
+    r1_deg,
+    ifelse(
+      r1_deg == r2_deg,
+      r1_deg,
+      ifelse(
+        r1_deg == "NO",
+        r2_deg,
+        ifelse(
+          r2_deg == "NO",
+          r1_deg,
+          "NO"
+        )
+      )
+    )
+  )
+]
+
+table(dt_cci_sdea_comp$ligand_deg)
+table(dt_cci_sdea_comp$receptor_deg)
+anyNA(dt_cci_sdea_comp$receptor_deg)
+
+dt_sdea_comp_count <- dt_cci_sdea_comp[
+  ,
+  .N,
+  by = c(
+    "dataset",
+    "scDiffCom_regulation",
+    "ligand_deg",
+    "receptor_deg"
+  )
+]
+dt_sdea_comp_count[
+  ,
+  pct := N / sum(N) * 100,
+  by = c("dataset")
+]
+setnames(
+  dt_sdea_comp_count,
+  old = colnames(dt_sdea_comp_count),
+  new = c("dataset", "scDiffCom_regulation", "ligand_SDEA_regulation",
+  "receptor_SDEA_regulation", "Number_of_LRIs", "Pct_of_LRIs")
 )
 
-# Stable LRI
-
-LRI_regulation_table <- dcast.data.table(
-  CCI_results[, .N, by = c("LRI", "REGULATION")],
-  formula = LRI ~ REGULATION,
-  value.var = "N",
-  fill = 0
+dt_sdea_comp_count_list <- lapply(
+  unique(dt_sdea_comp_count$dataset),
+  function(i) {
+    dt_sdea_comp_count[dataset == i]
+  }
 )
-
-LRI_regulation_table_notreg <- LRI_regulation_table[
-  DOWN == 0 & UP == 0
-][order(-FLAT)]
-
-
-
-
-## Annotate ORA LRI with HAGR and PMID ####
-
-data_4_tissue_specific_results <- readRDS(
-  "data_scAgeCom/analysis/outputs_data/data_4_tissue_specific_results.rds"
-)
-
-ORA_table <- data_4_tissue_specific_results$ORA_table
-
-table(ORA_table$ORA_REGULATION)
-table(ORA_table$ORA_CATEGORY)
-
-ORA_LRI <- ORA_table[
-    ORA_CATEGORY == "LRI" & ORA_REGULATION != "Not Over-represented",
-    c("Dataset", "Tissue", "VALUE", "ORA_REGULATION")
-]
-ORA_LRI[
-    LRI_mouse_dt,
-    on = "VALUE==LRI",
-    (pmid_colnames) := mget(paste0("i.", pmid_colnames))
-]
-ORA_LRI[
-    LRI_mouse_dt,
-    on = "VALUE==LRI",
-    (hagr_colnames) := mget(paste0("i.", hagr_colnames))
-]
-ORA_LRI_N <- ORA_LRI[
-    ,
-    .N,
-    by = eval(colnames(ORA_LRI)[3:14])
-][order(-N)]
-
-ORA_LIGAND <- ORA_table[
-    ORA_CATEGORY == "LIGAND_COMPLEX" &
-     ORA_REGULATION != "Not Over-represented",
-    c("Dataset", "Tissue", "VALUE", "ORA_REGULATION")
-]
-ORA_LIGAND[
-    LRI_mouse_dt,
-    on = "VALUE==LIGAND_1",
-    LIGAND_1_agepmid := i.LIGAND_1_agepmid
-]
-ORA_LIGAND[
-    LRI_mouse_dt,
-    on = "VALUE==LIGAND_1",
-    HAGR_L1 := i.HAGR_L1
-]
-ORA_LIGAND_N <- ORA_LIGAND[
-    ,
-    .N,
-    by = eval(colnames(ORA_LIGAND)[3:6])
-][order(-N)]
-
-ORA_RECEPTOR <- ORA_table[
-    ORA_CATEGORY == "RECEPTOR_COMPLEX" &
-     ORA_REGULATION != "Not Over-represented",
-    c("Dataset", "Tissue", "VALUE", "ORA_REGULATION")
-]
-ORA_RECEPTOR[
-    LRI_mouse_dt,
-    on = "VALUE==RECEPTOR_1",
-    RECEPTOR_1_agepmid := i.RECEPTOR_1_agepmid
-]
-ORA_RECEPTOR[
-    LRI_mouse_dt,
-    on = "VALUE==RECEPTOR_1",
-    HAGR_R1 := i.HAGR_R1
-]
-ORA_RECEPTOR_N <- ORA_RECEPTOR[
-    ,
-    .N,
-    by = eval(colnames(ORA_RECEPTOR)[3:6])
-][order(-N)]
-
-## Statistics of LRI ####
-
-LRI_combined_pmid_aging_n[order(-count)][1:10]
-
-table(
-    LRI_combined_pmid_aging_n[order(-count)][1:10]$gene %in%
-    hagr_genes
-)
-
-
-## New LRI of interest ####
-
-ORA_LIGAND_N[
-    ORA_REGULATION != "FLAT" &
-    LIGAND_1_agepmid <= 5 &
-    HAGR_L1 == FALSE &
-    N >= 5
-][1:20]
-ORA_RECEPTOR_N[
-    ORA_REGULATION != "FLAT" &
-    RECEPTOR_1_agepmid <= 5 &
-    HAGR_R1 == FALSE &
-    N >= 5
-][1:20]
-
-## Egfl7 #####
-
-ORA_LRI_N[
-    grepl("Egfl", VALUE)
-]
-
-# Egfl7:Notch1/2/3 upregulated.
-# Egfl7 not aging characterized
-# Notch is linked to pubmed aging (thymocyte development, angiogenesis
-# down implies less regeneration in muscle, senescence, etc, LRI_mouse_pmid_aging$Notch1). Notch
-# is related to many processes.
-# Here: angiogenesis (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3286203/) and
-# (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3031397/)
-# neural stem cell renewal (https://www.nature.com/articles/ncb1896)
-# Egfl7 acts as a Notch antagonist (reduce target gene expression)/opposite as well
-#/depent on the micorenviornment
-# Overexpression of Egfl7 can lead to abnormal vessel patterning
-# In NSC, Egfl7 reduces proliferation and trigger differentiation,
-# here maybe a similar effect on MSC in adipose tissues
-
-ccis_egfl7_up <- data_4_tissue_specific_results$CCI_table[
-    LIGAND_1 == "Egfl7" &
-    `Age Regulation` == "UP"
-]
-
-#appears up-regulaed in adipose tissues, brain, heart and mammary gland a lot
-ccis_egfl7_up[, .N, by = c("Dataset", "Tissue")][order(-N)]
-#secreted by endothelial cells
-ccis_egfl7_up[, .N, by = c("Tissue", "Emitter Cell Type")][order(-N)]
-#towards MSC in adipose, endocardial cells and fibroblast of cardiac tissues in heart, T cells
-ccis_egfl7_up[, .N, by = c("Tissue", "Receiver Cell Type")][order(-N)][1:10]
-#towards pericyte and oligodendrocyte precursor cells in Brain
-ccis_egfl7_up[, .N, by = c("Tissue", "Receiver Cell Type")][order(-N)][11:20]
-
-ccis_egfl7_up[, .N,
- by = c("Dataset", "Tissue", "Emitter Cell Type", "Receiver Cell Type")
-][order(-N)][1:10]
-
-## F13a1 ####
-
-ORA_LRI_N[
-    grepl("F13a1", VALUE)
-]
-
-#downregulated with integrins (https://pubmed.ncbi.nlm.nih.gov/10816592/)
-#The interaction of α4β1 and α9β1 with FXIII could be biologically significant.
-# Both α4β1 and α9β1 are highly expressed on specific populations of leukocytes,
-# where they play a prominent role in transendothelial leukocyte migration.
-# As a member of the coagulation cascade, FXIII is likely to be enriched at sites
-# of vascular injury and inflammation, where its interaction with α4β1 and α9β1 
-#could promote leukocyte extravasation.
-LRI_mouse_dt[LIGAND_1 == "F13a1"]
-
-#not well documented with aging (AMD papers)
-LRI_combined_pmid_aging$F13a1
-
-ccis_f13a1_down <- data_4_tissue_specific_results$CCI_table[
-    LIGAND_1 == "F13a1" &
-    `Age Regulation` == "DOWN"
-]
-
-#appears down-regulaed in Marrow, adipose tissue and other
-ccis_f13a1_down[, .N, by = c("Dataset", "Tissue")][order(-N)]
-#secreted by (pro-)monocyte/macrophages/myeloid principally
-ccis_f13a1_down[, .N, by = c("Tissue", "Emitter Cell Type")][order(-N)]
-#towards immune cell types
-ccis_f13a1_down[, .N, by = c("Tissue", "Receiver Cell Type")][order(-N)]
-
-#not well documented interaction with integrins
-
-## Gpi1 ####
-
-ORA_LRI_N[
-    grepl("Gpi1", VALUE)
-]
-
-LRI_combined_pmid_aging$Gpi1
-LRI_mouse_dt[LIGAND_1 == "Gpi1"]
-
-## Tln1 (probably false positive as intracellular with Itgb1) ####
-
-## Col6a2, H2-Q6 # to do ####
-
-## Slpi Plscr1 ####
-ORA_LRI_N[
-    grepl("Slpi", VALUE)
-]
-
-#Slpi with Plscr1 not linked to aging
-
-LRI_mouse_dt[LRI == "Slpi:Pls"]
-
-ccis_slpi_up <- data_4_tissue_specific_results$CCI_table[
-    LIGAND_1 == "Slpi" &
-    `Age Regulation` == "UP"
-]
-
-## Rpsa
-ORA_LRI_N[
-    grepl("Rpsa", VALUE)
-]
-
-ccis_rpsa_up <- data_4_tissue_specific_results$CCI_table[
-    RECEPTOR_1 == "Rpsa" &
-    `Age Regulation` == "UP"
-]
-
-## Gpc1
-
-## Tnfrsf21
+names(dt_sdea_comp_count_list) <- unique(dt_sdea_comp_count$dataset)
