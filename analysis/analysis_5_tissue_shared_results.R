@@ -240,7 +240,7 @@ dt_ora_key_counts_diffsex <- rbindlist(
   )
 )
 
-## Create a "tissue vs dataset" summary table for all ORA keywords ####
+## Create a diffsex "tissue vs dataset" summary table for all ORA keywords ####
 
 dt_ora_key_summary_diffsex <- melt.data.table(
   dcast.data.table(
