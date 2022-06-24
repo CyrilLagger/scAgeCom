@@ -279,7 +279,7 @@ dt_metadata[
 dt_md_tms_age_sex <- dt_metadata[
   dataset %in% c("tms_facs", "tms_droplet") & age_group != "NOT",
   .N,
-  by = c("dataset", "tissue", "cell_ontology_class", "sex", "age_group")
+  by = c("dataset", "tissue", "cell_ontology_final", "sex", "age_group")
 ][order(dataset, tissue, sex, age_group)]
 
 fwrite(
