@@ -16,7 +16,7 @@
 dt_ora_key_counts <- rbindlist(
   list(
     dcast.data.table(
-      copy(dt_ora_full[
+      copy(dt_ora_full[!grepl("mixed", dataset)][
         ORA_REGULATION %in% c("UP", "UP:DOWN"),
         c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
       ])[, ORA_REGULATION := "UP"][
@@ -29,7 +29,7 @@ dt_ora_key_counts <- rbindlist(
       fill = 0
     )[
       unique(
-        copy(dt_ora_full[
+        copy(dt_ora_full[!grepl("mixed", dataset)][
           ORA_REGULATION %in% c("UP", "UP:DOWN"),
           c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
         ])[, ORA_REGULATION := "UP"][
@@ -45,7 +45,7 @@ dt_ora_key_counts <- rbindlist(
       `Overall (Union)` := i.N
     ],
     dcast.data.table(
-      copy(dt_ora_full[
+      copy(dt_ora_full[!grepl("mixed", dataset)][
         ORA_REGULATION %in% c("DOWN", "UP:DOWN"),
         c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
       ])[, ORA_REGULATION := "DOWN"][
@@ -58,7 +58,7 @@ dt_ora_key_counts <- rbindlist(
       fill = 0
     )[
       unique(
-        copy(dt_ora_full[
+        copy(dt_ora_full[!grepl("mixed", dataset)][
           ORA_REGULATION %in% c("DOWN", "UP:DOWN"),
           c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
         ])[, ORA_REGULATION := "DOWN"][
@@ -74,7 +74,7 @@ dt_ora_key_counts <- rbindlist(
       `Overall (Union)` := i.N
     ],
     dcast.data.table(
-      copy(dt_ora_full[
+      copy(dt_ora_full[!grepl("mixed", dataset)][
         ORA_REGULATION %in% c("FLAT"),
         c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
       ])[, ORA_REGULATION := "FLAT"][
@@ -87,7 +87,7 @@ dt_ora_key_counts <- rbindlist(
       fill = 0
     )[
       unique(
-        copy(dt_ora_full[
+        copy(dt_ora_full[!grepl("mixed", dataset)][
           ORA_REGULATION %in% c("FLAT"),
           c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
         ])[, ORA_REGULATION := "FLAT"][
@@ -109,7 +109,7 @@ dt_ora_key_counts <- rbindlist(
 
 dt_ora_key_summary <- melt.data.table(
   dcast.data.table(
-    dt_ora_full[
+    dt_ora_full[!grepl("mixed", dataset)][
       ,
       c("ORA_CATEGORY", "VALUE", "tissue", "dataset", "ORA_REGULATION")
     ],
@@ -131,7 +131,7 @@ dt_ora_key_summary <- melt.data.table(
   ,
   ORA_REGULATION := ifelse(
     dataset_tissue %in% unique(
-      dt_ora_full[
+      dt_ora_full[!grepl("mixed", dataset)][
         ,
         c("dataset", "tissue")
       ]
