@@ -2,105 +2,570 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - February 2022
-##
-## cyril.lagger@liverpool.ac.uk
+## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
-## anais.equey@etu.univ-amu.fr
+## anais.equey@gmail.com
 ##
-## overlap scAgeCom and SASP ATLAS
+## Process secretomics datasets used for validation
 ##
 ####################################################
 ##
 
-## Libraries ####
+## Pancreas (human) secretomics (Li et al. 2022) ####
 
-library(data.table)
-library(scDiffCom)
-
-## Load Tushaus secretomics brain data ####
-
-tushaus_data <- fread(
-  "data_scAgeCom_11_04_2022_processed/tushaus_2020_secretome.csv"
+# read spreadsheet
+val_pancreas <- openxlsx::read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "Li_pancreas_secretome.xlsx"
+  ),
+  sheet = "S4",
+  startRow = 5
 )
-tushaus_data <- tushaus_data[PG.Genes != ""]
+setDT(val_pancreas)
 
-## Cell types to consider in TMS/scAgeCom ####
+val_pancreas_diff <- openxlsx::read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "Li_pancreas_secretome.xlsx"
+  ),
+  sheet = "S6",
+  startRow = 6
+)
+setDT(val_pancreas_diff)
 
-tushaus_cell_type <- data.table(
-    tushaus = c("Astro", "Microglia", "Neurons", "Oligodendrocytes"),
+anyNA(val_pancreas$Accession)
+any(duplicated(val_pancreas$Accession))
+anyNA(val_pancreas_diff$Protein.accession)
+any(duplicated(val_pancreas_diff$Protein.accession))
+
+# extract genes of proteins detected
+val_pancreas_genes <- val_pancreas[
+  ,
+  c("Accession", "Gene.Symbol", "Gene.ID")
+]
+val_pancreas_genes <- merge.data.table(
+  x = val_pancreas_genes[
+    ,
+    lapply(.SD, function(x) unlist(tstrsplit(x, "; ", fixed = TRUE))),
+    by = "Accession",
+    .SDcols = "Gene.Symbol"
+  ],
+  y = val_pancreas_genes[
+    ,
+    lapply(.SD, function(x) unlist(tstrsplit(x, "; ", fixed = TRUE))),
+    by = "Accession",
+    .SDcols = "Gene.ID"
+  ],
+  by = "Accession",
+  all = TRUE
+)
+
+# look for homologs
+mart_pancreas_human_from_ens <- biomaRt::getBM(
+  attributes = c(
+    "hgnc_symbol",
+    "ensembl_gene_id"
+  ),
+  filters = "ensembl_gene_id",
+  mart = mart_db_human,
+  values = sort(unique(val_pancreas_genes$Gene.Symbol))
+)
+setDT(mart_pancreas_human_from_ens)
+mart_pancreas_human_from_symb <- biomaRt::getBM(
+  attributes = c(
+    "hgnc_symbol",
+    "ensembl_gene_id"
+  ),
+  filters = "hgnc_symbol",
+  mart = mart_db_human,
+  values = sort(unique(val_pancreas_genes$Gene.ID))
+)
+setDT(mart_pancreas_human_from_symb)
+
+val_pancreas_genes <- merge.data.table(
+  x = val_pancreas_genes,
+  y = mart_pancreas_human_from_ens,
+  by.x = "Gene.Symbol",
+  by.y = "ensembl_gene_id",
+  all.x = TRUE
+)
+val_pancreas_genes <- merge.data.table(
+  x = val_pancreas_genes,
+  y = mart_pancreas_human_from_symb,
+  by.x = "Gene.ID",
+  by.y = "hgnc_symbol",
+  all.x = TRUE
+)
+
+mart_pancreas_ortho <- biomaRt::getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "mmusculus_homolog_associated_gene_name",
+    "mmusculus_homolog_orthology_confidence",
+    "mmusculus_homolog_orthology_type"
+  ),
+  filters = "ensembl_gene_id",
+  mart = mart_db_human,
+  values = sort(
+    unique(
+      c(
+        val_pancreas_genes$Gene.Symbol,
+        val_pancreas_genes$ensembl_gene_id
+      )
+    )
+  )
+)
+setDT(mart_pancreas_ortho)
+anyNA(mart_pancreas_ortho$mmusculus_homolog_associated_gene_name)
+mart_pancreas_ortho <- mart_pancreas_ortho[
+  mmusculus_homolog_associated_gene_name != ""
+]
+val_pancreas_genes <- merge.data.table(
+  val_pancreas_genes,
+  mart_pancreas_ortho[, 1:2],
+  by.x = "Gene.Symbol",
+  by.y = "ensembl_gene_id",
+  all = TRUE
+)
+setnames(
+  val_pancreas_genes,
+  old = "mmusculus_homolog_associated_gene_name",
+  new = "mmusculus_homolog_1"
+)
+val_pancreas_genes <- merge.data.table(
+  val_pancreas_genes,
+  mart_pancreas_ortho[, 1:2],
+  by.x = "ensembl_gene_id",
+  by.y = "ensembl_gene_id",
+  all.x = TRUE,
+  allow.cartesian = TRUE
+)
+setnames(
+  val_pancreas_genes,
+  old = "mmusculus_homolog_associated_gene_name",
+  new = "mmusculus_homolog_2"
+)
+
+# select genes that are in LRI
+val_pancreas_lr <- sort(
+  unique(
+    c(
+      val_pancreas_genes$mmusculus_homolog_1,
+      val_pancreas_genes$mmusculus_homolog_2
+    )
+  )
+)
+val_pancreas_lr <- val_pancreas_lr[val_pancreas_lr %in% genes_lri_mouse]
+
+# select genes that are in LRI only in hpde
+val_pancreas_lr_hpde <- sort(
+  unique(
+    c(
+      val_pancreas_genes[
+        Accession %in% val_pancreas[
+          Found.in.HPDE.replicate.1 != "Not Found" |
+          Found.in.HPDE.replicate.2 != "Not Found"
+        ]$Accession
+      ]$mmusculus_homolog_1,
+      val_pancreas_genes[
+        Accession %in% val_pancreas[
+          Found.in.HPDE.replicate.1 != "Not Found" |
+          Found.in.HPDE.replicate.2 != "Not Found"
+        ]$Accession
+      ]$mmusculus_homolog_2
+    )
+  )
+)
+val_pancreas_lr_hpde <- val_pancreas_lr_hpde[
+  val_pancreas_lr_hpde %in% genes_lri_mouse
+]
+
+# select genes that are differentially expressed with cancer
+val_pancreas_lr_can_up <- sort(
+  unique(
+    c(
+      val_pancreas_genes[
+        Accession %in%
+          val_pancreas_diff[log2.change > 0]$Protein.accession
+      ]$mmusculus_homolog_1,
+      val_pancreas_genes[
+        Accession %in%
+          val_pancreas_diff[log2.change > 0]$Protein.accession
+      ]$mmusculus_homolog_2
+    )
+  )
+)
+val_pancreas_lr_can_up <- val_pancreas_lr_can_up[
+  val_pancreas_lr_can_up %in% genes_lri_mouse
+]
+
+val_pancreas_lr_can_down <- sort(
+  unique(
+    c(
+      val_pancreas_genes[
+        Accession %in%
+          val_pancreas_diff[log2.change < 0]$Protein.accession
+      ]$mmusculus_homolog_1,
+      val_pancreas_genes[
+        Accession %in%
+          val_pancreas_diff[log2.change < 0]$Protein.accession
+      ]$mmusculus_homolog_2
+    )
+  )
+)
+val_pancreas_lr_can_down <- val_pancreas_lr_can_down[
+  val_pancreas_lr_can_down %in% genes_lri_mouse
+]
+
+## Cardiomyocytes (rat) proteomics (Kuhn et al. 2020) ####
+
+# read spreadsheet
+val_cardio <- list(
+  openxlsx::read.xlsx(
+    paste0(
+      path_scagecom_input,
+      "kuhn_cardio_secretome.xlsx"
+    ),
+    sheet = "hypoxia_12",
+    startRow = 1
+  ),
+  openxlsx::read.xlsx(
+    paste0(
+      path_scagecom_input,
+      "kuhn_cardio_secretome.xlsx"
+    ),
+    sheet = "hypoxia_24",
+    startRow = 1
+  ),
+  openxlsx::read.xlsx(
+    paste0(
+      path_scagecom_input,
+      "kuhn_cardio_secretome.xlsx"
+    ),
+    sheet = "hypoxia_24_30",
+    startRow = 1
+  )
+)
+val_cardio <- lapply(
+  val_cardio,
+  function(i) {
+    setDT(i)
+    setnames(
+      i,
+      old = colnames(i),
+      new = c("gene", "protein", "log2", "sdlog2",
+      "pval", "bh", "fasta", "secreted")
+    )
+    i <- i[, c("gene", "log2", "pval", "bh")]
+  }
+)
+val_cardio <- merge.data.table(
+  merge.data.table(
+    val_cardio[[1]],
+    val_cardio[[2]],
+    by = "gene",
+    all = TRUE,
+    suffixes = c("_h12", "_h24")
+  ),
+  val_cardio[[3]],
+  by = "gene",
+  all = TRUE
+)
+setnames(
+  val_cardio,
+  old = c("log2", "pval", "bh"),
+  new = c("log2_h24_30", "pval_h24_30", "bh_h24_30")
+)
+val_cardio <- val_cardio[!is.na(gene)]
+
+val_cardio[
+  ,
+  diff_h12 := ifelse(
+    bh_h12 <= 0.05 & log2_h12 > 0,
+    "UP",
+    ifelse(
+      bh_h12 <= 0.05 & log2_h12 < 0,
+      "DOWN",
+      "NS"
+    )
+  )
+]
+val_cardio[
+  ,
+  diff_h24 := ifelse(
+    bh_h24 <= 0.05 & log2_h24 > 0,
+    "UP",
+    ifelse(
+      bh_h24 <= 0.05 & log2_h24 < 0,
+      "DOWN",
+      "NS"
+    )
+  )
+]
+val_cardio[
+  ,
+  diff_h24_30 := ifelse(
+    bh_h24_30 <= 0.05 & log2_h24_30 > 0,
+    "UP",
+    ifelse(
+      bh_h24_30 <= 0.05 & log2_h24_30 < 0,
+      "DOWN",
+      "NS"
+    )
+  )
+]
+val_cardio[
+  ,
+  diff_h12 := ifelse(is.na(diff_h12), "NS", diff_h12)
+]
+val_cardio[
+  ,
+  diff_h24 := ifelse(is.na(diff_h24), "NS", diff_h24)
+]
+val_cardio[
+  ,
+  diff_h24_30 := ifelse(is.na(diff_h24_30), "NS", diff_h24_30)
+]
+
+val_cardio[
+  ,
+  diff_total := ifelse(
+    diff_h12 == "UP" | diff_h24 == "UP" |
+    diff_h24_30 == "UP",
+    "UP",
+    ifelse(
+      diff_h12 == "DOWN" | diff_h24 == "DOWN" |
+      diff_h24_30 == "DOWN",
+      "DOWN",
+      "NS"
+    )
+  )
+]
+
+# extract genes of proteins detected
+val_cardio_genes <- val_cardio[
+  ,
+  c("gene")
+]
+anyNA(val_cardio_genes$gene)
+any(duplicated(val_cardio_genes$gene))
+
+# look for mouse-rat homologs
+
+mart_db_rat <- biomaRt::useMart(
+  "ensembl",
+  dataset = "rnorvegicus_gene_ensembl",
+  verbose = TRUE
+)
+mart_cardio_rat_from_ens <- biomaRt::getBM(
+  attributes = c(
+    "external_gene_name",
+    "ensembl_gene_id"
+  ),
+  filters = "external_gene_name",
+  mart = mart_db_rat,
+  values = sort(unique(val_cardio_genes$gene))
+)
+table(
+  sort(unique(val_cardio_genes$gene)) %in%
+  mart_cardio_rat_from_ens$external_gene_name
+)
+sort(unique(val_cardio_genes$gene))[
+  !sort(unique(val_cardio_genes$gene)) %in%
+  mart_cardio_rat_from_ens$external_gene_name
+]
+setDT(mart_cardio_rat_from_ens)
+
+val_cardio_genes <- merge.data.table(
+  x = val_cardio_genes,
+  y = mart_cardio_rat_from_ens,
+  by.x = "gene",
+  by.y = "external_gene_name",
+  all.x = TRUE
+)
+
+mart_cardio_ortho <- biomaRt::getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "mmusculus_homolog_associated_gene_name",
+    "mmusculus_homolog_orthology_confidence",
+    "mmusculus_homolog_orthology_type"
+  ),
+  filters = "ensembl_gene_id",
+  mart = mart_db_rat,
+  values = unique(val_cardio_genes$ensembl_gene_id)
+)
+setDT(mart_cardio_ortho)
+anyNA(mart_cardio_ortho$mmusculus_homolog_associated_gene_name)
+mart_cardio_ortho <- mart_cardio_ortho[
+  mmusculus_homolog_associated_gene_name != ""
+]
+val_cardio_genes <- merge.data.table(
+  val_cardio_genes,
+  mart_cardio_ortho[, 1:2],
+  by = "ensembl_gene_id",
+  all = TRUE
+)
+setnames(
+  val_cardio_genes,
+  old = "mmusculus_homolog_associated_gene_name",
+  new = "mmusculus_homolog"
+)
+val_cardio_genes[
+  ,
+  mgi_symbol := ifelse(
+    is.na(mgi_symbol),
+    gene,
+    mgi_symbol
+  )
+]
+val_cardio_genes[mgi_symbol != gene]
+
+# select genes that are in LRI
+val_cardio_lr <- sort(val_cardio_genes[
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol)
+
+# select genes that are in LRI and diff with hypoxia
+val_cardio_lr_hyp_up <- unique(val_cardio_genes[
+  gene %in% val_cardio[diff_total == "UP"]$gene &
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol)
+val_cardio_lr_hyp_down <- unique(val_cardio_genes[
+  gene %in% val_cardio[diff_total == "DOWN"]$gene &
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol)
+
+#do brain, sasp similar as above
+#do cci annotations
+
+
+## code below in progress #####
+########################################
+
+
+
+dt_cci_rel[
+  ,
+  in_pancreas_lr_all := LIGAND_1 %in% pancreas_lr_all |
+    LIGAND_2 %in% pancreas_lr_all |
+    RECEPTOR_1 %in% pancreas_lr_all |
+    RECEPTOR_2 %in% pancreas_lr_all |
+    RECEPTOR_3 %in% pancreas_lr_all
+]
+
+dt_cci_rel[
+  ,
+  in_pancreas_lr_hpde := LIGAND_1 %in% val_pancreas_lr_hpde |
+    LIGAND_2 %in% val_pancreas_lr_hpde |
+    RECEPTOR_1 %in% val_pancreas_lr_hpde |
+    RECEPTOR_2 %in% val_pancreas_lr_hpde |
+    RECEPTOR_3 %in% val_pancreas_lr_hpde
+]
+
+dt_cci_rel[
+  ,
+  in_pancreas_lr_cancer_up := LIGAND_1 %in% val_pancreas_lr_can_up |
+    LIGAND_2 %in% val_pancreas_lr_can_up |
+    RECEPTOR_1 %in% val_pancreas_lr_can_up |
+    RECEPTOR_2 %in% val_pancreas_lr_can_up |
+    RECEPTOR_3 %in% val_pancreas_lr_can_up
+]
+
+dt_cci_rel[
+  ,
+  in_pancreas_lr_cancer_down := LIGAND_1 %in% val_pancreas_lr_can_down |
+    LIGAND_2 %in% val_pancreas_lr_can_down |
+    RECEPTOR_1 %in% val_pancreas_lr_can_down |
+    RECEPTOR_2 %in% val_pancreas_lr_can_down |
+    RECEPTOR_3 %in% val_pancreas_lr_can_down
+]
+
+test <- dt_cci_rel[
+  tissue == "Pancreas" &
+  in_pancreas_lr_cancer_up == TRUE
+][, .N, by = c("dataset", "REGULATION", "EMITTER_CELLTYPE")][
+  order(-N)
+]
+
+test2 <- dt_cci_rel[
+  tissue == "Pancreas" &
+  in_pancreas_lr_cancer_up == TRUE &
+  EMITTER_CELLTYPE == "pancreatic ductal cell" &
+  REGULATION == "UP"
+]
+
+test3 <- dt_cci_rel[
+  tissue == "Pancreas" &
+  in_pancreas_lr_cancer_up == TRUE &
+  EMITTER_CELLTYPE == "pancreatic ductal cell" &
+  REGULATION == "DOWN"
+]
+
+dt_cci_rel[, .N, by = c(
+  "dataset", "tissue", "in_pancreas_lr_all"
+)]
+
+dt_cci_rel[
+  , {
+    totwt = .N
+    .SD[, .(frac = .N / totwt), by = in_pancreas_lr_all]
+  },
+  by = c("dataset", "tissue")
+][order(-frac)][in_pancreas_lr_all == TRUE]
+
+dt_cci_pancreas <- dt_cci_rel[tissue == "Pancreas"]
+table(dt_cci_pancreas$dataset, dt_cci_pancreas$in_pancreas_lr_all)
+
+dt_cci_pancreas[, .N, by = c("EMITTER_CELLTYPE", "in_pancreas_lr_all")][
+  order(-N)
+]
+dt_cci_pancreas[
+  , {
+    totwt <- .N
+    .SD[, .(frac = .N / totwt), by = in_pancreas_lr_all]
+  },
+  by = c("EMITTER_CELLTYPE")
+][order(-frac)]
+
+table(dt_cci_rel$in_pancreas_lr_all)
+
+dt_cci_rel[
+  LIGAND_1 %in% pancreas_lr_all
+][, .N, by = "tissue"][order(-N)][1:10]
+dt_cci_rel[
+  LIGAND_1 %in% pancreas_lr_all
+][, .N, by = c("EMITTER_CELLTYPE", "tissue")][order(-N)][1:30]
+
+test4 <- dt_cci_full_diffsex[
+  dataset == "TMS FACS (young)" &
+  tissue == "Pancreas" &
+  LRI == "Tgm2:Adgrg1"
+]
+
+## Brain mouse secretome (bms) data preparation ####
+
+bms_data <- fread(
+  paste0(
+    path_scagecom_input,
+    "tushaus_2020_secretome.csv"
+  )
+)
+bms_data <- bms_data[PG.Genes != ""]
+table(
+  bms_data$tms_genes %in% unique(unlist(seurat_genes))
+)
+bms_data$tms_genes[
+  !bms_data$tms_genes %in% unique(unlist(seurat_genes))
+]
+
+bms_cell_type <- data.table(
+    bms = c("Astro", "Microglia", "Neurons", "Oligodendrocytes"),
     tms = c("astrocyte", "microglial cell", "neuron", "oligodendrocyte")
 )
 
-## Clean Tushaus gene/protein names ####
-
-table(tushaus_data$PG.Genes %in% unique(unlist(seurat_genes)))
-tushaus_data$PG.Genes[
-  !tushaus_data$PG.Genes %in% unique(unlist(seurat_genes))
-]
-
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Acta2;Actg2", "Acta2", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Adgrb3", "Bai3", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Akr1b1", "Akr1b3", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Aoc1", "Abp1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Arf3;Arf1", "Arf1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "B3GNT2", "B3gnt2", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Cntnap5b;Cntnap5a", "Cntnap5a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "C5", "Hc", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Ca3", "Car3", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Ces1;Ces1f", "Ces1f", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Dnase2", "Dnase2a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Dsg1a;Dsg1b", "Dsg1b", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Ero1a", "Ero1l", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Galnt17", "Wbscr17", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Gpi", "Gpi1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Gstp1;Gstp2", "Gstp1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "H3f3c;Hist1h3a;Hist1h3b;H3f3a", "H3f3a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Hist1h1c;Hist1h1e;Hist1h1d", "Hist1h1c", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Hist1h2bf;Hist1h2bm;Hist1h2bb;Hist1h2bh;Hist2h2bb;Hist1h2bc;Hist1h2bk;Hist1h2bp", "Hist1h2bf", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Hnrnph1;Hnrnph2", "Hnrnph1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Ica", "1300017J02Rik", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Large1", "Large", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Man1a1", "Man1a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Pea15", "Pea15a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Rala;Ralb", "Rala", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Rnaset2a;Rnaset2b", "Rnaset2a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Selenbp1;Selenbp2", "Selenbp1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Tenm1", "Odz1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Tenm2", "Odz2", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Tf", "Trf", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "D1Pas1;Ddx3y;Ddx3x", "D1Pas1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Eef1b", "Eef1b2", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Gsto1;Gsto2", "Gsto1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Hist1h2ab;Hist1h2ac;Hist1h2ad;Hist1h2ae;Hist1h2ag;Hist1h2ai;Hist1h2an;Hist1h2ao;Hist1h2ap;Hist2h2ac;Hist2h2aa1;Hist3h2a;Hist1h2af;Hist1h2ah;Hist1h2ak;H2afj", "Hist1h2ab", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Hprt1", "Hprt", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Hspa1b;Hspa1a", "Hspa1b", PG.Genes)]
-tushaus_data <- rbindlist(
-  list(
-    tushaus_data,
-    tushaus_data[PG.Genes == "Hspa1b"]
-  )
-)
-tushaus_data[PG.Genes == "Hspa1b", PG.Genes := c("Hspa1a", "Hspa1b")]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Krt72", "Krt72-ps", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Nme1;Nme2", "Nme1", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Ppp1ca;Ppp1cc", "Ppp1ca", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Rab6a;Rab6b;Rab39a", "Rab6a", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Rab7a", "Rab7", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Sprr2d;Sprr2h", "Sprr2d", PG.Genes)]
-tushaus_data[, PG.Genes := ifelse(PG.Genes == "Ubb;Ubc;Rps27a;Uba52", "Rps27a", PG.Genes)]
-
-table(tushaus_data$PG.Genes %in% unique(unlist(seurat_genes)))
-tushaus_data$PG.Genes[
-  !tushaus_data$PG.Genes %in% unique(unlist(seurat_genes))
-]
-
-#"Rps27a" %in% unique(unlist(seurat_genes))
-#"Rps27a" %in% LRI_mouse_genes
-
-## Annotate Tushaus data by number of detected protein/cell type ####
-
-tushaus_data[
+bms_data[
   ,
   paste0("is_detected_Astro_", 1:6) := lapply(
     .SD,
@@ -108,13 +573,12 @@ tushaus_data[
   ),
   .SDcols = paste0("log2_LFQ_Astro_", 1:6)
 ]
-tushaus_data[
+bms_data[
   ,
   nrep_Astro := rowSums(.SD),
   .SDcols = paste0("is_detected_Astro_", 1:6)
 ]
-
-tushaus_data[
+bms_data[
   ,
   paste0("is_detected_Microglia_", 1:6) := lapply(
     .SD,
@@ -122,13 +586,12 @@ tushaus_data[
   ),
   .SDcols = paste0("log2_LFQ_Microglia_", 1:6)
 ]
-tushaus_data[
+bms_data[
   ,
   nrep_Microglia := rowSums(.SD),
   .SDcols = paste0("is_detected_Microglia_", 1:6)
 ]
-
-tushaus_data[
+bms_data[
   ,
   paste0("is_detected_Neurons_", 1:6) := lapply(
     .SD,
@@ -136,13 +599,12 @@ tushaus_data[
   ),
   .SDcols = paste0("log2_LFQ_Neurons_", 1:6)
 ]
-tushaus_data[
+bms_data[
   ,
   nrep_Neurons := rowSums(.SD),
   .SDcols = paste0("is_detected_Neurons_", 1:6)
 ]
-
-tushaus_data[
+bms_data[
   ,
   paste0("is_detected_Oligodendrocytes_", 1:6) := lapply(
     .SD,
@@ -150,141 +612,162 @@ tushaus_data[
   ),
   .SDcols = paste0("log2_LFQ_Oligodendrocytes_", 1:6)
 ]
-tushaus_data[
+bms_data[
   ,
   nrep_Oligodendrocytes := rowSums(.SD),
   .SDcols = paste0("is_detected_Oligodendrocytes_", 1:6)
 ]
 
 ftable(
-  tushaus_data$nrep_Astro> 4,
-  tushaus_data$nrep_Microglia > 4,
-  tushaus_data$nrep_Neurons > 4,
-  tushaus_data$nrep_Oligodendrocytes > 4
+  bms_data$nrep_Astro > 4,
+  bms_data$nrep_Microglia > 4,
+  bms_data$nrep_Neurons > 4,
+  bms_data$nrep_Oligodendrocytes > 4
 )
 
-## Look at RNA expression in TMS facs ####
+## Annotate scAgeCom results with bms data ####
 
-tms_facs <- readRDS(dataset_path[[1]])
-tms_facs_brain <- subset(
-    tms_facs,
-    subset = tissue %in% c("Brain_Non-Myeloid", "Brain_Myeloid")
+dt_cci_rel[
+    ,
+    L1_bms := ifelse(
+        LIGAND_1 %in% bms_data$tms_genes, TRUE, FALSE
+    )
+]
+dt_cci_rel[
+    ,
+    L2_bms := ifelse(
+        LIGAND_2 %in% bms_data$tms_genes, TRUE, FALSE
+    )
+]
+dt_cci_rel[
+    ,
+    R1_bms := ifelse(
+        RECEPTOR_1 %in% bms_data$tms_genes, TRUE, FALSE
+    )
+]
+dt_cci_rel[
+    ,
+    R2_bms := ifelse(
+        RECEPTOR_2 %in% bms_data$tms_genes, TRUE, FALSE
+    )
+]
+dt_cci_rel[
+    ,
+    R3_bms := ifelse(
+        RECEPTOR_3 %in% bms_data$tms_genes, TRUE, FALSE
+    )
+]
+
+table(
+  dt_ora_rel[
+    tissue == "Brain" & ORA_CATEGORY == "LIGAND_COMPLEX"
+  ]$VALUE %in% bms_data$tms_genes
 )
-lapply(
-    seq_len(nrow(tushaus_cell_type)),
-    function(i) {
-        temp_seurat <- subset(
-            tms_facs_brain,
-            subset = cell_ontology_final == tushaus_cell_type[i]$tms
-        )
-        expr <- rowMeans(
-            expm1(
-                GetAssayData(
-                    temp_seurat
-                )[
-                    tushaus_data[
-                        get(paste0("nrep_", tushaus_cell_type[i]$tushaus)) > 4 &
-                        PG.Genes %in% rownames(temp_seurat)
-                    ]$PG.Genes,
-                ]
+
+table(
+  dt_cci_rel[
+    tissue == "Brain" & EMITTER_CELLTYPE %in% bms_cell_type$tms
+  ]$L1_bms
+)
+table(dt_cci_rel$L1_bms)
+
+table(unique(dt_cci_rel[
+  tissue == "Brain" & EMITTER_CELLTYPE == "neuron"
+]$LIGAND_1) %in% bms_data[
+    nrep_Neurons > 4
+]$tms_genes)
+
+
+
+
+table(unique(dt_cci_rel[
+  tissue == "Liver" & EMITTER_CELLTYPE == "hepatocyte"
+]$LIGAND_1) %in% bms_data[
+    nrep_Neurons > 4
+]$tms_genes)
+
+
+test <- sapply(
+  unique(dt_cci_rel$dataset),
+  function(i) {
+    sapply(
+      unique(dt_cci_rel[dataset == i]$tissue),
+      function(j) {
+        sapply(
+          unique(dt_cci_rel[dataset == i & tissue == j]$EMITTER_CELLTYPE),
+          function(k) {
+            temp <- unique(
+              dt_cci_rel[
+                dataset == i & tissue == j & EMITTER_CELLTYPE == k
+              ]$LIGAND_1
             )
+            sum(temp %in% bms_data[nrep_Neurons > 4]$tms_genes)/length(temp)
+          }
         )
-        dt <- data.table(
-            gene = names(expr),
-            avgExpr = expr
-        )
-        tushaus_data[
-            dt,
-            on = "PG.Genes==gene",
-            paste0("tms_avgExpr_", tushaus_cell_type[i]$tushaus) := i.avgExpr
-        ]
-    }
+      }
+    )
+  }
 )
 
-ggplot(
-    tushaus_data,
-    aes(
-        x = log2(tms_avgExpr_Microglia),
-        y = log2Avg_Microglia
-    )
-) + geom_point() + geom_smooth(method="lm")
+table(
+  unique(dt_lri_mouse$LIGAND_1) %in% bms_data$tms_genes
+)
 
-ggplot(
-    tushaus_data,
-    aes(
-        x = log2(tms_avgExpr_Astro),
-        y = log2Avg_Astro
-    )
-) + geom_point() + geom_smooth(method="lm")
+table(
+  unique(bms_data$tms_genes) %in% unique(dt_lri_mouse$RECEPTOR_1)
+)
 
-ggplot(
-    tushaus_data,
-    aes(
-        x = log2(tms_avgExpr_Neurons),
-        y = log2Avg_Neurons
+testx <- sapply(
+  unique(dt_cci_rel$dataset),
+  function(i) {
+    sapply(
+      unique(dt_cci_rel[dataset == i]$tissue),
+      function(j) {
+        sapply(
+          unique(dt_cci_rel[dataset == i & tissue == j]$EMITTER_CELLTYPE),
+          function(k) {
+            temp <- unique(
+              dt_cci_rel[
+                dataset == i & tissue == j & EMITTER_CELLTYPE == k
+              ]$LIGAND_1
+            )
+            sum(temp %in% bms_data[nrep_Microglia > 4]$tms_genes)/length(temp)
+          }
+        )
+      }
     )
-) + geom_point() + geom_smooth(method="lm")
+  }
+)
 
-ggplot(
-    tushaus_data,
-    aes(
-        x = log2(tms_avgExpr_Oligodendrocytes),
-        y = log2Avg_Oligodendrocytes
-    )
-) + geom_point() + geom_smooth(method="lm")
+test2x <- data.table(
+  x = unlist(testx),
+  y = names(unlist(testx))
+)
 
 
-## Annotate CCIs with Tushaus genes ####
+max(unlist(test))
 
-cci_tushaus <- copy(CCI_table)
+test2 <- data.table(
+  x = unlist(test),
+  y = names(unlist(test))
+)
 
-cci_tushaus[
-    ,
-    L1_th := ifelse(
-        LIGAND_1 %in% tushaus_data$PG.Genes, TRUE, FALSE
-    )
-]
-cci_tushaus[
-    ,
-    L2_th := ifelse(
-        LIGAND_2 %in% tushaus_data$PG.Genes, TRUE, FALSE
-    )
-]
-cci_tushaus[
-    ,
-    R1_th := ifelse(
-        RECEPTOR_1 %in% tushaus_data$PG.Genes, TRUE, FALSE
-    )
-]
-cci_tushaus[
-    ,
-    R2_th := ifelse(
-        RECEPTOR_2 %in% tushaus_data$PG.Genes, TRUE, FALSE
-    )
-]
-cci_tushaus[
-    ,
-    R3_th := ifelse(
-        RECEPTOR_3 %in% tushaus_data$PG.Genes, TRUE, FALSE
-    )
-]
+hist(test2$x)
 
-sort(table(cci_tushaus$LIGAND_1))
-sort(table(cci_tushaus[L1_th == TRUE]$LIGAND_1))
-sort(table(cci_tushaus[R1_th == TRUE]$RECEPTOR_1))
+summary(test2x$x)
 
 ## ####
 
-tushaus_spec_neuron <- tushaus_data[
+bms_spec_neuron <- bms_data[
     nrep_Neurons > 4 &
     nrep_Astro < 5 &
-    nrep_Microglia < 5 & 
+    nrep_Microglia < 5 &
     nrep_Oligodendrocytes < 5
 ]$PG.Genes
 
-cci_tushaus[L1_th == TRUE & LIGAND_1 %in% tushaus_spec_neuron]
+cci_bms[L1_th == TRUE & LIGAND_1 %in% bms_spec_neuron]
 
-test <- cci_tushaus[L1_th == TRUE & LIGAND_1 %in% tushaus_spec_neuron][
+test <- cci_bms[L1_th == TRUE & LIGAND_1 %in% bms_spec_neuron][
     ,
     sum(CCI_SCORE_YOUNG),
     by = c("Dataset", "Tissue", "EMITTER_CELLTYPE", "LIGAND_1")
@@ -292,7 +775,7 @@ test <- cci_tushaus[L1_th == TRUE & LIGAND_1 %in% tushaus_spec_neuron][
 
 test <- test[Tissue == "Brain"]
 
-test <- cci_tushaus[L1_th == TRUE][
+test <- cci_bms[L1_th == TRUE][
     ,
     sum(CCI_SCORE_YOUNG),
     by = c("Dataset", "Tissue", "EMITTER_CELLTYPE", "LIGAND_1")
@@ -309,9 +792,9 @@ ggplot(
 
 test[Tissue == "Lung"]
 
-cci_tushaus[L1_th == TRUE]
+cci_bms[L1_th == TRUE]
 
-cci_tushaus[, .N, by = c("Dataset", "R3_th")]
+cci_bms[, .N, by = c("Dataset", "R3_th")]
 
 scd_brain_facs <- CCI_table[
   Tissue == "Brain"
@@ -323,15 +806,13 @@ scd_brain_facs_female <- CCI_table[
   Dataset == "TMS FACS (female)" & Tissue == "Brain"
 ]
 
-##
+## CCIs originating from bms cells ####
 
-## CCIs originating from Tushaus cells ####
-
-cci_tushaus <- scd_brain_facs[
-    EMITTER_CELLTYPE %in% tushaus_cell_type$tms
+cci_bms <- scd_brain_facs[
+    EMITTER_CELLTYPE %in% bms_cell_type$tms
 ]
 
-table(cci_tushaus$EMITTER_CELLTYPE)
+table(cci_bms$EMITTER_CELLTYPE)
 
 scd_brain_facs_male_from_astro <- scd_brain_facs_male[
   EMITTER_CELLTYPE == "astrocyte"
@@ -350,7 +831,7 @@ scd_liver_facs_male_from_nk <- CCI_table[
 
 ligand_background <- unique(c(
   unique(LRI_mouse_dt$LIGAND_1),
-  tushaus_data$PG.Genes
+  bms_data$PG.Genes
 ))
 
 test <- sapply(
@@ -373,14 +854,14 @@ test <- sapply(
             )
             t1 <- intersect(
               ligs,
-              tushaus_data[nrep_Microglia > 4]$PG.Genes
+              bms_data[nrep_Microglia > 4]$PG.Genes
             )
             t2 <- setdiff(
               ligs,
-              tushaus_data[nrep_Microglia > 4]$PG.Genes
+              bms_data[nrep_Microglia > 4]$PG.Genes
             )
             t3 <- setdiff(
-              tushaus_data[nrep_Microglia > 4]$PG.Genes,
+              bms_data[nrep_Microglia > 4]$PG.Genes,
               ligs
             )
             fisher.test(
@@ -394,9 +875,9 @@ test <- sapply(
                 nrow = 2
               )
             )$estimate
-            #sum(ligs %in% tushaus_data[nrep_Astrocytes > 4]$PG.Genes) /
+            #sum(ligs %in% bms_data[nrep_Astrocytes > 4]$PG.Genes) /
             #  length(ligs)
-            #table(ligs %in% tushaus_data[nrep_Astrocytes > 4]$PG.Genes)
+            #table(ligs %in% bms_data[nrep_Astrocytes > 4]$PG.Genes)
           }
         )
       }
@@ -425,13 +906,13 @@ out_scores_astro <- unique(
 )
 
 out_scores_astro[
-  tushaus_data,
+  bms_data,
   on = "LIGAND_1==PG.Genes",
   secretome_score := i.log2Avg_Asstrocytes
 ]
 
 table(
-    out_scores_astro$LIGAND_1 %in% tushaus_data[nrep_Astrocytes > 4]$PG.Genes
+    out_scores_astro$LIGAND_1 %in% bms_data[nrep_Astrocytes > 4]$PG.Genes
 )
 
 sum(out_scores_astro$secretome_score > 0, na.rm = TRUE)
@@ -449,22 +930,22 @@ out_scores_astro$ligand
 
 ligand_background <- unique(c(
   unique(LRI_mouse_dt$LIGAND_1),
-  tushaus_data$PG.Genes
+  bms_data$PG.Genes
 ))
 
 out_scores_astro$ligand %in% ligand_background
-tushaus_data[nrep_Astrocytes > 4]$PG.Genes %in% ligand_background
+bms_data[nrep_Astrocytes > 4]$PG.Genes %in% ligand_background
 
 t1 <- intersect(
   out_scores_astro$ligand,
-  tushaus_data[nrep_Astrocytes > 4]$PG.Genes
+  bms_data[nrep_Astrocytes > 4]$PG.Genes
 )
 t2 <- setdiff(
   out_scores_astro$ligand,
-  tushaus_data[nrep_Astrocytes > 4]$PG.Genes
+  bms_data[nrep_Astrocytes > 4]$PG.Genes
 )
 t3 <- setdiff(
-  tushaus_data[nrep_Astrocytes > 4]$PG.Genes,
+  bms_data[nrep_Astrocytes > 4]$PG.Genes,
   out_scores_astro$ligand
 )
 ft <- fisher.test(
@@ -503,71 +984,56 @@ table(is.na(out_scores_astro$secretome_score))
 
 sort(test, decreasing = TRUE)[1:10]
 
-tushaus_data[nrep_Astrocytes > 4][, ][, c("PG.Genes", "log2Avg_Asstrocytes")]
+bms_data[nrep_Astrocytes > 4][, ][, c("PG.Genes", "log2Avg_Asstrocytes")]
 
 table(scd_brain_facs_male$REGULATION)
 
 LRI_mouse_dt[
   ,
-  L1_tushaus := ifelse(
-    LIGAND_1 %in% tushaus_data$PG.Gene,
+  L1_bms := ifelse(
+    LIGAND_1 %in% bms_data$PG.Gene,
     TRUE, FALSE
   )
 ]
 
-table(LRI_mouse_dt$L1_tushaus)
+table(LRI_mouse_dt$L1_bms)
 
 CCI_table[Tissue == "Brain" & EMITTER_CELLTYPE == "astrocyte"][, .N, by = "LRI"][order(-N)][
   LRI_mouse_dt,
   on = "LRI",
-  L1_tushaus := i.L1_tushaus
+  L1_bms := i.L1_bms
 ][1:20]
 
 
 
-tushaus_data$PG.Genes[
-  !tushaus_data$PG.Genes %in% LRI_mouse_genes
+bms_data$PG.Genes[
+  !bms_data$PG.Genes %in% LRI_mouse_genes
 ]
 
 ## Load SASP atlas data ####
 
-sasp_atlas <- fread("data_scAgeCom_11_04_2022_processed/sasp_atlas.csv")
-
-## Build reference gene annotations ####
-
-genes_mart_nov2020 <- biomaRt::useMart(
-  "ensembl",
-  dataset = "hsapiens_gene_ensembl",
-  host = "https://nov2020.archive.ensembl.org",
-  verbose = TRUE
+sasp_atlas <- fread(
+  paste0(
+    path_scagecom_input,
+    "sasp_atlas.csv"
+  )
 )
-genes_ensembl_nov2020 <- biomaRt::getBM(
+
+## SASP Atlas orthologs ####
+
+mart_sasp <- biomaRt::getBM(
   attributes = c(
-    "ensembl_gene_id",
     "hgnc_symbol",
-    "hgnc_id"
+    "entrezgene_id",
+    "ensembl_gene_id"
   ),
-  mart = genes_mart_nov2020,
+  filters = "hgnc_symbol",
+  mart = mart_db_human,
+  values = unique(sasp_atlas$gene)
 )
-setDT(genes_ensembl_nov2020)
-genes_ensembl_nov2020[
-  ,
-  hgnc_symbol := ifelse(
-    hgnc_symbol == "",
-    NA,
-    hgnc_symbol
-  )
-]
-genes_ensembl_nov2020[
-  ,
-  hgnc_id := ifelse(
-    hgnc_id == "",
-    NA,
-    hgnc_id
-  )
-]
+table(sasp_atlas$gene %in% mart_sasp$hgnc_symbol)
 
-genes_ortho_nov2020 <- biomaRt::getBM(
+mart_sasp_ortho <- biomaRt::getBM(
   attributes = c(
     "ensembl_gene_id",
     "mmusculus_homolog_associated_gene_name",
@@ -575,52 +1041,70 @@ genes_ortho_nov2020 <- biomaRt::getBM(
     "mmusculus_homolog_orthology_type"
   ),
   filters = "ensembl_gene_id",
-  mart = genes_mart_nov2020,
-  value = genes_ensembl_nov2020$ensembl_gene_id
+  mart = mart_db_human,
+  values = mart_sasp$ensembl_gene_id
 )
-setDT(genes_ortho_nov2020)
+setDT(mart_sasp_ortho)
+setDT(mart_sasp)
 
-genes_ortho_nov2020[
-  ,
-  mmusculus_homolog_associated_gene_name := ifelse(
-    mmusculus_homolog_associated_gene_name == "",
-    NA,
-    mmusculus_homolog_associated_gene_name
+mart_sasp_ortho[
+  mart_sasp,
+  on = "ensembl_gene_id",
+  (c("hgnc_symbol", "entrezgene_id")) := mget(
+    c("i.hgnc_symbol", "i.entrezgene_id")
   )
 ]
-genes_ortho_nov2020[
-  ,
-  mmusculus_homolog_orthology_type := ifelse(
-    mmusculus_homolog_orthology_type == "",
-    NA,
-    mmusculus_homolog_orthology_type
-  )
-]
-
-## Check gene names ####
 
 table(
-  sasp_atlas$gene %in% genes_ensembl_nov2020$hgnc_symbol
+  sasp_atlas$gene %in% mart_sasp_ortho$hgnc_symbol
 )
-
-## Add orthologs ####
 
 sasp_atlas <- merge.data.table(
   sasp_atlas,
-  genes_ortho_nov2020,
+  mart_sasp_ortho,
   by.x = "ensembl_id",
   by.y = "ensembl_gene_id",
   all.x = TRUE,
   all.y = FALSE,
   sort = FALSE
 )
-table(is.na(sasp_atlas$mmusculus_homolog_associated_gene_name))
-table(sasp_atlas$mmusculus_homolog_orthology_confidence)
+
 setnames(
   sasp_atlas,
   old = "mmusculus_homolog_associated_gene_name",
   new = "mgi_symbol"
 )
+
+anyNA(sasp_atlas$mgi_symbol)
+table(sasp_atlas$mgi_symbol == "")
+
+sort(unique(sasp_atlas[
+  mgi_symbol == ""
+]$hgnc_symbol))
+
+#annotation of remaining genes
+hom_jax <- fread(
+  paste0(
+    path_scagecom_input,
+    "HOM_MouseHumanSequence.rpt"
+  )
+)
+
+table(sasp_atlas[
+  mgi_symbol == ""
+]$entrezgene_id %in% hom_jax$`EntrezGene ID`,
+sasp_atlas[
+  mgi_symbol == ""
+]$hgnc_symbol %in% hom_jax$Symbol)
+
+sasp_atlas$entrezgene_id
+sasp_ortho_manual <- data.table(
+  c("AKR1C1")
+)
+
+dt_lri_human[LIGAND_1 %in% unique(sasp_atlas[
+  mgi_symbol == ""
+]$hgnc_symbol)][ , 1:2]
 
 ## SASP genes of interest ####
 
@@ -661,7 +1145,6 @@ CCI_table[
   .N,
   by = c("sasp_up_fib_xir", "REGULATION", "Dataset")
 ]
-
 
 unique(CCI_table[Tissue == "Skin"]$EMITTER_CELLTYPE)
 
@@ -728,16 +1211,6 @@ sort(
   ]$LRI),
   decreasing = TRUE
 )[1:8]
-
-###########
-
-
-## Load libraries ####
-
-library(Seurat)
-library(data.table)
-library(scDiffCom)
-library(future)
 
 ## Load scRNA-seq data and metadata ####
 
