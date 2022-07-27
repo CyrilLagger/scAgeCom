@@ -522,7 +522,7 @@ val_brain_lr <- lapply(
   }
 )
 
-## SASP atlas secretomics (Basisty et al., 2020) ####
+## SASP atlas (human) secretomics (Basisty et al., 2020) ####
 
 val_sasp <- fread(
   paste0(
@@ -682,7 +682,6 @@ val_sasp_lr <- sort(
 val_sasp_lr <- val_sasp_lr[val_sasp_lr %in% genes_lri_mouse]
 
 # select genes that are in different conditions
-
 select_sasp_genes <- function(
   ct,
   cond,
@@ -760,3 +759,129 @@ intersect(
   ),
   val_sasp_lr_cond$fibro_ataz_up
 )
+
+## BM macrophages (mouse) activated (Meissner et al. 2013) ####
+
+val_macro <- openxlsx::read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "Meissner_macrophage.xlsx"
+  ),
+  startRow = 1
+)
+setDT(val_macro)
+val_macro[
+  ,
+  proteins.kendall.up := ifelse(
+    is.na(proteins.kendall.up),
+    "-",
+    proteins.kendall.up
+  )
+]
+val_macro[
+  ,
+  proteins.kendall.down := ifelse(
+    is.na(proteins.kendall.down),
+    "-",
+    proteins.kendall.down
+  )
+]
+val_macro[
+  ,
+  direction := ifelse(
+    proteins.kendall.up == "+",
+    "up",
+    ifelse(
+      proteins.kendall.down == "+",
+      "down",
+      "ns"
+    )
+  )
+]
+table(val_macro$direction)
+
+val_macro <- val_macro[
+  !is.na(Gene.names)
+]
+
+# extract genes of proteins detected
+val_macro_genes <- val_macro[
+  ,
+  c("Protein.IDs", "Gene.names")
+]
+anyNA(val_macro_genes$Gene.names)
+which(duplicated(val_macro_genes$Gene.names))
+anyNA(val_macro_genes$Protein.IDs)
+any(duplicated(val_macro_genes$Protein.IDs))
+
+val_macro_genes <- val_macro_genes[
+  ,
+  lapply(
+    .SD,
+    function(x) unlist(tstrsplit(x, ";", fixed = TRUE))
+  ),
+  by = Protein.IDs
+]
+
+# check gene symbols
+table(
+  val_macro_genes$Gene.names %in% unique(unlist(seurat_genes)),
+  val_macro_genes$Gene.names %in% dt_org_mm$SYMBOL
+)
+table(
+  val_macro_genes$Gene.names %in% unique(unlist(seurat_genes)),
+  val_macro_genes$Gene.names %in% dt_org_mm$ALIAS
+)
+val_macro_genes[
+  ,
+  in_tms := Gene.names %in% unique(unlist(seurat_genes))
+]
+val_macro_genes[
+  ,
+  in_orgdb := Gene.names %in% dt_org_mm$SYMBOL
+]
+
+val_macro_genes <- merge.data.table(
+  val_macro_genes,
+  dt_org_mm[
+    ALIAS %in% val_macro_genes[
+      in_tms == FALSE
+    ]$Gene.names
+  ][, c("SYMBOL", "ALIAS")],
+  by.x = "Gene.names",
+  by.y = "ALIAS",
+  all.x = TRUE
+)
+
+val_macro_genes[
+  ,
+  mgi_symbol := ifelse(
+    in_tms == TRUE,
+    Gene.names,
+    SYMBOL
+  )
+]
+sum(is.na(val_macro_genes$mgi_symbol))
+table(val_macro_genes$mgi_symbol %in% unique(unlist(seurat_genes)))
+ 
+# select genes that are in LRI
+val_macro_lr <- val_macro_genes[
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol
+
+# select genes that are regulated by activation
+val_macro_lr_up <- val_macro_genes[
+  Protein.IDs %in% val_macro[
+    direction == "up"
+  ]$Protein.IDs &
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol
+
+val_macro_lr_down <- val_macro_genes[
+  Protein.IDs %in% val_macro[
+    direction == "down"
+  ]$Protein.IDs &
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol
+
+
