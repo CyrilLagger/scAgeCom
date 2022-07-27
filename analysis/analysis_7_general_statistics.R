@@ -24,6 +24,8 @@ dt_cci_rel[
   )
 ]
 
+dt_ora_rel <- dt_ora_full[!grepl("mixed", dataset)]
+
 ## General LRI statistics ####
 
 dt_lri_human
@@ -363,3 +365,11 @@ dt_sdea_comp_count_list <- lapply(
   }
 )
 names(dt_sdea_comp_count_list) <- unique(dt_sdea_comp_count$dataset)
+
+## Distribution of OR GO Terms by GO levels ####
+
+hist(
+dt_ora_rel[
+  ORA_CATEGORY == "GO_TERMS" & ORA_REGULATION %in% c("UP", "DOWN") #&
+  #dataset == "TMS FACS (male)" & tissue == "Liver"
+]$LEVEL, breaks = 100)
