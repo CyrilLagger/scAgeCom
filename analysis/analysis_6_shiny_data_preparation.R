@@ -564,14 +564,14 @@ shiny_dt_ora_key_counts[
   ),
 ]
 
-shiny_dt_ora_key_counts[
-  ,
-  `TMS FACS (mixed)` :=  NULL
-]
-shiny_dt_ora_key_counts[
-  ,
-  `TMS Droplet (mixed)` :=  NULL
-]
+# shiny_dt_ora_key_counts[
+#   ,
+#   `TMS FACS (mixed)` :=  NULL
+# ]
+# shiny_dt_ora_key_counts[
+#   ,
+#   `TMS Droplet (mixed)` :=  NULL
+# ]
 
 ## Process the cross-tissue keyword summary table ####
 
