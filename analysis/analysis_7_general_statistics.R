@@ -24,6 +24,27 @@ dt_cci_rel[
   )
 ]
 
+dt_cci_rel[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family")
+  ],
+  on = c("tissue==new_tissue", "EMITTER_CELLTYPE==cell_ontology_final"),
+  EMITTER_CELLFAMILY := i.cell_family
+]
+dt_cci_rel[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family")
+  ],
+  on = c("tissue==new_tissue", "RECEIVER_CELLTYPE==cell_ontology_final"),
+  RECEIVER_CELLFAMILY := i.cell_family
+]
+table(
+  dt_cci_rel$EMITTER_CELLFAMILY,
+  dt_cci_rel$RECEIVER_CELLFAMILY
+)
+
 dt_ora_rel <- dt_ora_full[!grepl("mixed", dataset)]
 
 ## General LRI statistics ####
