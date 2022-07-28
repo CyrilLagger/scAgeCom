@@ -507,10 +507,10 @@ val_brain[
 
 # extract genes of proteins detected
 val_brain_genes <- list(
-  Astro = unique(val_brain[nrep_Astro > 0]$tms_genes),
-  Micro = unique(val_brain[nrep_Microglia> 0]$tms_genes),
-  Neurons = unique(val_brain[nrep_Neurons > 0]$tms_genes),
-  Oligo = unique(val_brain[nrep_Oligodendrocytes > 0]$tms_genes)
+  astro = unique(val_brain[nrep_Astro > 0]$tms_genes),
+  micro = unique(val_brain[nrep_Microglia > 0]$tms_genes),
+  neurons = unique(val_brain[nrep_Neurons > 0]$tms_genes),
+  oligo = unique(val_brain[nrep_Oligodendrocytes > 0]$tms_genes)
 )
 sapply(val_brain_genes, anyNA)
 
@@ -884,4 +884,361 @@ val_macro_lr_down <- val_macro_genes[
   mgi_symbol %in% genes_lri_mouse
 ]$mgi_symbol
 
+## Upset plot of secreted lris ####
+
+val_dt <- data.table(
+  gene = sort(unique(unlist(val_all)))
+)
+val_dt[
+  ,
+  (names(val_all)) := lapply(
+    val_all,
+    function(i) {
+      gene %in% i
+    }
+  )
+]
+
+ComplexUpset::upset(
+  as.data.frame(val_dt),
+  c(
+    "pancreas", "cardio", "macro", "astro",
+    "micro", "neurons", "oligo", "fibro_xir_up",
+    "epi_xir_up"
+  ),
+  name = "xx",
+  set_sizes = ComplexUpset::upset_set_size(),
+  min_size = 5
+) + ggtitle(
+  "xx"
+)
+
+## Annotate LRIs and CCIs with secretomics genes ####
+
+# list of all conditions
+val_all <- c(
+  list(
+    pancreas = val_pancreas_lr,
+    pancreas_hpde = val_pancreas_lr_hpde,
+    pancreas_can_up = val_pancreas_lr_can_up,
+    pancreas_can_down = val_pancreas_lr_can_down,
+    cardio = val_cardio_lr,
+    cardio_hyp_up = val_cardio_lr_hyp_up,
+    cardio_hyp_down = val_cardio_lr_hyp_down,
+    macro = val_macro_lr,
+    macro_up = val_macro_lr_up,
+    macro_down = val_macro_lr_down
+  ),
+  val_brain_lr,
+  val_sasp_lr_cond
+)
+
+# annoated LRI table first
+dt_lri_mouse_val <- copy(dt_lri_mouse)
+dt_lri_mouse_val[
+  ,
+  (names(val_all)) := lapply(
+    val_all,
+    function(i) {
+      ifelse(
+        LIGAND_1 %in% i,
+        "L1",
+        ifelse(
+          LIGAND_2 %in% i,
+          "L2",
+          ifelse(
+            RECEPTOR_1 %in% i,
+            "R1",
+            ifelse(
+              RECEPTOR_2 %in% i,
+              "R2",
+              ifelse(
+                RECEPTOR_3 %in% i,
+                "R3",
+                "NO"
+              )
+            )
+          )
+        )
+      )
+    }
+  )
+]
+table(dt_lri_mouse_val$pancreas)
+table(dt_lri_mouse_val$macro)
+
+# annotate CCIs
+dt_cci_rel <- merge.data.table(
+  dt_cci_rel,
+  dt_lri_mouse_val[, c("LRI", names(val_all)), with = FALSE],
+  by = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
+
+## Frequency table of CCIs by validation group ####
+
+dt_cci_val_tissue <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+dt_cci_val_tissue_reg <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue", "REGULATION")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+dt_cci_val_emmitter <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue", "EMITTER_CELLTYPE")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+dt_cci_val_emmitter_reg <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue", "EMITTER_CELLTYPE", "REGULATION")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+dt_cci_val_receiver <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue", "RECEIVER_CELLTYPE")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+dt_cci_val_receiver_reg <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue", "RECEIVER_CELLTYPE", "REGULATION")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+write.xlsx(
+  x = list(
+    dt_cci_val_tissue,
+    dt_cci_val_tissue_reg,
+    dt_cci_val_emmitter,
+    dt_cci_val_emmitter_reg,
+    dt_cci_val_receiver,
+    dt_cci_val_receiver_reg
+  ),
+  paste0(
+    path_scagecom_output,
+    "cci_validation_tables.xlsx"
+  )
+)
+
+
+dt_cci_val_tissue[
+  lr_type == "NO" &
+  validation_set == "pancreas"
+]
+
+ggplot(
+  dt_cci_val_tissue[
+    lr_type == "NO" &
+    validation_set == "macro"
+  ],
+  aes(
+    x = reorder(paste(dataset, tissue), frac),
+    y = (1 - frac) * 100
+  )
+) + geom_point() + coord_flip()
+
+ggplot(
+  dt_cci_val_tissue_reg[
+    lr_type == "NO" &
+    validation_set == "cardio_hyp_down"
+  ][frac < 0.95],
+  aes(
+    x = reorder(paste(dataset, tissue, REGULATION), frac),
+    y = (1 - frac) * 100
+  )
+) + geom_point(
+) + coord_flip()
+
+ggplot(
+  dt_cci_val_emmitter[
+    lr_type == "NO" &
+    validation_set == "macro"
+  ][frac < 0.2],
+  aes(
+    x = reorder(paste(dataset, tissue, EMITTER_CELLTYPE), frac),
+    y = (1 - frac) * 100
+  )
+) + geom_point() + coord_flip()
+
+ggplot(
+  dt_cci_val_emmitter_reg[
+    lr_type == "NO" &
+    validation_set == "macro_up"
+  ][frac < 0.1],
+  aes(
+    x = reorder(paste(dataset, tissue, EMITTER_CELLTYPE, REGULATION), frac),
+    y = (1 - frac) * 100
+  )
+) + geom_point(
+) + coord_flip(
+)
+
+ggplot(
+  dt_cci_val_emmitter_reg[
+    lr_type == "NO" &
+    validation_set == "cardio" &
+    tissue == "Heart" &
+    #EMITTER_CELLTYPE == "pancreatic ductal cell" &
+    dataset == "TMS FACS (female)"
+  ],
+  aes(
+    x = reorder(paste(dataset, tissue, EMITTER_CELLTYPE, REGULATION), frac),
+    y = (1 - frac) * 100
+  )
+) + geom_point() + coord_flip()
+
+
+ggplot(
+  dt_cci_val_receiver[
+    lr_type == "NO" &
+    validation_set == "pancreas_can_down"
+  ][frac < 0.97],
+  aes(
+    x = reorder(paste(dataset, tissue, RECEIVER_CELLTYPE), frac),
+    y = 1 - frac
+  )
+) + geom_point() + coord_flip()
+
+names(val_all)
+val_pancreas_lr_can_down
+
+
+dt_cci_val_tissue[lr_type == "NO", .N, by = "validation_set"]
+
+###########
+dt_cci_rel[
+  , {
+    totwt = .N
+    .SD[, .(frac = .N / totwt), by = cardio_hyp_up]
+  },
+  by = c("dataset", "tissue", "REGULATION")
+][order(-frac)][cardio_hyp_up != "NO"][
+  tissue == "Heart_and_Aorta"
+]
+
+dt_cci_rel[
+  , {
+    totwt = .N
+    .SD[, .(frac = .N / totwt), by = macro]
+  },
+  by = c("dataset", "tissue", "EMITTER_CELLTYPE")
+][order(-frac)][macro != "NO"][1:20]
 
