@@ -40,10 +40,43 @@ dt_cci_rel[
   on = c("tissue==new_tissue", "RECEIVER_CELLTYPE==cell_ontology_final"),
   RECEIVER_CELLFAMILY := i.cell_family
 ]
+dt_cci_rel[
+  ,
+  ER_CELLFAMILY := paste(
+    EMITTER_CELLFAMILY,
+    RECEIVER_CELLFAMILY,
+    sep = "_"
+  )
+]
 table(
   dt_cci_rel$EMITTER_CELLFAMILY,
   dt_cci_rel$RECEIVER_CELLFAMILY
 )
+
+dt_cci_rel[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family_mid")
+  ],
+  on = c("tissue==new_tissue", "EMITTER_CELLTYPE==cell_ontology_final"),
+  EMITTER_CELLFAMILY_2 := i.cell_family_mid
+]
+dt_cci_rel[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family_mid")
+  ],
+  on = c("tissue==new_tissue", "RECEIVER_CELLTYPE==cell_ontology_final"),
+  RECEIVER_CELLFAMILY_2 := i.cell_family_mid
+]
+dt_cci_rel[
+  ,
+  ER_CELLFAMILY_2 := paste(
+    EMITTER_CELLFAMILY_2,
+    RECEIVER_CELLFAMILY_2,
+    sep = "_"
+  )
+]
 
 dt_ora_rel <- dt_ora_full[!grepl("mixed", dataset)]
 
