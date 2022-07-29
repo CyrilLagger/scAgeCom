@@ -1166,6 +1166,7 @@ val_msccomb_lr <- sort(val_msccomb_genes[
 ]$mmusculus_homolog)
 
 ## list of all conditions ####
+
 val_all <- c(
   list(
     pancreas = val_pancreas_lr,
@@ -1187,6 +1188,9 @@ val_all <- c(
   val_brain_lr,
   val_sasp_lr_cond
 )
+
+val_all <- val_all[lapply(val_all, length) > 0]
+names(val_all)
 
 ## Upset plot of secreted lris ####
 
@@ -1264,406 +1268,143 @@ dt_cci_rel <- merge.data.table(
   sort = FALSE
 )
 
+dt_cci_rel[
+  ,
+  dataset_tissue := paste(
+    dataset,
+    tissue,
+    sep = "_"
+  )
+]
+
 ## ORA function on validation #####
 
 run_ora_validation <- function(
   data,
   category,
-  val_set
+  val_set,
+  by_group = "none"
 ) {
+  if (by_group == "none") {
+    bg <- NULL
+  } else {
+    bg <- by_group
+  }
   dt1 <- data[
     get(val_set) != "NO"
-  ][, .(V1 = .N), by = category]
-  dt1[, V2 := sum(V1) - V1]
+  ][, .(CAT_LR = .N), by = c(category, bg)]
+  dt1[, notCAT_LR := sum(CAT_LR) - CAT_LR, by = bg]
   dt2 <- data[
     get(val_set) == "NO"
-  ][, .(V3 = .N), by = category]
-  dt2[, V4 := sum(V3) - V3]
+  ][, .(CAT_notLR = .N), by = c(category, bg)]
+  dt2[, notCAT_notLR := sum(CAT_notLR) - CAT_notLR, by = bg]
   dt <- merge.data.table(
     dt1,
     dt2,
-    by = category
+    by = c(category, bg)
   )
   dt[
     ,
     c("OR", "pval") :=
     scDiffCom:::vfisher_2sided(
-      V1, V3, V2, V4
+      CAT_LR, CAT_notLR, notCAT_LR, notCAT_notLR
     )
   ]
+  dt[
+    ,
+    BH := p.adjust(pval, method = "BH")
+  ]
+  dt[, category_type := category]
+  dt[, group_type := by_group]
+  if (by_group == "none") {
+    dt[, group := "none" ]
+    setnames(
+      dt,
+      old = c(category),
+      new = c("category")
+    )
+  } else {
+    setnames(
+      dt,
+      old = c(category, by_group),
+      new = c("category", "group")
+    )
+  }
+  dt[, validation_set := val_set]
   return(dt)
 }
 
 ## Compute ORA validation ####
 
-test2 <- run_ora_validation(
-  data = dt_cci_rel[tissue == "Tongue"],
-  category = "EMITTER_CELLTYPE",
-  val_set = "macro"
-)
-test3 <- run_ora_validation2(
-  data = dt_cci_rel[tissue == "Tongue"],
-  category = "EMITTER_CELLTYPE",
-  val_set = "macro"
+dt_ora_validation_groups <- data.table(
+  category = c(
+    "dataset", "tissue", "tissue",
+    "EMITTER_CELLTYPE", "EMITTER_CELLTYPE", "EMITTER_CELLTYPE",
+    "RECEIVER_CELLTYPE", "RECEIVER_CELLTYPE", "RECEIVER_CELLTYPE",
+    "EMITTER_CELLFAMILY", "EMITTER_CELLFAMILY", "EMITTER_CELLFAMILY",
+    "RECEIVER_CELLFAMILY", "RECEIVER_CELLFAMILY", "RECEIVER_CELLFAMILY",
+    "EMITTER_CELLFAMILY_2", "EMITTER_CELLFAMILY_2", "EMITTER_CELLFAMILY_2",
+    "RECEIVER_CELLFAMILY_2", "RECEIVER_CELLFAMILY_2", "RECEIVER_CELLFAMILY_2",
+    "ER_CELLTYPES", "ER_CELLTYPES", "ER_CELLTYPES",
+    "ER_CELLFAMILY", "ER_CELLFAMILY", "ER_CELLFAMILY",
+    "ER_CELLFAMILY_2", "ER_CELLFAMILY_2", "ER_CELLFAMILY_2"
+  ),
+  by_group = c(
+    "none", "none", "dataset",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue",
+    "none", "dataset", "dataset_tissue"
+  )
 )
 
-test[
-  ,
-  EMITTER_REG := paste(
-    EMITTER_CELLTYPE,
-    REGULATION,
-    sep = "_"
-  )
+dt_ora_validation_groups <- setkey(
+  data.table(val_set = names(val_all))[, c(k = 1, .SD)],
+  k
+)[dt_ora_validation_groups[ ,c(k = 1, .SD)],
+allow.cartesian = TRUE][, k := NULL]
+
+options(future.globals.maxSize = 15 * 1024^3)
+future::plan(multicore, workers = 20)
+#future::plan(sequential)
+
+dt_ora_validation_groups_p <- dt_ora_validation_groups[
+  category %in% c(
+    "EMITTER_CELLTYPE",
+    "RECEIVER_CELLTYPE",
+    "ER_CELLTYPES",
+    "ER_CELLFAMILY",
+    "ER_CELLFAMILY_2"
+  ) &
+  by_group == "dataset_tissue"
 ]
 
-
-## Frequency table of CCIs by validation group ####
-
-dt_cci_val_tissue <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "tissue")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
+dt_cci_secr_validation <- rbindlist(
+  future.apply::future_lapply(
+    seq_len(nrow(dt_ora_validation_groups_p)),
+    function(i) {
+      run_ora_validation(
+        data = dt_cci_rel,
+        category = dt_ora_validation_groups_p$category[[i]],
+        val_set = dt_ora_validation_groups_p$val_set[[i]],
+        by_group = dt_ora_validation_groups_p$by_group[[i]]
+      )
     }
   ),
-  idcol = "validation_set"
+  use.names = TRUE
 )
 
-dt_cci_val_emitter_fam <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "EMITTER_CELLFAMILY")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
-    }
-  ),
-  idcol = "validation_set"
-)
+dt_cci_secr_validation
 
-dt_cci_val_tissue <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "tissue")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
-    }
-  ),
-  idcol = "validation_set"
-)
-
-dt_cci_val_emmitter <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "tissue", "EMITTER_CELLTYPE")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
-    }
-  ),
-  idcol = "validation_set"
-)
-
-dt_cci_val_emmitter_reg <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "tissue", "EMITTER_CELLTYPE", "REGULATION")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
-    }
-  ),
-  idcol = "validation_set"
-)
-
-dt_cci_val_receiver <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "tissue", "RECEIVER_CELLTYPE")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
-    }
-  ),
-  idcol = "validation_set"
-)
-
-dt_cci_val_receiver_reg <- rbindlist(
-  lapply(
-    setNames(
-      names(val_all),
-      names(val_all)
-    ),
-    function(val_name) {
-      dt <- dt_cci_rel[
-      , {
-        totwt <- .N
-        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
-      },
-      by = c("dataset", "tissue", "RECEIVER_CELLTYPE", "REGULATION")
-    ]
-    setnames(
-      dt,
-      old = val_name,
-      new = "lr_type"
-    )
-    }
-  ),
-  idcol = "validation_set"
-)
-
-write.xlsx(
-  x = list(
-    dt_cci_val_tissue,
-    dt_cci_val_tissue_reg,
-    dt_cci_val_emmitter,
-    dt_cci_val_emmitter_reg,
-    dt_cci_val_receiver,
-    dt_cci_val_receiver_reg
-  ),
+fwrite(
+  dt_cci_secr_validation,
   paste0(
     path_scagecom_output,
-    "cci_validation_tables.xlsx"
+    "cci_validation.csv"
   )
 )
-
-
-dt_cci_val_tissue[
-  lr_type == "NO" &
-  validation_set == "pancreas"
-]
-
-ggplot(
-  dt_cci_val_tissue[
-    lr_type == "NO" &
-    validation_set == "macro"
-  ],
-  aes(
-    x = reorder(paste(dataset, tissue), frac),
-    y = (1 - frac) * 100
-  )
-) + geom_point() + coord_flip()
-
-ggplot(
-  dt_cci_val_tissue_reg[
-    lr_type == "NO" &
-    validation_set == "cardio_hyp_down"
-  ][frac < 0.95],
-  aes(
-    x = reorder(paste(dataset, tissue, REGULATION), frac),
-    y = (1 - frac) * 100
-  )
-) + geom_point(
-) + coord_flip()
-
-ggplot(
-  dt_cci_val_emitter_fam[
-    lr_type == "NO" &
-    validation_set == "macro"
-  ],
-  aes(
-    x = reorder(paste(dataset, EMITTER_CELLFAMILY), frac),
-    y = (1 - frac) * 100
-  )
-) + geom_point() + coord_flip()
-
-#test ORA in a tissue or dataset
-
-as.matrix(table(
-  test$macro != "NO",
-  test$EMITTER_CELLFAMILY == "erythroid lineage cell"
-))
-table(
-  test$EMITTER_CELLFAMILY == "erythroid lineage cell"
-)
-
-
-sapply(
-  unique(test$EMITTER_CELLFAMILY),
-  function(i) {
-    fisher.test(
-      matrix(
-        c(
-          test[
-            EMITTER_CELLFAMILY == i &
-            pancreas != "NO"
-          ][, .N],
-          test[
-            EMITTER_CELLFAMILY == i &
-            pancreas == "NO"
-          ][, .N],
-          test[
-            EMITTER_CELLFAMILY != i &
-            pancreas != "NO"
-          ][, .N],
-          test[
-            EMITTER_CELLFAMILY != i &
-            pancreas == "NO"
-          ][, .N]
-        ),
-        ncol = 2
-      )
-    )$estimate
-  }
-)
-
-test[
-  EMITTER_CELLFAMILY != "erythroid lineage cell" &
-  macro == "NO"
-][, .N]
-
-test2 <- fisher.test(matrix(c(1758, 415, 70304, 27400), ncol = 2))
-
-1/test2$estimate
-(70304/(27400))/(1758/(415))
-
-ggplot(
-  dt_cci_val_emmitter[
-    lr_type == "NO" &
-    validation_set == "macro"
-  ][frac < 0.2],
-  aes(
-    x = reorder(paste(dataset, tissue, EMITTER_CELLTYPE), frac),
-    y = (1 - frac) * 100
-  )
-) + geom_point() + coord_flip()
-
-ggplot(
-  dt_cci_val_emmitter_reg[
-    lr_type == "NO" &
-    validation_set == "macro_up"
-  ][frac < 0.1],
-  aes(
-    x = reorder(paste(dataset, tissue, EMITTER_CELLTYPE, REGULATION), frac),
-    y = (1 - frac) * 100
-  )
-) + geom_point(
-) + coord_flip(
-)
-
-ggplot(
-  dt_cci_val_emmitter_reg[
-    lr_type == "NO" &
-    validation_set == "cardio" &
-    tissue == "Heart" &
-    #EMITTER_CELLTYPE == "pancreatic ductal cell" &
-    dataset == "TMS FACS (female)"
-  ],
-  aes(
-    x = reorder(paste(dataset, tissue, EMITTER_CELLTYPE, REGULATION), frac),
-    y = (1 - frac) * 100
-  )
-) + geom_point() + coord_flip()
-
-
-ggplot(
-  dt_cci_val_receiver[
-    lr_type == "NO" &
-    validation_set == "pancreas_can_down"
-  ][frac < 0.97],
-  aes(
-    x = reorder(paste(dataset, tissue, RECEIVER_CELLTYPE), frac),
-    y = 1 - frac
-  )
-) + geom_point() + coord_flip()
-
-names(val_all)
-val_pancreas_lr_can_down
-
-
-dt_cci_val_tissue[lr_type == "NO", .N, by = "validation_set"]
-
-###########
-dt_cci_rel[
-  , {
-    totwt = .N
-    .SD[, .(frac = .N / totwt), by = cardio_hyp_up]
-  },
-  by = c("dataset", "tissue", "REGULATION")
-][order(-frac)][cardio_hyp_up != "NO"][
-  tissue == "Heart_and_Aorta"
-]
-
-dt_cci_rel[
-  , {
-    totwt = .N
-    .SD[, .(frac = .N / totwt), by = macro]
-  },
-  by = c("dataset", "tissue", "EMITTER_CELLTYPE")
-][order(-frac)][macro != "NO"][1:20]
-
