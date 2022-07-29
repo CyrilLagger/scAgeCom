@@ -884,6 +884,310 @@ val_macro_lr_down <- val_macro_genes[
   mgi_symbol %in% genes_lri_mouse
 ]$mgi_symbol
 
+## Endo cells (human) secretomics (Brioschi et al. 2013) ####
+
+# read spreadsheet
+val_endo <- read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "Brioschi_endo_secretome.xlsx"
+  ),
+  startRow = 2
+)
+setDT(val_endo)
+val_endo[
+  ,
+  UniProt.Accession := sub("*", "", UniProt.Accession, fixed = TRUE)
+]
+
+# extract protein ids
+val_endo_genes <- val_endo[
+  ,
+  c("UniProt.Accession", "Description")
+]
+anyNA(val_endo_genes$UniProt.Accession)
+any(duplicated(val_endo_genes$UniProt.Accession))
+
+# look for gene names and homologs
+
+mart_endo_human <- biomaRt::getBM(
+  attributes = c(
+    "hgnc_symbol",
+    "ensembl_gene_id",
+    "uniprotswissprot"
+  ),
+  filters = "uniprotswissprot",
+  mart = mart_db_human,
+  values = sort(unique(val_endo_genes$UniProt.Accession))
+)
+setDT(mart_endo_human)
+table(val_endo_genes$UniProt.Accession %in% mart_endo_human$uniprotswissprot)
+
+val_endo_genes <- merge.data.table(
+  x = val_endo_genes,
+  y = mart_endo_human,
+  by.x = "UniProt.Accession",
+  by.y = "uniprotswissprot",
+  all = TRUE
+)
+
+mart_endo_ortho <- biomaRt::getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "mmusculus_homolog_associated_gene_name",
+    "mmusculus_homolog_orthology_confidence",
+    "mmusculus_homolog_orthology_type"
+  ),
+  filters = "ensembl_gene_id",
+  mart = mart_db_human,
+  values = unique(val_endo_genes$ensembl_gene_id)
+)
+setDT(mart_endo_ortho)
+anyNA(mart_endo_ortho$mmusculus_homolog_associated_gene_name)
+mart_endo_ortho <- mart_endo_ortho[
+  mmusculus_homolog_associated_gene_name != ""
+]
+val_endo_genes <- merge.data.table(
+  val_endo_genes,
+  mart_endo_ortho[, 1:2],
+  by.x = "ensembl_gene_id",
+  by.y = "ensembl_gene_id",
+  all = TRUE
+)
+setnames(
+  val_endo_genes,
+  old = "mmusculus_homolog_associated_gene_name",
+  new = "mmusculus_homolog"
+)
+table(
+  val_endo$UniProt.Accession %in%
+  val_endo_genes[!is.na(mmusculus_homolog)]$UniProt.Accession
+)
+
+# select genes that are in LRI
+val_endo_lr <- sort(val_endo_genes[
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
+
+## Huvec secretomics (Zhao et al. 2020) ####
+val_huvec <- read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "zhao_huvec_secretomics.xlsx"
+  ),
+  startRow = 3
+)
+setDT(val_huvec)
+
+# extract genes of proteins detected
+val_huvec_genes <- val_huvec[
+  ,
+  c("Protein.IDs", "Gene.names")
+]
+
+# look for homologs
+mart_huvec_human <- biomaRt::getBM(
+  attributes = c(
+    "hgnc_symbol",
+    "ensembl_gene_id"
+  ),
+  filters = "hgnc_symbol",
+  mart = mart_db_human,
+  values = sort(unique(val_huvec_genes$Gene.names))
+)
+setDT(mart_huvec_human)
+val_huvec_genes <- merge.data.table(
+  x = val_huvec_genes,
+  y = mart_huvec_human,
+  by.x = "Gene.names",
+  by.y = "hgnc_symbol",
+  all.x = TRUE
+)
+mart_huvec_ortho <- biomaRt::getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "mmusculus_homolog_associated_gene_name",
+    "mmusculus_homolog_orthology_confidence",
+    "mmusculus_homolog_orthology_type"
+  ),
+  filters = "ensembl_gene_id",
+  mart = mart_db_human,
+  values = sort(unique(val_huvec_genes$ensembl_gene_id))
+)
+setDT(mart_huvec_ortho)
+anyNA(mart_huvec_ortho$mmusculus_homolog_associated_gene_name)
+mart_huvec_ortho <- mart_huvec_ortho[
+  mmusculus_homolog_associated_gene_name != ""
+]
+val_huvec_genes <- merge.data.table(
+  val_huvec_genes,
+  mart_huvec_ortho[, 1:2],
+  by.x = "ensembl_gene_id",
+  by.y = "ensembl_gene_id",
+  all = TRUE
+)
+setnames(
+  val_huvec_genes,
+  old = "mmusculus_homolog_associated_gene_name",
+  new = "mmusculus_homolog_1"
+)
+
+# select genes that are in LRI
+val_huvec_lr <- sort(val_huvec_genes[
+  mmusculus_homolog_1 %in% genes_lri_mouse
+]$mmusculus_homolog_1)
+
+## MSC AT mouse secretomics (Acar et al. 2020) ####
+
+val_mscat <- read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "acar_mscat_secretome.xlsx"
+  ),
+  startRow = 1
+)
+setDT(val_mscat)
+
+# extract proteins detected
+val_mscat_genes <- val_mscat[, c("Protein_id")]
+
+# look for gene symbols
+mart_db_mouse_2 <- biomaRt::useMart(
+  "ensembl",
+  host = "https://dec2017.archive.ensembl.org",
+  dataset = "mmusculus_gene_ensembl",
+  verbose = TRUE
+)
+mart_mscat_mouse <- biomaRt::getBM(
+  attributes = c(
+    "mgi_symbol",
+    "ensembl_gene_id",
+    "uniprotswissprot"
+  ),
+  filters = "uniprotswissprot",
+  mart = mart_db_mouse,
+  values = sort(unique(val_mscat_genes$Protein_id))
+)
+setDT(mart_mscat_mouse)
+table(val_mscat_genes$Protein_id %in% mart_mscat_mouse$uniprotswissprot)
+
+val_mscat_genes <- merge.data.table(
+  x = val_mscat_genes,
+  y = mart_mscat_mouse,
+  by.x = "Protein_id",
+  by.y = "uniprotswissprot",
+  all = TRUE
+)
+
+table(is.na(val_mscat_genes$mgi_symbol))
+
+# select genes that are in LRI
+val_mscat_lr <- sort(val_mscat_genes[
+  mgi_symbol %in% genes_lri_mouse
+]$mgi_symbol)
+
+# select genes upregulated with HFD
+val_mscat_lr_hfd <- sort(val_mscat_genes[
+  mgi_symbol %in% genes_lri_mouse &
+  Protein_id %in% val_mscat[Condition == "HFD"]$Protein_id
+]$mgi_symbol)
+
+## MSC human secretomics (Shin et al. 2021) ####
+
+# read spreadsheet
+val_msccomb <- read.xlsx(
+  paste0(
+    path_scagecom_input,
+    "shin_msc_secretome.xlsx"
+  ),
+  startRow = 3
+)
+setDT(val_msccomb)
+
+# extract genes
+val_msccomb_genes <- val_msccomb[
+  ,
+  c("Accession", "SYM")
+]
+anyNA(val_msccomb_genes$Accession)
+any(duplicated(val_msccomb_genes$Accession))
+
+# look for homologs
+mart_msccomb_human <- getBM(
+  attributes = c(
+    "hgnc_symbol",
+    "ensembl_gene_id"
+  ),
+  filters = "hgnc_symbol",
+  mart = mart_db_human,
+  values = sort(unique(val_msccomb_genes$SYM))
+)
+setDT(mart_msccomb_human)
+
+val_msccomb_genes <- merge.data.table(
+  x = val_msccomb_genes,
+  y = mart_msccomb_human,
+  by.x = "SYM",
+  by.y = "hgnc_symbol",
+  all = TRUE
+)
+mart_msccomb_ortho <- biomaRt::getBM(
+  attributes = c(
+    "ensembl_gene_id",
+    "mmusculus_homolog_associated_gene_name",
+    "mmusculus_homolog_orthology_confidence",
+    "mmusculus_homolog_orthology_type"
+  ),
+  filters = "ensembl_gene_id",
+  mart = mart_db_human,
+  values = unique(val_msccomb_genes$ensembl_gene_id)
+)
+setDT(mart_msccomb_ortho)
+anyNA(mart_msccomb_ortho$mmusculus_homolog_associated_gene_name)
+mart_msccomb_ortho <- mart_msccomb_ortho[
+  mmusculus_homolog_associated_gene_name != ""
+]
+val_msccomb_genes <- merge.data.table(
+  val_msccomb_genes,
+  mart_msccomb_ortho[, 1:2],
+  by.x = "ensembl_gene_id",
+  by.y = "ensembl_gene_id",
+  all = TRUE
+)
+setnames(
+  val_msccomb_genes,
+  old = "mmusculus_homolog_associated_gene_name",
+  new = "mmusculus_homolog"
+)
+
+# select genes that are in LRI
+val_msccomb_lr <- sort(val_msccomb_genes[
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
+
+## list of all conditions ####
+val_all <- c(
+  list(
+    pancreas = val_pancreas_lr,
+    pancreas_hpde = val_pancreas_lr_hpde,
+    pancreas_can_up = val_pancreas_lr_can_up,
+    pancreas_can_down = val_pancreas_lr_can_down,
+    cardio = val_cardio_lr,
+    cardio_hyp_up = val_cardio_lr_hyp_up,
+    cardio_hyp_down = val_cardio_lr_hyp_down,
+    macro = val_macro_lr,
+    macro_up = val_macro_lr_up,
+    macro_down = val_macro_lr_down,
+    endo = val_endo_lr,
+    huvec = val_huvec_lr,
+    mscat = val_mscat_lr,
+    mscat_hfd = val_mscat_lr_hfd,
+    msccomb = val_msccomb_lr
+  ),
+  val_brain_lr,
+  val_sasp_lr_cond
+)
+
 ## Upset plot of secreted lris ####
 
 val_dt <- data.table(
@@ -902,36 +1206,19 @@ val_dt[
 ComplexUpset::upset(
   as.data.frame(val_dt),
   c(
-    "pancreas", "cardio", "macro", "astro",
-    "micro", "neurons", "oligo", "fibro_xir_up",
-    "epi_xir_up"
+    "pancreas", "endo", "huvec", "macro", "mscat", "msccomb"
+    #"pancreas", "cardio", "macro", "astro",
+    #"micro", "neurons", "oligo", "fibro_xir_up",
+    #"epi_xir_up", "endo"
   ),
   name = "xx",
   set_sizes = ComplexUpset::upset_set_size(),
-  min_size = 5
+  min_size = 6
 ) + ggtitle(
   "xx"
 )
 
 ## Annotate LRIs and CCIs with secretomics genes ####
-
-# list of all conditions
-val_all <- c(
-  list(
-    pancreas = val_pancreas_lr,
-    pancreas_hpde = val_pancreas_lr_hpde,
-    pancreas_can_up = val_pancreas_lr_can_up,
-    pancreas_can_down = val_pancreas_lr_can_down,
-    cardio = val_cardio_lr,
-    cardio_hyp_up = val_cardio_lr_hyp_up,
-    cardio_hyp_down = val_cardio_lr_hyp_down,
-    macro = val_macro_lr,
-    macro_up = val_macro_lr_up,
-    macro_down = val_macro_lr_down
-  ),
-  val_brain_lr,
-  val_sasp_lr_cond
-)
 
 # annoated LRI table first
 dt_lri_mouse_val <- copy(dt_lri_mouse)
@@ -977,6 +1264,59 @@ dt_cci_rel <- merge.data.table(
   sort = FALSE
 )
 
+## ORA function on validation #####
+
+run_ora_validation <- function(
+  data,
+  category,
+  val_set
+) {
+  dt1 <- data[
+    get(val_set) != "NO"
+  ][, .(V1 = .N), by = category]
+  dt1[, V2 := sum(V1) - V1]
+  dt2 <- data[
+    get(val_set) == "NO"
+  ][, .(V3 = .N), by = category]
+  dt2[, V4 := sum(V3) - V3]
+  dt <- merge.data.table(
+    dt1,
+    dt2,
+    by = category
+  )
+  dt[
+    ,
+    c("OR", "pval") :=
+    scDiffCom:::vfisher_2sided(
+      V1, V3, V2, V4
+    )
+  ]
+  return(dt)
+}
+
+## Compute ORA validation ####
+
+test2 <- run_ora_validation(
+  data = dt_cci_rel[tissue == "Tongue"],
+  category = "EMITTER_CELLTYPE",
+  val_set = "macro"
+)
+test3 <- run_ora_validation2(
+  data = dt_cci_rel[tissue == "Tongue"],
+  category = "EMITTER_CELLTYPE",
+  val_set = "macro"
+)
+
+test[
+  ,
+  EMITTER_REG := paste(
+    EMITTER_CELLTYPE,
+    REGULATION,
+    sep = "_"
+  )
+]
+
+
 ## Frequency table of CCIs by validation group ####
 
 dt_cci_val_tissue <- rbindlist(
@@ -1003,7 +1343,7 @@ dt_cci_val_tissue <- rbindlist(
   idcol = "validation_set"
 )
 
-dt_cci_val_tissue_reg <- rbindlist(
+dt_cci_val_emitter_fam <- rbindlist(
   lapply(
     setNames(
       names(val_all),
@@ -1015,7 +1355,31 @@ dt_cci_val_tissue_reg <- rbindlist(
         totwt <- .N
         .SD[, .(frac = .N / totwt, N = .N), by = val_name]
       },
-      by = c("dataset", "tissue", "REGULATION")
+      by = c("dataset", "EMITTER_CELLFAMILY")
+    ]
+    setnames(
+      dt,
+      old = val_name,
+      new = "lr_type"
+    )
+    }
+  ),
+  idcol = "validation_set"
+)
+
+dt_cci_val_tissue <- rbindlist(
+  lapply(
+    setNames(
+      names(val_all),
+      names(val_all)
+    ),
+    function(val_name) {
+      dt <- dt_cci_rel[
+      , {
+        totwt <- .N
+        .SD[, .(frac = .N / totwt, N = .N), by = val_name]
+      },
+      by = c("dataset", "tissue")
     ]
     setnames(
       dt,
@@ -1166,6 +1530,67 @@ ggplot(
   )
 ) + geom_point(
 ) + coord_flip()
+
+ggplot(
+  dt_cci_val_emitter_fam[
+    lr_type == "NO" &
+    validation_set == "macro"
+  ],
+  aes(
+    x = reorder(paste(dataset, EMITTER_CELLFAMILY), frac),
+    y = (1 - frac) * 100
+  )
+) + geom_point() + coord_flip()
+
+#test ORA in a tissue or dataset
+
+as.matrix(table(
+  test$macro != "NO",
+  test$EMITTER_CELLFAMILY == "erythroid lineage cell"
+))
+table(
+  test$EMITTER_CELLFAMILY == "erythroid lineage cell"
+)
+
+
+sapply(
+  unique(test$EMITTER_CELLFAMILY),
+  function(i) {
+    fisher.test(
+      matrix(
+        c(
+          test[
+            EMITTER_CELLFAMILY == i &
+            pancreas != "NO"
+          ][, .N],
+          test[
+            EMITTER_CELLFAMILY == i &
+            pancreas == "NO"
+          ][, .N],
+          test[
+            EMITTER_CELLFAMILY != i &
+            pancreas != "NO"
+          ][, .N],
+          test[
+            EMITTER_CELLFAMILY != i &
+            pancreas == "NO"
+          ][, .N]
+        ),
+        ncol = 2
+      )
+    )$estimate
+  }
+)
+
+test[
+  EMITTER_CELLFAMILY != "erythroid lineage cell" &
+  macro == "NO"
+][, .N]
+
+test2 <- fisher.test(matrix(c(1758, 415, 70304, 27400), ncol = 2))
+
+1/test2$estimate
+(70304/(27400))/(1758/(415))
 
 ggplot(
   dt_cci_val_emmitter[
