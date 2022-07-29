@@ -96,8 +96,8 @@ setnames(
     "tissue",
     "cell_ontology_class",
     "cell_ontology_final",
-    "cell_family",
     "cell_family_mid",
+    "cell_family",
     "cell_abbreviation"
   )
 )
