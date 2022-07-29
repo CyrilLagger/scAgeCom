@@ -84,6 +84,7 @@ dt_celltype_conversion <- dt_celltype_conversion[
     "Tissue",
     "Original_annotation",
     "Final_annotation",
+    "Family_middle",
     "Family_broad",
     "Abbreviation"
   )
@@ -96,6 +97,7 @@ setnames(
     "cell_ontology_class",
     "cell_ontology_final",
     "cell_family",
+    "cell_family_mid",
     "cell_abbreviation"
   )
 )
