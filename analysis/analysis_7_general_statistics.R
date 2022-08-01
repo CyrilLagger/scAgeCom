@@ -48,26 +48,22 @@ dt_cci_rel[
     sep = "_"
   )
 ]
-table(
-  dt_cci_rel$EMITTER_CELLFAMILY,
-  dt_cci_rel$RECEIVER_CELLFAMILY
-)
 
 dt_cci_rel[
   dt_celltype_conversion[
     ,
-    c("new_tissue", "cell_ontology_final", "cell_family_mid")
+    c("new_tissue", "cell_ontology_final", "cell_family_mid_2")
   ],
   on = c("tissue==new_tissue", "EMITTER_CELLTYPE==cell_ontology_final"),
-  EMITTER_CELLFAMILY_2 := i.cell_family_mid
+  EMITTER_CELLFAMILY_2 := i.cell_family_mid_2
 ]
 dt_cci_rel[
   dt_celltype_conversion[
     ,
-    c("new_tissue", "cell_ontology_final", "cell_family_mid")
+    c("new_tissue", "cell_ontology_final", "cell_family_mid_2")
   ],
   on = c("tissue==new_tissue", "RECEIVER_CELLTYPE==cell_ontology_final"),
-  RECEIVER_CELLFAMILY_2 := i.cell_family_mid
+  RECEIVER_CELLFAMILY_2 := i.cell_family_mid_2
 ]
 dt_cci_rel[
   ,
