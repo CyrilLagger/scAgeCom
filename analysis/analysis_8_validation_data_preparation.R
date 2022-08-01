@@ -522,6 +522,15 @@ val_brain_lr <- lapply(
   }
 )
 
+val_brain_lr$glia <- unique(
+  c(
+    val_brain_lr$astro,
+    val_brain_lr$micro,
+    val_brain_lr$oligo
+  )
+)
+names(val_brain_lr)
+
 ## SASP atlas (human) secretomics (Basisty et al., 2020) ####
 
 val_sasp <- fread(
@@ -1207,14 +1216,38 @@ val_dt[
   )
 ]
 
+val_dt_selection <- val_dt[
+  ,
+  c("gene", val_upset_keep),
+  with = FALSE
+][,
+  tot:= Reduce(`|`, lapply(.SD, function(x) {x})),
+  .SDcols = val_upset_keep
+][tot == TRUE]
+val_dt_selection[
+  ,
+  N := rowSums(.SD),
+  .SDcols = val_upset_keep
+]
+
+sort(val_dt_selection[N >= 6]$gene)
+
+val_upset_keep <- c(
+  "pancreas", "huvec", "macro", "mscat",
+  "neurons", "glia", "cardio"
+)
 ComplexUpset::upset(
-  as.data.frame(val_dt),
-  c(
-    "pancreas", "endo", "huvec", "macro", "mscat", "msccomb"
-    #"pancreas", "cardio", "macro", "astro",
-    #"micro", "neurons", "oligo", "fibro_xir_up",
-    #"epi_xir_up", "endo"
+  as.data.frame(
+    val_dt[
+      ,
+      c("gene", val_upset_keep),
+      with = FALSE
+    ][,
+     tot:= Reduce(`|`, lapply(.SD, function(x) {x})),
+      .SDcols = val_upset_keep
+    ][tot == TRUE]
   ),
+  val_upset_keep,
   name = "xx",
   set_sizes = ComplexUpset::upset_set_size(),
   min_size = 6
@@ -1366,7 +1399,7 @@ dt_ora_validation_groups <- data.table(
 dt_ora_validation_groups <- setkey(
   data.table(val_set = names(val_all))[, c(k = 1, .SD)],
   k
-)[dt_ora_validation_groups[ ,c(k = 1, .SD)],
+)[dt_ora_validation_groups[ , c(k = 1, .SD)],
 allow.cartesian = TRUE][, k := NULL]
 
 options(future.globals.maxSize = 15 * 1024^3)
@@ -1377,11 +1410,29 @@ dt_ora_validation_groups_p <- dt_ora_validation_groups[
   category %in% c(
     "EMITTER_CELLTYPE",
     "RECEIVER_CELLTYPE",
-    "ER_CELLTYPES",
+    #"ER_CELLTYPES",
     "ER_CELLFAMILY",
     "ER_CELLFAMILY_2"
   ) &
-  by_group == "dataset_tissue"
+  by_group %in% c(
+    "dataset_tissue",
+    "none",
+    "dataset"
+  )
+]
+
+dt_ora_validation_groups_p2 <- dt_ora_validation_groups[
+  category %in% c(
+    "EMITTER_CELLFAMILY",
+    "EMITTER_CELLFAMILY_2",
+    "RECEIVER_CELLFAMILY",
+    "RECEIVER_CELLFAMILY_2"
+  ) &
+  by_group %in% c(
+    "dataset_tissue",
+    "none",
+    "dataset"
+  )
 ]
 
 dt_cci_secr_validation <- rbindlist(
@@ -1399,12 +1450,233 @@ dt_cci_secr_validation <- rbindlist(
   use.names = TRUE
 )
 
+dt_cci_secr_validation2 <- rbindlist(
+  future.apply::future_lapply(
+    seq_len(nrow(dt_ora_validation_groups_p2)),
+    function(i) {
+      run_ora_validation(
+        data = dt_cci_rel,
+        category = dt_ora_validation_groups_p2$category[[i]],
+        val_set = dt_ora_validation_groups_p2$val_set[[i]],
+        by_group = dt_ora_validation_groups_p2$by_group[[i]]
+      )
+    }
+  ),
+  use.names = TRUE
+)
+
+
 dt_cci_secr_validation
+dt_cci_secr_validation2
+
+dt_cci_secr_validation_full <- rbindlist(
+  list(
+    dt_cci_secr_validation,
+    dt_cci_secr_validation2
+  )
+)
 
 fwrite(
-  dt_cci_secr_validation,
+  dt_cci_secr_validation_full,
   paste0(
     path_scagecom_output,
     "cci_validation.csv"
   )
+)
+
+## Specific results of interest to select ####
+
+# huvec
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "huvec" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    color = -log10(BH+1E-70)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+  ggplot2::scale_color_gradient(low = "orange", high = "red") +
+  ggplot2::xlab(paste0("ORA score ", regulation)) +
+  ggplot2::ylab("") +
+  ggplot2::labs(
+    size = "-log10(Adj. P-Value)",
+    color = "log2(Odds Ratio)",
+    caption = extra_label_annotation
+  ) +
+  ggplot2::theme(text = ggplot2::element_text(size = 14)) +
+  ggplot2::theme(legend.position = c(0.8, 0.3)) +
+  ggplot2::theme(legend.title = ggplot2::element_text(size = 12)) +
+  ggplot2::theme(legend.text = ggplot2::element_text(size = 12)) +
+  ggplot2::theme(plot.title.position = "plot") +
+  ggplot2::ggtitle(
+    paste0(
+      "Top ",
+      n_row_tokeep,
+      " ",
+      regulation,
+      " ",
+      category_label
+    )
+  )
+
+# macro
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "macro" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    color = -log10(BH+1E-195)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+#mscat
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "mscat" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    color = -log10(BH+1E-180)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "mscat" &
+    group_type == "dataset_tissue" &
+    category_type == "EMITTER_CELLTYPE"
+  ][grepl("Adipose", group)],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(BH),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+#neurons
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "neurons" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(BH+1E-60)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+#glial
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "glia" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(BH+1E-126)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+names(val_all)
+
+#cardio
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "cardio" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    color = -log10(BH+1E-189)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "cardio" &
+    group_type == "dataset_tissue" &
+    category_type == "EMITTER_CELLTYPE"
+  ][grepl("Heart", group)],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(BH),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+#pancreas
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "pancreas" &
+    group_type == "none" &
+    category_type == "EMITTER_CELLFAMILY_2"
+  ][category != "leukocyte"],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    color = -log10(BH+1E-250)
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
+)
+
+ggplot(
+  dt_cci_secr_validation_full[
+    validation_set == "pancreas" &
+    group_type == "dataset_tissue" &
+    category_type == "EMITTER_CELLTYPE"
+  ][grepl("Pancreas", group)],
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(BH),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1, linetype = "dotted"
 )
