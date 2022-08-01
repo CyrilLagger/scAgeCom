@@ -220,7 +220,7 @@ LRI_template <- LRI_mouse$LRI_curated[, 1:6]
 
 LRI_in_seurat <- lapply(
   seurat_genes,
-  function (i) {
+  function(i) {
     LRI_mouse$LRI_curated[
       LIGAND_1 %in% i &
         RECEPTOR_1 %in% i &

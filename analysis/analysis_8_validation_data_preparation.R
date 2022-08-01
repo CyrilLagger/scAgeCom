@@ -456,7 +456,9 @@ val_brain[
   ,
   paste0("is_detected_Astro_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Astro_", 1:6)
 ]
@@ -469,7 +471,9 @@ val_brain[
   ,
   paste0("is_detected_Microglia_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Microglia_", 1:6)
 ]
@@ -482,7 +486,9 @@ val_brain[
   ,
   paste0("is_detected_Neurons_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Neurons_", 1:6)
 ]
@@ -495,7 +501,9 @@ val_brain[
   ,
   paste0("is_detected_Oligodendrocytes_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Oligodendrocytes_", 1:6)
 ]
@@ -654,7 +662,7 @@ hom_jax <- hom_jax[
 ][, c(1, 2, 4)]
 hom_jax <- hom_jax[
   Common.Organism.Name == "mouse, laboratory" |
-  (Common.Organism.Name == "human" & Symbol %in% 
+  (Common.Organism.Name == "human" & Symbol %in%
   val_sasp_genes$gene)
 ]
 hom_jax <- merge.data.table(
@@ -1221,7 +1229,9 @@ val_dt_selection <- val_dt[
   c("gene", val_upset_keep),
   with = FALSE
 ][,
-  tot:= Reduce(`|`, lapply(.SD, function(x) {x})),
+  tot := Reduce(`|`, lapply(.SD, function(x) {
+    x
+  })),
   .SDcols = val_upset_keep
 ][tot == TRUE]
 val_dt_selection[
@@ -1243,7 +1253,7 @@ ComplexUpset::upset(
       c("gene", val_upset_keep),
       with = FALSE
     ][,
-     tot:= Reduce(`|`, lapply(.SD, function(x) {x})),
+     tot := Reduce(`|`, lapply(.SD, function(x) {x})),
       .SDcols = val_upset_keep
     ][tot == TRUE]
   ),
@@ -1350,7 +1360,7 @@ run_ora_validation <- function(
   dt[, category_type := category]
   dt[, group_type := by_group]
   if (by_group == "none") {
-    dt[, group := "none" ]
+    dt[, group := "none"]
     setnames(
       dt,
       old = c(category),
@@ -1399,7 +1409,7 @@ dt_ora_validation_groups <- data.table(
 dt_ora_validation_groups <- setkey(
   data.table(val_set = names(val_all))[, c(k = 1, .SD)],
   k
-)[dt_ora_validation_groups[ , c(k = 1, .SD)],
+)[dt_ora_validation_groups[, c(k = 1, .SD)],
 allow.cartesian = TRUE][, k := NULL]
 
 options(future.globals.maxSize = 15 * 1024^3)
@@ -1496,7 +1506,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    color = -log10(BH+1E-70)
+    color = -log10(BH + 1E-70)
   )
 ) + geom_point(
 ) + geom_vline(
@@ -1536,7 +1546,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    color = -log10(BH+1E-195)
+    color = -log10(BH + 1E-195)
   )
 ) + geom_point(
 ) + geom_vline(
@@ -1553,7 +1563,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    color = -log10(BH+1E-180)
+    color = -log10(BH + 1E-180)
   )
 ) + geom_point(
 ) + geom_vline(
@@ -1587,7 +1597,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    size = -log10(BH+1E-60)
+    size = -log10(BH + 1E-60)
   )
 ) + geom_point(
 ) + geom_vline(
@@ -1604,7 +1614,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    size = -log10(BH+1E-126)
+    size = -log10(BH + 1E-126)
   )
 ) + geom_point(
 ) + geom_vline(
@@ -1623,7 +1633,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    color = -log10(BH+1E-189)
+    color = -log10(BH + 1E-189)
   )
 ) + geom_point(
 ) + geom_vline(
@@ -1657,7 +1667,7 @@ ggplot(
   aes(
     x = OR,
     y = reorder(category, OR),
-    color = -log10(BH+1E-250)
+    color = -log10(BH + 1E-250)
   )
 ) + geom_point(
 ) + geom_vline(
