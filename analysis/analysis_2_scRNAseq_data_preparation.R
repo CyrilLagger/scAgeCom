@@ -85,6 +85,7 @@ dt_celltype_conversion <- dt_celltype_conversion[
     "Original_annotation",
     "Final_annotation",
     "Family_middle",
+    "Family_middle_2",
     "Family_broad",
     "Abbreviation"
   )
@@ -97,6 +98,7 @@ setnames(
     "cell_ontology_class",
     "cell_ontology_final",
     "cell_family_mid",
+    "cell_family_mid_2",
     "cell_family",
     "cell_abbreviation"
   )
@@ -114,8 +116,8 @@ setDT(md_tms_facs)
 md_tms_facs[
   dt_celltype_conversion,
   on = c("tissue", "cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(
-    paste0("i.", names(dt_celltype_conversion)[3:5])
+  names(dt_celltype_conversion)[c(3, 6, 7)] := mget(
+    paste0("i.", names(dt_celltype_conversion)[c(3, 6, 7)])
   )
 ]
 sort(table(md_tms_facs$cell_ontology_final), decreasing = TRUE)
@@ -151,8 +153,8 @@ setDT(md_tms_droplet)
 md_tms_droplet[
   dt_celltype_conversion,
   on = c("tissue", "cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(
-    paste0("i.", names(dt_celltype_conversion)[3:5])
+  names(dt_celltype_conversion)[c(3, 6, 7)] := mget(
+    paste0("i.", names(dt_celltype_conversion)[c(3, 6, 7)])
   )
 ]
 
@@ -187,8 +189,8 @@ setDT(md_calico_kidney)
 md_calico_kidney[
   dt_celltype_conversion[tissue == "Kidney"],
   on = c("cell_type==cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(
-    paste0("i.", names(dt_celltype_conversion)[3:5])
+  names(dt_celltype_conversion)[c(3, 6, 7)] := mget(
+    paste0("i.", names(dt_celltype_conversion)[c(3, 6, 7)])
   )
 ]
 sort(table(md_calico_kidney$cell_ontology_final), decreasing = TRUE)
@@ -238,8 +240,8 @@ setDT(md_calico_lung)
 md_calico_lung[
   dt_celltype_conversion[tissue == "Lung"],
   on = c("cell_type==cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(
-    paste0("i.", names(dt_celltype_conversion)[3:5])
+  names(dt_celltype_conversion)[c(3, 6, 7)] := mget(
+    paste0("i.", names(dt_celltype_conversion)[c(3, 6, 7)])
   )
 ]
 sort(table(md_calico_lung$cell_ontology_final), decreasing = TRUE)
@@ -289,8 +291,8 @@ setDT(md_calico_spleen)
 md_calico_spleen[
   dt_celltype_conversion[tissue == "Spleen"],
   on = c("cell_type==cell_ontology_class"),
-  names(dt_celltype_conversion)[3:5] := mget(
-    paste0("i.", names(dt_celltype_conversion)[3:5])
+  names(dt_celltype_conversion)[c(3, 6, 7)] := mget(
+    paste0("i.", names(dt_celltype_conversion)[c(3, 6, 7)])
   )
 ]
 
