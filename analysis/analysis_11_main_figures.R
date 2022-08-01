@@ -960,7 +960,7 @@ fun_plot_volcano_cci(
   ]
 )
 
-## Prepare Figure Tissue Specific scores (Fig. 4.b) ####
+## Deprecated! Prepare Figure Tissue Specific scores (old Fig. 4.b) ####
 
 fun_plot_scores_cci <- function(
   cci_table
@@ -1058,7 +1058,7 @@ fun_plot_scores_cci(
   ]
 )
 
-## Prepare Figure Tissue Specific lrfc (Fig. 4.c) ####
+## Prepare Figure Tissue Specific lrfc (Fig. 4.b) ####
 
 fun_plot_lrfc_cci <- function(
   cci_table
@@ -1148,7 +1148,7 @@ fun_plot_lrfc_cci(
   ]
 )
 
-## Prepare Figure Tissue Specific visnetwork (Fig. 4.d) ####
+## Prepare Figure Tissue Specific visnetwork (Fig. 4.e) ####
 
 fun_plot_ora_visnetwork <- function(
   cci_table,
@@ -1258,7 +1258,7 @@ fun_plot_ora_visnetwork(
   shiny_abbr_celltype
 )
 
-## Prepare Figure Tissue Specific go treemap (Fig. 4.e) ####
+## Prepare Figure Tissue Specific go treemap (Fig. 4.f) ####
 
 fun_plot_ora_go_treemap <- function(
   go_reduced_table,
@@ -1379,11 +1379,11 @@ fun_plot_ora_go_treemap(
   min_size = 12
 )
 
-## Prepare Figure Tissue Specific gene ORA (Fig. 4.f) ####
+## Deprecated! Prepare Figure Tissue Specific gene ORA (old Fig. 4.f) ####
 
 #TODO
 
-## Prepare Figure Cross Tissue GO table (Fig. 5.a) ####
+## Deprecated! Prepare Figure Cross Tissue GO table (old Fig. 5a) ####
 
 fun_display_keyword_counts <- function(
   ora_keyword_counts,
@@ -1513,13 +1513,6 @@ webshot(
   zoom = 3
 )
 
-
-
-
-
-
-
-
 plot_keyword_summary <- function(
   ora_keyword_summary,
   ora_keyword_template,
@@ -1611,10 +1604,7 @@ plot_keyword_summary(
   "Lgals3:Lag3"
 )
 
-## Figure 5 ####
-
-
-
+## Prepare Figure Cross Tissue T cell summary (Fig 4f) ####
 
 plot_KEYWORD_summary <- function(
   ora_keyword_summary,
@@ -1736,6 +1726,8 @@ plot_KEYWORD_summary(
   category = "Ligand-Receptor Interaction",
   keyword = "Gpi1:Amfr"
 )
+
+## Figure 5 validation
 
 ## Figure 6 ####
 
