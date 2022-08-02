@@ -476,7 +476,7 @@ get_seurat = function(
   SEX
 ) {
   if (INPUT == "droplet") {
-    seurat_sample_obj = readRDS("../data/seurat_shared_tms_droplet.rds")
+    seurat_sample_obj = readRDS("../../scDiffCom/data/seurat_shared_tms_droplet.rds")
     seurat_sample_obj = subset(x = seurat_sample_obj, subset = tissue == TISSUE)
     seurat_sample_obj[["age_group"]] = ifelse(
       seurat_sample_obj[[]]$age %in% AGE_GROUP$YOUNG, 
@@ -492,7 +492,7 @@ get_seurat = function(
     seurat_sample_obj[["cell_type"]] = seurat_sample_obj$cell_type_scagecom
     seurat_sample_obj[["cell_abbreviation"]] = seurat_sample_obj$cell_abbreviation_scagecom
   } else if (INPUT == "facs") {
-    seurat_sample_obj = readRDS("../data/seurat_shared_tms_facs.rds")
+    seurat_sample_obj = readRDS("../../scDiffCom/data/seurat_shared_tms_facs.rds")
     seurat_sample_obj = subset(x = seurat_sample_obj, subset = tissue == TISSUE)
     seurat_sample_obj[["age_group"]] = ifelse(
       seurat_sample_obj[[]]$age %in% AGE_GROUP$YOUNG, 

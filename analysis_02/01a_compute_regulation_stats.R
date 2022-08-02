@@ -16,7 +16,7 @@ source("coexpression.R")
 ### Parameters ###
 
 NUM_SAMPLES = 50
-READ_ONLY = TRUE
+READ_ONLY = FALSE
 
 ##################
 
@@ -24,7 +24,7 @@ READ_ONLY = TRUE
 
 DATASETS = NULL
 # DATASETS = list(
-#   
+# 
 #   dataset1 = list(
 #     INPUT = "droplet",
 #     TISSUE = "Liver",
@@ -33,57 +33,57 @@ DATASETS = NULL
 #       OLD = c("18m", "21m", "24m")
 #     ),
 #     SEX = c("male")
+#   ),
+#   
+#   dataset2 = list(
+#     INPUT = "droplet",
+#     TISSUE = "Liver",
+#     AGE_GROUP = list(
+#       YOUNG = c("3m"),
+#       OLD = c("18m", "21m", "24m")
+#     ),
+#     SEX = c("female")
+#   ),
+#   
+#   dataset3 = list(
+#     INPUT = "droplet",
+#     TISSUE = "Kidney",
+#     AGE_GROUP = list(
+#       YOUNG = c("3m"),
+#       OLD = c("18m", "21m", "24m")
+#     ),
+#     SEX = c("male")
+#   ),
+#   
+#   dataset4 = list(
+#     INPUT = "droplet",
+#     TISSUE = "Kidney",
+#     AGE_GROUP = list(
+#       YOUNG = c("3m"),
+#       OLD = c("18m", "21m", "24m")
+#     ),
+#     SEX = c("female")
+#   ),
+#   
+#   dataset5 = list(
+#     INPUT = "droplet",
+#     TISSUE = "Spleen",
+#     AGE_GROUP = list(
+#       YOUNG = c("3m"),
+#       OLD = c("18m", "21m", "24m")
+#     ),
+#     SEX = c("male")
+#   ),
+#   
+#   dataset6 = list(
+#     INPUT = "droplet",
+#     TISSUE = "Spleen",
+#     AGE_GROUP = list(
+#       YOUNG = c("3m"),
+#       OLD = c("18m", "21m", "24m")
+#     ),
+#     SEX = c("female")
 #   )
-# 
-# dataset2 = list(
-#   INPUT = "droplet",
-#   TISSUE = "Liver",
-#   AGE_GROUP = list(
-#     YOUNG = c("3m"),
-#     OLD = c("18m", "21m", "24m")
-#   ),
-#   SEX = c("female")
-# ),
-# 
-# dataset3 = list(
-#   INPUT = "droplet",
-#   TISSUE = "Kidney",
-#   AGE_GROUP = list(
-#     YOUNG = c("3m"),
-#     OLD = c("18m", "21m", "24m")
-#   ),
-#   SEX = c("male")
-# ),
-# 
-# dataset4 = list(
-#   INPUT = "droplet",
-#   TISSUE = "Kidney",
-#   AGE_GROUP = list(
-#     YOUNG = c("3m"),
-#     OLD = c("18m", "21m", "24m")
-#   ),
-#   SEX = c("female")
-# ),
-# 
-# dataset5 = list(
-#   INPUT = "droplet",
-#   TISSUE = "Spleen",
-#   AGE_GROUP = list(
-#     YOUNG = c("3m"),
-#     OLD = c("18m", "21m", "24m")
-#   ),
-#   SEX = c("male")
-# ),
-# 
-# dataset6 = list(
-#   INPUT = "droplet",
-#   TISSUE = "Spleen",
-#   AGE_GROUP = list(
-#     YOUNG = c("3m"),
-#     OLD = c("18m", "21m", "24m")
-#   ),
-#   SEX = c("female")
-# )
 # )
 
 # INPUT = "droplet"  # facs, sample
@@ -95,13 +95,13 @@ DATASETS = NULL
 # SEX = c("male")
 
 ##################
-
+print(getwd())
 if (is.null(DATASETS)) {
   DATASETS = list()
   
   counter = 0
   for (input in c("droplet", "facs")) {
-    seurat_obj = readRDS(glue("../data/seurat_shared_tms_{input}.rds"))
+    seurat_obj = readRDS(glue("../../scDiffCom/data/seurat_shared_tms_{input}.rds"))
     tissues = unique(seurat_obj[[]]$tissue)
     for (tissue in tissues) {
       for (sex in c("male", "female")) {
