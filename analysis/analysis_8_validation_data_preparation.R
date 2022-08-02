@@ -11,7 +11,7 @@
 ####################################################
 ##
 
-## Pancreas (human) secretomics (Li et al. 2022) ####
+## hPDE secretomics (Li et al. 2022) ####
 
 # read spreadsheet
 val_pancreas <- openxlsx::read.xlsx(
@@ -1320,6 +1320,24 @@ dt_cci_rel[
   )
 ]
 
+dt_cci_sex <- merge.data.table(
+  dt_cci_sex,
+  dt_lri_mouse_val[, c("LRI", names(val_all)), with = FALSE],
+  by = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
+
+dt_cci_sex[
+  ,
+  dataset_tissue := paste(
+    dataset,
+    tissue,
+    sep = "_"
+  )
+]
+
 ## ORA function on validation #####
 
 run_ora_validation <- function(
@@ -1475,16 +1493,17 @@ dt_cci_secr_validation2 <- rbindlist(
   use.names = TRUE
 )
 
-
-dt_cci_secr_validation
-dt_cci_secr_validation2
-
 dt_cci_secr_validation_full <- rbindlist(
   list(
     dt_cci_secr_validation,
     dt_cci_secr_validation2
   )
 )
+
+dt_cci_secr_validation_full[
+   ,
+  recall := CAT_LR / (CAT_LR + CAT_notLR)
+]
 
 fwrite(
   dt_cci_secr_validation_full,
@@ -1497,196 +1516,185 @@ fwrite(
 ## Specific results of interest to select ####
 
 # huvec
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "huvec" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    color = -log10(BH + 1E-70)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
-  ggplot2::scale_color_gradient(low = "orange", high = "red") +
-  ggplot2::xlab(paste0("ORA score ", regulation)) +
-  ggplot2::ylab("") +
-  ggplot2::labs(
-    size = "-log10(Adj. P-Value)",
-    color = "log2(Odds Ratio)",
-    caption = extra_label_annotation
-  ) +
-  ggplot2::theme(text = ggplot2::element_text(size = 14)) +
-  ggplot2::theme(legend.position = c(0.8, 0.3)) +
-  ggplot2::theme(legend.title = ggplot2::element_text(size = 12)) +
-  ggplot2::theme(legend.text = ggplot2::element_text(size = 12)) +
-  ggplot2::theme(plot.title.position = "plot") +
-  ggplot2::ggtitle(
-    paste0(
-      "Top ",
-      n_row_tokeep,
-      " ",
-      regulation,
-      " ",
-      category_label
-    )
-  )
+dt_val_huvec_fam <- dt_cci_secr_validation_full[
+  validation_set == "huvec" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
 
-# macro
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "macro" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    color = -log10(BH + 1E-195)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
+
+#macro
+dt_val_macro_fam <- dt_cci_secr_validation_full[
+  validation_set == "macro" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
 
 #mscat
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "mscat" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    color = -log10(BH + 1E-180)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
+dt_val_mscat_fam <- dt_cci_secr_validation_full[
+  validation_set == "mscat" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
 
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "mscat" &
-    group_type == "dataset_tissue" &
-    category_type == "EMITTER_CELLTYPE"
-  ][grepl("Adipose", group)],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(BH),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
+dt_val_mscat_at <-   dt_cci_secr_validation_full[
+  validation_set == "mscat" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Adipose", group)]
 
 #neurons
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "neurons" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(BH + 1E-60)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
+dt_val_neuron_fam <-   dt_cci_secr_validation_full[
+  validation_set == "neurons" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
 
 #glial
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "glia" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(BH + 1E-126)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
-
-names(val_all)
+dt_val_glial_fam <-   dt_cci_secr_validation_full[
+  validation_set == "glia" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
 
 #cardio
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "cardio" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    color = -log10(BH + 1E-189)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
+dt_val_cardio_fam <-   dt_cci_secr_validation_full[
+  validation_set == "cardio" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
 
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "cardio" &
-    group_type == "dataset_tissue" &
-    category_type == "EMITTER_CELLTYPE"
-  ][grepl("Heart", group)],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(BH),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
-)
+dt_val_cardio_heart <- dt_cci_secr_validation_full[
+  validation_set == "cardio" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Heart", group)]
 
 #pancreas
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "pancreas" &
-    group_type == "none" &
-    category_type == "EMITTER_CELLFAMILY_2"
-  ][category != "leukocyte"],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    color = -log10(BH + 1E-250)
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
+dt_val_pancreas_fam <-   dt_cci_secr_validation_full[
+  validation_set == "pancreas" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+dt_val_pancreas_pct <-   dt_cci_secr_validation_full[
+  validation_set == "pancreas" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Pancreas", group)]
+
+## Rename validation in cci and related datasets ####
+
+dt_cci_age <- copy(dt_cci_rel)
+dt_cci_age[
+  ,
+  c(
+    "pancreas_hpde", "pancreas_can_up", "pancreas_can_down",
+    "cardio_hyp_up", "cardio_hyp_down", "macro_up", "macro_down",
+    "endo", "mscat_hfd", "msccomb", "astro", "micro", "oligo",
+    "fibro_ras_up", "fibro_ataz_up", "fibro_xir_up", "fibro_ras_down",
+    "fibro_xir_down", "epi_xir_up", "epi_xir_down"
+  ) := NULL
+]
+setnames(
+  dt_cci_age,
+  old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
+  new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
 )
 
-ggplot(
-  dt_cci_secr_validation_full[
-    validation_set == "pancreas" &
-    group_type == "dataset_tissue" &
-    category_type == "EMITTER_CELLTYPE"
-  ][grepl("Pancreas", group)],
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(BH),
-    color = group
+dt_cci_sex[
+  ,
+  c(
+    "pancreas_hpde", "pancreas_can_up", "pancreas_can_down",
+    "cardio_hyp_up", "cardio_hyp_down", "macro_up", "macro_down",
+    "endo", "mscat_hfd", "msccomb", "astro", "micro", "oligo",
+    "fibro_ras_up", "fibro_ataz_up", "fibro_xir_up", "fibro_ras_down",
+    "fibro_xir_down", "epi_xir_up", "epi_xir_down"
+  ) := NULL
+]
+setnames(
+  dt_cci_sex,
+  old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
+  new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
+)
+
+
+dt_secr_validation_final <- dt_cci_secr_validation_full[
+  validation_set %in% c(
+    "pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"
   )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1, linetype = "dotted"
+]
+dt_secr_validation_final[
+  ,
+  validation_set := ifelse(
+    validation_set == "pancreas",
+    "hPDE",
+    ifelse(
+      validation_set == "cardio",
+      "rCM",
+      ifelse(
+        validation_set == "macro",
+        "mBBM",
+        ifelse(
+          validation_set == "huvec",
+          "hUVEC",
+          ifelse(
+            validation_set == "mscat",
+            "mMSC-AT",
+            ifelse(
+              validation_set == "neurons",
+              "mNeuron",
+              "mGlial"
+            )
+          )
+        )
+      )
+    )
+  )
+]
+table(dt_secr_validation_final$validation_set)
+
+saveRDS(
+  dt_secr_validation_final,
+  paste0(
+    path_scagecom_output,
+    "dt_secr_validation_final.rds"
+  ) 
+)
+fwrite(
+  dt_secr_validation_final,
+  paste0(
+    path_scagecom_output,
+    "dt_secr_validation_final.csv"
+  )
+)
+
+saveRDS(
+  dt_cci_age,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_age.rds"
+  )
+)
+fwrite(
+  dt_cci_age,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_age.csv"
+  )
+)
+
+saveRDS(
+  dt_cci_sex,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_sex.rds"
+  )
+)
+fwrite(
+  dt_cci_sex,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_sex.csv"
+  )
 )
