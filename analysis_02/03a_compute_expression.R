@@ -23,7 +23,7 @@ DATASETS = list()
 
 counter = 0
 for (input in c("droplet", "facs")) {
-  seurat_obj = readRDS(glue("../data/seurat_shared_tms_{input}.rds"))
+  seurat_obj = readRDS(glue("../../scDiffCom/data/seurat_shared_tms_{input}.rds"))
   tissues = unique(seurat_obj[[]]$tissue)
   for (tissue in tissues) {
     for (sex in c("male", "female")) {
