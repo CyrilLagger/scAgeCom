@@ -1698,3 +1698,20 @@ fwrite(
     "dt_cci_sex.csv"
   )
 )
+
+dt_lri_mouse_val_clean <- copy(dt_lri_mouse_val)
+dt_lri_mouse_val_clean[
+  ,
+  c(
+    "pancreas_hpde", "pancreas_can_up", "pancreas_can_down",
+    "cardio_hyp_up", "cardio_hyp_down", "macro_up", "macro_down",
+    "endo", "mscat_hfd", "msccomb", "astro", "micro", "oligo",
+    "fibro_ras_up", "fibro_ataz_up", "fibro_xir_up", "fibro_ras_down",
+    "fibro_xir_down", "epi_xir_up", "epi_xir_down"
+  ) := NULL
+]
+setnames(
+  dt_lri_mouse_val_clean,
+  old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
+  new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
+)
