@@ -141,6 +141,19 @@ dt_cci_sex[
 
 dt_ora_sex <- dt_ora_full_diffsex[!grepl("combined", dataset)]
 
+## Full list of Seurat genes ####
+
+seurat_genes <- lapply(
+  seurats_analysis,
+  rownames
+)
+seurat_genes$calico <- unique(
+  c(seurat_genes$calico_kidney,
+  seurat_genes$calico_lung,
+  seurat_genes$calico_spleen
+  )
+)
+
 ## General LRI statistics ####
 
 dt_lri_human
@@ -269,17 +282,6 @@ NLRI_template[, mean(N)]
 NLRI_template[, sd(N)]
 
 ## LRI not detected at all and counts of detection for each LRI per dataset ####
-
-seurat_genes <- lapply(
-  seurats_analysis,
-  rownames
-)
-seurat_genes$calico <- unique(
-  c(seurat_genes$calico_kidney,
-  seurat_genes$calico_lung,
-  seurat_genes$calico_spleen
-  )
-)
 
 LRI_template <- LRI_mouse$LRI_curated[, 1:6]
 
