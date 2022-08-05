@@ -43,6 +43,46 @@ dt_ora_key_counts <- rbindlist(
       ],
       on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
       `Overall (Union)` := i.N
+    ][
+      unique(
+        copy(dt_ora_full[
+          dataset %in% c(
+            "Calico Droplet (male)", "TMS Droplet (male)", "TMS FACS (male)"
+          )
+        ][
+          ORA_REGULATION %in% c("UP", "UP:DOWN"),
+          c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+        ])[, ORA_REGULATION := "UP"][
+          ,
+          -c("dataset")
+        ]
+      )[
+        ,
+        .N,
+        by = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+      ],
+      on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
+      `Overall Male (Union)` := i.N
+    ][
+      unique(
+        copy(dt_ora_full[
+          dataset %in% c(
+            "TMS Droplet (female)", "TMS FACS (female)"
+          )
+        ][
+          ORA_REGULATION %in% c("UP", "UP:DOWN"),
+          c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+        ])[, ORA_REGULATION := "UP"][
+          ,
+          -c("dataset")
+        ]
+      )[
+        ,
+        .N,
+        by = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+      ],
+      on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
+      `Overall Female (Union)` := i.N
     ],
     dcast.data.table(
       copy(dt_ora_full[!grepl("mixed", dataset)][
@@ -72,6 +112,46 @@ dt_ora_key_counts <- rbindlist(
       ],
       on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
       `Overall (Union)` := i.N
+    ][
+      unique(
+        copy(dt_ora_full[
+          dataset %in% c(
+            "Calico Droplet (male)", "TMS Droplet (male)", "TMS FACS (male)"
+          )
+        ][
+          ORA_REGULATION %in% c("DOWN", "UP:DOWN"),
+          c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+        ])[, ORA_REGULATION := "DOWN"][
+          ,
+          -c("dataset")
+        ]
+      )[
+        ,
+        .N,
+        by = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+      ],
+      on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
+      `Overall Male (Union)` := i.N
+    ][
+      unique(
+        copy(dt_ora_full[
+          dataset %in% c(
+            "TMS Droplet (female)", "TMS FACS (female)"
+          )
+        ][
+          ORA_REGULATION %in% c("DOWN", "UP:DOWN"),
+          c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+        ])[, ORA_REGULATION := "DOWN"][
+          ,
+          -c("dataset")
+        ]
+      )[
+        ,
+        .N,
+        by = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+      ],
+      on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
+      `Overall Female (Union)` := i.N
     ],
     dcast.data.table(
       copy(dt_ora_full[!grepl("mixed", dataset)][
@@ -101,6 +181,46 @@ dt_ora_key_counts <- rbindlist(
       ],
       on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
       `Overall (Union)` := i.N
+    ][
+      unique(
+        copy(dt_ora_full[
+          dataset %in% c(
+            "Calico Droplet (male)", "TMS Droplet (male)", "TMS FACS (male)"
+          )
+        ][
+          ORA_REGULATION %in% c("FLAT"),
+          c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+        ])[, ORA_REGULATION := "FLAT"][
+          ,
+          -c("dataset")
+        ]
+      )[
+        ,
+        .N,
+        by = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+      ],
+      on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
+      `Overall Male (Union)` := i.N
+    ][
+      unique(
+        copy(dt_ora_full[
+          dataset %in% c(
+            "TMS Droplet (female)", "TMS FACS (female)"
+          )
+        ][
+          ORA_REGULATION %in% c("FLAT"),
+          c("dataset", "tissue", "ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+        ])[, ORA_REGULATION := "FLAT"][
+          ,
+          -c("dataset")
+        ]
+      )[
+        ,
+        .N,
+        by = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE")
+      ],
+      on = c("ORA_CATEGORY", "ORA_REGULATION", "VALUE"),
+      `Overall Female (Union)` := i.N
     ]
   )
 )
