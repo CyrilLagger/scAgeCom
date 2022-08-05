@@ -11,6 +11,11 @@
 ####################################################
 ##
 
+## Library ####
+
+library(openxlsx)
+library(ggplot2)
+
 ## hPDE secretomics (Li et al. 2022) ####
 
 # read spreadsheet
@@ -414,28 +419,28 @@ setnames(
 )
 val_cardio_genes[
   ,
-  mgi_symbol := ifelse(
-    is.na(mgi_symbol),
+  mmusculus_homolog := ifelse(
+    is.na(mmusculus_homolog),
     gene,
-    mgi_symbol
+    mmusculus_homolog
   )
 ]
-val_cardio_genes[mgi_symbol != gene]
+val_cardio_genes[mmusculus_homolog != gene]
 
 # select genes that are in LRI
 val_cardio_lr <- sort(val_cardio_genes[
-  mgi_symbol %in% genes_lri_mouse
-]$mgi_symbol)
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
 
 # select genes that are in LRI and diff with hypoxia
 val_cardio_lr_hyp_up <- unique(val_cardio_genes[
   gene %in% val_cardio[diff_total == "UP"]$gene &
-  mgi_symbol %in% genes_lri_mouse
-]$mgi_symbol)
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
 val_cardio_lr_hyp_down <- unique(val_cardio_genes[
   gene %in% val_cardio[diff_total == "DOWN"]$gene &
-  mgi_symbol %in% genes_lri_mouse
-]$mgi_symbol)
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
 
 ## Brain mouse secretomics (Tushaus et al. 2020) ####
 
@@ -1224,6 +1229,11 @@ val_dt[
   )
 ]
 
+val_upset_keep <- c(
+  "pancreas", "huvec", "macro", "mscat",
+  "neurons", "glia", "cardio"
+)
+
 val_dt_selection <- val_dt[
   ,
   c("gene", val_upset_keep),
@@ -1242,10 +1252,6 @@ val_dt_selection[
 
 sort(val_dt_selection[N >= 6]$gene)
 
-val_upset_keep <- c(
-  "pancreas", "huvec", "macro", "mscat",
-  "neurons", "glia", "cardio"
-)
 ComplexUpset::upset(
   as.data.frame(
     val_dt[
@@ -1432,7 +1438,6 @@ allow.cartesian = TRUE][, k := NULL]
 
 options(future.globals.maxSize = 15 * 1024^3)
 future::plan(multicore, workers = 20)
-#future::plan(sequential)
 
 dt_ora_validation_groups_p <- dt_ora_validation_groups[
   category %in% c(
@@ -1521,7 +1526,6 @@ dt_val_huvec_fam <- dt_cci_secr_validation_full[
   group_type == "none" &
   category_type == "EMITTER_CELLFAMILY_2"
 ][category != "leukocyte"]
-
 
 #macro
 dt_val_macro_fam <- dt_cci_secr_validation_full[
@@ -1618,7 +1622,6 @@ setnames(
   new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
 )
 
-
 dt_secr_validation_final <- dt_cci_secr_validation_full[
   validation_set %in% c(
     "pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"
@@ -1659,7 +1662,7 @@ saveRDS(
   paste0(
     path_scagecom_output,
     "dt_secr_validation_final.rds"
-  ) 
+  )
 )
 fwrite(
   dt_secr_validation_final,
