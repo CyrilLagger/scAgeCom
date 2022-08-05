@@ -1718,3 +1718,30 @@ setnames(
   old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
   new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
 )
+
+dt_lri_mouse_val_clean[
+  dcast.data.table(
+    melt.data.table(
+      dt_lri_mouse_val_clean[
+        ,
+        c(
+          "LRI", "hPDE", "rCM", "mBBM", "hUVEC",
+          "mMSC-AT", "mNeuron", "mGlial"
+        )
+      ],
+      id.vars = "LRI"
+    )[
+      ,
+      value := value != "NO"
+    ][
+      value == TRUE
+    ],
+    LRI ~ .,
+    value.var = "variable",
+    fun.aggregate = function(i) {
+      paste(sort(i), collapse = "/")
+    }
+  ),
+  on = "LRI",
+  summary_val := i..
+]
