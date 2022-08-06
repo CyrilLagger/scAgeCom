@@ -1745,3 +1745,27 @@ dt_lri_mouse_val_clean[
   on = "LRI",
   summary_val := i..
 ]
+
+dt_lri_mouse_val_clean[
+  dcast.data.table(
+    melt.data.table(
+      dt_lri_mouse_val_clean[
+        ,
+        c(
+          "LRI", "L1_N_agepmid", "L2_N_agepmid",
+          "R1_N_agepmid", "R2_N_agepmid", "R3_N_agepmid"
+        )
+      ],
+      id.vars = "LRI"
+    )[
+      !is.na(value)
+    ],
+    LRI ~ .,
+    value.var = "value",
+    fun.aggregate = function(i) {
+      paste(i, collapse = "_")
+    }
+  ),
+  on = "LRI",
+  pubmed := i..
+]
