@@ -1769,3 +1769,27 @@ dt_lri_mouse_val_clean[
   on = "LRI",
   pubmed := i..
 ]
+
+dt_lri_mouse_val_clean[
+  dcast.data.table(
+    melt.data.table(
+      dt_lri_mouse_val_clean[
+        ,
+        c(
+          "LRI", "HAGR_L1", "HAGR_L2",
+          "HAGR_R1", "HAGR_R2", "HAGR_R3"
+        )
+      ],
+      id.vars = "LRI"
+    )[
+      !is.na(value)
+    ],
+    LRI ~ .,
+    value.var = "value",
+    fun.aggregate = function(i) {
+      paste(i, collapse = "_")
+    }
+  ),
+  on = "LRI",
+  "HAGR" := i..
+]
