@@ -256,15 +256,14 @@ aging_go_immune_topm10 <- c(
 table(
     aging_go_immune_topm10 %in% dt_ora_key_counts$VALUE
 )
-
 aging_go_immune_topm10 <- dt_ora_key_counts[
     ORA_CATEGORY == "GO_TERMS" &
     VALUE %in% aging_go_immune_topm10 &
     ORA_REGULATION == "UP" &
     `Overall (Union)` >= 10
-]$VALUE
+]
 
-# select KEGG pws of interest in more than 10 tissues #
+# select KEGG pws of interest in more than 10 tissues
 
 aging_kegg_immune_topm10 <- c(
     "Human immunodeficiency virus 1 infection",
@@ -281,13 +280,12 @@ aging_kegg_immune_topm10 <- c(
 table(
     aging_kegg_immune_topm10 %in% dt_ora_key_counts$VALUE
 )
-
 aging_kegg_immune_topm10 <- dt_ora_key_counts[
     ORA_CATEGORY == "KEGG_PWS" &
     VALUE %in% aging_kegg_immune_topm10 &
     ORA_REGULATION == "UP" &
     `Overall (Union)` >= 10
-]$VALUE
+]
 
 # ER_celltype overrepresentation
 
@@ -298,41 +296,23 @@ aging_er_immune <- dt_ora_key_counts[
     `Overall (Union)` >= 10
 ]
 
-#select LRI based on go/kegg terms ####
+#select LRI based on go/kegg terms 
 
 aging_dt_lri_fom_go_immune <- dt_ora_key_counts[
     ORA_CATEGORY == "LRI" &
     VALUE %in% scDiffCom::LRI_mouse$LRI_curated_GO[
         GO_ID %in% scDiffCom::gene_ontology_level[
-            NAME %in% aging_go_immune_topm10
+            NAME %in% aging_go_immune_topm10$VALUE
         ]$ID
     ]$LRI &
     ORA_REGULATION == "UP"
 ]
-aging_dt_lri_fom_go_immune <- merge.data.table(
-    aging_dt_lri_fom_go_immune,
-    dt_lri_mouse[, c("LRI", pmid_colnames, hagr_colnames), with = FALSE],
-    by.x = "VALUE",
-    by.y = "LRI",
-    all.x = TRUE,
-    all.y = FALSE,
-    sort = FALSE
-)
 aging_dt_lri_fom_kegg_immune <- dt_ora_key_counts[
     ORA_CATEGORY == "LRI" &
     VALUE %in% scDiffCom::LRI_mouse$LRI_curated_KEGG[
         KEGG_NAME %in% aging_kegg_immune_topm10
     ]$LRI
 ]
-aging_dt_lri_fom_kegg_immune <- merge.data.table(
-    aging_dt_lri_fom_kegg_immune,
-    dt_lri_mouse[, c("LRI", pmid_colnames, hagr_colnames), with = FALSE],
-    by.x = "VALUE",
-    by.y = "LRI",
-    all.x = TRUE,
-    all.y = FALSE,
-    sort = FALSE
-)
 
 aging_lri_from_gokegg_immune <- c(
     "B2m:Cd3g", "B2m:Cd3d", "H2-D1:Cd8b1",
@@ -343,21 +323,22 @@ aging_lri_from_gokegg_immune <- c(
     "Tnfsf12:Tnfrsf12a", "Ccl11:Cxcr3",
     #"H2-M3:Cd8b1",
     #"H2-T22:Cd8b1",
-    "Slpi:Plscr1"
+    "Slpi:Plscr1",
+    "Hmgb1:Ager"
 )
-
 table(
     aging_lri_from_gokegg_immune %in% dt_ora_key_counts$VALUE
 )
-
 aging_dt_lri_immune <- dt_ora_key_counts[
     ORA_CATEGORY == "LRI" &
-    ORA_REGULATION == "UP" & 
+    ORA_REGULATION == "UP" &
     VALUE %in% aging_lri_from_gokegg_immune
 ]
+
+# add aging information
 aging_dt_lri_immune <- merge.data.table(
   aging_dt_lri_immune,
-  dt_lri_mouse[, c("LRI", pmid_colnames, hagr_colnames), with = FALSE],
+  dt_lri_mouse_val_clean[, c("LRI", "pubmed", "HAGR"), with = FALSE],
   by.x = "VALUE",
   by.y = "LRI",
   all.x = TRUE,
@@ -371,7 +352,7 @@ aging_dt_lri_immune <- merge.data.table(
   aging_dt_lri_immune,
   dt_lri_mouse_val_clean[, c(
     "LRI",
-    "hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial"),
+    "summary_val"),
     with = FALSE],
   by.x = "VALUE",
   by.y = "LRI",
@@ -380,23 +361,31 @@ aging_dt_lri_immune <- merge.data.table(
   sort = FALSE
 )
 
+# full table
+aging_dt_immune <- rbindlist(
+    list(
+        aging_dt_lri_immune,
+        aging_go_immune_topm10,
+        aging_kegg_immune_topm10,
+        aging_er_immune
+    ),
+    fill = TRUE,
+    use.names = TRUE
+)
+
 # add sex results
 
-dt_cci_sex[LRI == "B2m:Cd247"][
-  , .N, by = c("dataset", "tissue", "REGULATION")
-][order(-N)][REGULATION %in% c("UP", "DOWN")]
-
-dt_ora_sex[VALUE == "H2-K1:Cd8a"][
-  ,
-  .N,
-  by = c("ORA_REGULATION")
-]
-
-dt_ora_rel[VALUE == "Ccl11:Cxcr3"][
-  ,
-  .N,
-  by = c("ORA_REGULATION")
-]
+aging_dt_immune_sex <- merge.data.table(
+    aging_dt_immune,
+    dt_ora_key_counts_diffsex[
+        ORA_REGULATION %in% c("UP", "DOWN")
+    ],
+    by = c("ORA_CATEGORY", "VALUE"),
+    all.x = TRUE,
+    all.y = FALSE,
+    sort = FALSE,
+    suffixes = c("_age", "_sex")
+)
 
 #most interesting new finding is Slpi:Plscr1
 
@@ -406,93 +395,78 @@ pmid_aging_lri[["Plscr1"]]
 dt_ora_key_summary[VALUE == "Slpi:Plscr1" & ORA_REGULATION == "UP"]
 table(dt_cci_rel[LRI == "Slpi:Plscr1"]$REGULATION)
 
-dt_cci_slpi_plscr1 <- dt_cci_rel[
+table(dt_cci_age[
     LRI == "Slpi:Plscr1" & REGULATION == "UP"
-]
+]$dataset_tissue)
+
+dt_cci_age[
+    LRI == "Slpi:Plscr1" & REGULATION == "UP" &
+    grepl("arrow", tissue)
+]$CCI
+
+sort(table(dt_cci_age[
+    LRI == "Slpi:Plscr1" & REGULATION == "UP"
+]$EMITTER_CELLTYPE))
+
+sort(table(dt_cci_age[
+    LRI == "Slpi:Plscr1" & REGULATION == "UP"
+]$RECEIVER_CELLTYPE))
+
+sort(table(dt_cci_age[
+    LRI == "Slpi:Plscr1" & REGULATION == "UP"
+]$ER_CELLTYPE))
 
 ## Lipid metabolism ####
 
 # select GO terms of interest in more than 10 tissues
-# from shiny_dt_ora_key_counts
 
-aging_go_lipmet_topm10 <- c(
-    #"cellular macromolecule metabolic process",
-    "lipid metabolic process",
-    "metabolic process",
-    "cellular lipid metabolic process",
-    "lipid catabolic process",
-    "lipoprotein metabolic process",
-    "positive regulation of lipid localization",
-    "positive regulation of lipid metabolic process",
-    "regulation of lipid localization",
-    "fatty acid biosynthetic process",
-    "fatty acid metabolic process",
-    "lipid biosynthetic process"
+aging_go_lipmed_candidates <- unique(
+        dt_ora_key_counts[
+        ORA_CATEGORY == "GO_TERMS" &
+        (grepl("fat", VALUE) | grepl("lip", VALUE) |
+         grepl("chole", VALUE))
+    ]$VALUE
 )
-
-table(
-    aging_go_lipmet_topm10 %in% dt_ora_key_counts$VALUE
-)
-
 aging_go_lipmet_topm10 <- dt_ora_key_counts[
     ORA_CATEGORY == "GO_TERMS" &
-    VALUE %in% aging_go_lipmet_topm10 &
+    VALUE %in% aging_go_lipmed_candidates &
     ORA_REGULATION %in% c("UP", "DOWN") &
     `Overall (Union)` >= 10
-]$VALUE
+]
 
 # select KEGG pws of interest in more than 10 tissues #
 
-aging_kegg_lipmet_topm10 <- c(
-    "Cholesterol metabolism"
+aging_kegg_lipmed_candidates <- unique(
+        dt_ora_key_counts[
+        ORA_CATEGORY == "KEGG_PWS" &
+        (grepl("fat", VALUE) | grepl("lip", VALUE) |
+         grepl("Chole", VALUE))
+    ]$VALUE
 )
-
-table(
-    aging_kegg_lipmet_topm10 %in% dt_ora_key_counts$VALUE
-)
-
 aging_kegg_lipmet_topm10 <- dt_ora_key_counts[
     ORA_CATEGORY == "KEGG_PWS" &
-    VALUE %in% aging_kegg_lipmet_topm10 &
+    VALUE %in% aging_kegg_lipmed_candidates &
     ORA_REGULATION %in% c("UP", "DOWN") &
     `Overall (Union)` >= 10
-]$VALUE
+]
 
-#select LRI based on go/kegg terms ####
+#select LRI based on go/kegg terms
 
 aging_dt_lri_fom_go_lipmet <- dt_ora_key_counts[
     ORA_CATEGORY == "LRI" &
     VALUE %in% scDiffCom::LRI_mouse$LRI_curated_GO[
         GO_ID %in% scDiffCom::gene_ontology_level[
-            NAME %in% aging_go_lipmet_topm10
+            NAME %in% aging_go_lipmet_topm10$VALUE
         ]$ID
-    ]$LRI
+    ]$LRI &
+    ORA_REGULATION %in% c("UP", "DOWN")
 ]
-aging_dt_lri_fom_go_lipmet <- merge.data.table(
-    aging_dt_lri_fom_go_lipmet,
-    dt_lri_mouse[, c("LRI", pmid_colnames, hagr_colnames), with = FALSE],
-    by.x = "VALUE",
-    by.y = "LRI",
-    all.x = TRUE,
-    all.y = FALSE,
-    sort = FALSE
-)
 aging_dt_lri_fom_kegg_lipmet <- dt_ora_key_counts[
     ORA_CATEGORY == "LRI" &
     VALUE %in% scDiffCom::LRI_mouse$LRI_curated_KEGG[
-        KEGG_NAME %in% aging_kegg_lipmet_topm10
+        KEGG_NAME %in% aging_kegg_lipmet_topm10$VALUE
     ]$LRI
 ]
-aging_dt_lri_fom_kegg_lipmet <- merge.data.table(
-    aging_dt_lri_fom_kegg_lipmet,
-    dt_lri_mouse[, c("LRI", pmid_colnames, hagr_colnames), with = FALSE],
-    by.x = "VALUE",
-    by.y = "LRI",
-    all.x = TRUE,
-    all.y = FALSE,
-    sort = FALSE
-)
-
 aging_lri_from_gokegg_lipmed <- c(
     "Apoe:Sdc4", "Apoe:Lrp1", "App:Lrp10", "Apoe:Ldlr", "Apoa1:Ldlr",
     "F13a1:Itgb1", "App:Cav1", "App:Ncstn", "App:Notch2",
@@ -504,31 +478,46 @@ aging_lri_from_gokegg_lipmed <- c(
 table(
     aging_lri_from_gokegg_lipmed %in% dt_ora_key_counts$VALUE
 )
-
 aging_dt_lri_lipmed <- dt_ora_key_counts[
     ORA_CATEGORY == "LRI" &
     ORA_REGULATION %in% c("UP", "DOWN") &
     VALUE %in% aging_lri_from_gokegg_lipmed
 ]
 
-####################################################
-aging_dt_lri_immune <- merge.data.table(
-  aging_dt_lri_immune,
-  dt_lri_mouse[, c("LRI", pmid_colnames, hagr_colnames), with = FALSE],
+#select Ligands based on go/kegg terms
+aging_dt_ligand_fom_go_lipmet <- dt_ora_key_counts[
+    ORA_CATEGORY == "LIGAND_COMPLEX" &
+    VALUE %in% unlist(strsplit(scDiffCom::LRI_mouse$LRI_curated_GO[
+        GO_ID %in% scDiffCom::gene_ontology_level[
+            NAME %in% aging_go_lipmet_topm10$VALUE
+        ]$ID
+    ]$LRI, ":")) &
+    ORA_REGULATION %in% c("UP", "DOWN")
+]
+aging_dt_ligand_fom_kegg_lipmet <- dt_ora_key_counts[
+    ORA_CATEGORY == "LIGAND_COMPLEX" &
+    VALUE %in% unlist(strsplit(scDiffCom::LRI_mouse$LRI_curated_KEGG[
+        KEGG_NAME %in% aging_kegg_lipmet_topm10$VALUE
+    ]$LRI, ":"))
+]
+
+# add aging information
+aging_dt_lri_lipmed <- merge.data.table(
+  aging_dt_lri_lipmed,
+  dt_lri_mouse_val_clean[, c("LRI", "pubmed", "HAGR"), with = FALSE],
   by.x = "VALUE",
   by.y = "LRI",
   all.x = TRUE,
   all.y = FALSE,
   sort = FALSE
 )
-#careful H2-XX (HLA in human) should be more represented
 
 # add validation results
-aging_dt_lri_immune <- merge.data.table(
-  aging_dt_lri_immune,
+aging_dt_lri_lipmed <- merge.data.table(
+  aging_dt_lri_lipmed,
   dt_lri_mouse_val_clean[, c(
     "LRI",
-    "hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial"),
+    "summary_val"),
     with = FALSE],
   by.x = "VALUE",
   by.y = "LRI",
@@ -537,27 +526,104 @@ aging_dt_lri_immune <- merge.data.table(
   sort = FALSE
 )
 
+# full table
+aging_dt_lipmed <- rbindlist(
+    list(
+        aging_dt_lri_lipmed,
+        aging_go_lipmet_topm10,
+        aging_kegg_lipmet_topm10
+    ),
+    fill = TRUE,
+    use.names = TRUE
+)
+
 # add sex results
 
-dt_cci_sex[LRI == "B2m:Cd247"][
-  , .N, by = c("dataset", "tissue", "REGULATION")
-][order(-N)][REGULATION %in% c("UP", "DOWN")]
+aging_dt_lipmed_sex <- merge.data.table(
+    aging_dt_lipmed,
+    dt_ora_key_counts_diffsex[
+        ORA_REGULATION %in% c("UP", "DOWN")
+    ],
+    by = c("ORA_CATEGORY", "VALUE"),
+    all.x = TRUE,
+    all.y = FALSE,
+    sort = FALSE,
+    suffixes = c("_age", "_sex")
+)
 
-dt_ora_sex[VALUE == "H2-K1:Cd8a"][
-  ,
-  .N,
-  by = c("ORA_REGULATION")
+# App:Lrp10 sex-dependent
+
+dt_ora_key_summary[
+    VALUE == "App:Lrp10" &
+    grepl("TMS", dataset)
 ]
 
-dt_ora_rel[VALUE == "Ccl11:Cxcr3"][
-  ,
-  .N,
-  by = c("ORA_REGULATION")
+test <- merge.data.table(
+    dcast.data.table(
+        dt_ora_key_summary[
+            VALUE == "App:Lrp10" &
+            grepl("TMS", dataset)
+        ],
+        tissue ~ dataset,
+        value.var = "ORA_REGULATION"
+    ),
+    dcast.data.table(
+        dt_ora_key_summary_diffsex[
+            VALUE == "App:Lrp10" &
+            grepl("TMS", dataset) &
+            !grepl("combined", dataset)
+        ],
+        tissue ~ dataset,
+        value.var = "ORA_REGULATION"
+    ),
+    by = "tissue",
+    all = TRUE
+)
+
+dt_ora_key_summary_diffsex[
+    VALUE == "App:Lrp10" &
+    grepl("TMS", dataset) &
+    !grepl("combined", dataset)
 ]
 
-#most interesting new finding is 
+dt_ora_key_summary_diffsex[
+    VALUE == "App:Lrp10" &
+    ORA_REGULATION %in% c("UP", "DOWN")
+]
 
+dt_ora_key_summary[
+    VALUE == "App" &
+    dataset_tissue %in% c(
+        "TMS FACS (male)_Brain",
+        "TMS FACS (female)_Brain"
+    )
+]
 
+dt_ora_key_summary_diffsex[
+    VALUE == "App" &
+    dataset_tissue %in% c(
+        "TMS FACS (young)_Brain",
+        "TMS FACS (old)_Brain"
+    )
+]
+
+dt_ora_key_summary[
+    VALUE == "Apoe" &
+    dataset_tissue %in% c(
+        "TMS FACS (male)_Brain",
+        "TMS FACS (female)_Brain"
+    )
+]
+
+dt_ora_key_summary_diffsex[
+    VALUE == "Apoe" &
+    dataset_tissue %in% c(
+        "TMS FACS (young)_Brain",
+        "TMS FACS (old)_Brain"
+    )
+]
+
+#Apoe:Sdc4 is interesting based on longevity and lipid
 
 
 # interest in the following up LRI for (not really lipid, move below)
@@ -578,22 +644,165 @@ aging_lri_from_gokegg_lipmed <- dt_lri_mouse[
     LRI %in% aging_lri_from_gokegg_lipmed
 ]
 
-#Apoe:Sdc4 is interesting based on longevity and lipid
+## ECM ####
 
-pmid_aging_lri[["Sdc4"]]
+# select GO terms of interest in more than 10 tissues
+# from shiny_dt_ora_key_counts
 
-#most interesting new finding is xxx
-
-
-
-dt_ora_key_summary[VALUE == "Slpi:Plscr1" & ORA_REGULATION == "UP"]
-table(dt_cci_rel[LRI == "Slpi:Plscr1"]$REGULATION)
-
-dt_cci_slpi_plscr1 <- dt_cci_rel[
-    LRI == "Slpi:Plscr1" & REGULATION == "UP"
+aging_go_ecm_topm10 <- c(
+    "basement membrane",
+    "collagen-containing extracellular matrix",
+    "extracellular matrix",
+    "extracellular matrix organization",
+    "extracellular structure organization",
+    "biological adhesion",
+    "cell adhesion",
+    "cell-substrate adhesion",
+    "collagen binding",
+    "cell junction",
+    "cell junction organization",
+    "cell-matrix adhesion",
+    "cell-substrate junction",
+    "extracellular region",
+    "basement membrane organization",
+    "cell junction assembly",
+    "focal adhesion"
+)
+table(
+    aging_go_ecm_topm10 %in% dt_ora_key_counts$VALUE
+)
+aging_go_ecm_topm10 <- dt_ora_key_counts[
+    ORA_CATEGORY == "GO_TERMS" &
+    VALUE %in% aging_go_ecm_topm10 &
+    ORA_REGULATION == "DOWN" &
+    `Overall (Union)` >= 10
 ]
 
-# validation
+# select KEGG pws of interest in more than 10 tissues
+
+aging_kegg_ecm_topm10 <- c(
+    "ECM-receptor interaction",
+    "Focal adhesion"
+)
+table(
+    aging_kegg_ecm_topm10 %in% dt_ora_key_counts$VALUE
+)
+aging_kegg_ecm_topm10 <- dt_ora_key_counts[
+    ORA_CATEGORY == "KEGG_PWS" &
+    VALUE %in% aging_kegg_ecm_topm10 &
+    ORA_REGULATION == "DOWN" &
+    `Overall (Union)` >= 10
+]
+
+# ER_celltype overrepresentation
+
+aging_er_ecm <- dt_ora_key_counts[
+    ORA_CATEGORY == "ER_CELLFAMILIES" &
+    ORA_REGULATION == "DOWN" &
+    grepl("connective", VALUE) &
+    `Overall (Union)` >= 7
+]
+
+#select LRI based on go/kegg terms
+
+aging_dt_lri_fom_go_ecm <- dt_ora_key_counts[
+    ORA_CATEGORY == "LRI" &
+    VALUE %in% scDiffCom::LRI_mouse$LRI_curated_GO[
+        GO_ID %in% scDiffCom::gene_ontology_level[
+            NAME %in% aging_go_ecm_topm10$VALUE
+        ]$ID
+    ]$LRI &
+    ORA_REGULATION == "DOWN"
+]
+aging_dt_lri_fom_kegg_ecm <- dt_ora_key_counts[
+    ORA_CATEGORY == "LRI" &
+    VALUE %in% scDiffCom::LRI_mouse$LRI_curated_KEGG[
+        KEGG_NAME %in% aging_kegg_ecm_topm10$VALUE
+    ]$LRI &
+    ORA_REGULATION == "DOWN"
+]
+
+aging_lri_from_gokegg_ecm <- c(
+    "Sell:Cd34", "Adam17:Itgb1", "Adam9:Itgb1",
+    "Nid1:Itgb1", "Adam15:Itga9", "Adam15:Itgb1",
+    "Hspg2:Itgb1", "Mmp2:Itgb1", "Postn:Itgb1",
+    "Col4a2:Itgb1_Itga1", "Adam9:Itgb5", "Alcam:Nrp1",
+    "Col15a1:Itgb1_Itga1",
+    #"Fam3c:Lifr",
+    "Fbln1:Itgb1",
+    "Gcg:Dpp4", "Tgm2:Itgb1", "Adam9:Itgav", "Ccn4:Itgb1",
+    "Cdh1:Cdh1", "Cdh1:Itga1_Itgb1", "Ceacam1:Ceacam1",
+    "Col1a1:Sdc4", "Col1a2:Sdc4", "Col3a1:Ddr2",
+    "Col4a1:Itga9_Itgb1", "Col4a1:Itgb1_Itga1",
+    "Col4a2:Itga9_Itgb1", "Col4a2:Sdc4",
+    "Col5a2:Itgb1_Itga1", "Col6a1:Cd44",
+    "Col6a2:Itgb1_Itga1", "Col4a2:Itgb5",
+    "Col1a1:Cd44", "Col4a1:Cd44", "Col1a2:Cd36",
+    "Col1a2:Cd44"
+)
+table(
+    aging_lri_from_gokegg_ecm %in% dt_ora_key_counts$VALUE
+)
+aging_dt_lri_ecm <- dt_ora_key_counts[
+    ORA_CATEGORY == "LRI" &
+    ORA_REGULATION == "DOWN" &
+    VALUE %in% aging_lri_from_gokegg_ecm
+]
+
+# add aging information
+aging_dt_lri_ecm <- merge.data.table(
+  aging_dt_lri_ecm,
+  dt_lri_mouse_val_clean[, c("LRI", "pubmed", "HAGR"), with = FALSE],
+  by.x = "VALUE",
+  by.y = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
+
+# add validation results
+aging_dt_lri_ecm <- merge.data.table(
+  aging_dt_lri_ecm,
+  dt_lri_mouse_val_clean[, c(
+    "LRI",
+    "summary_val"),
+    with = FALSE],
+  by.x = "VALUE",
+  by.y = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
+
+# full table
+aging_dt_ecm <- rbindlist(
+    list(
+        aging_dt_lri_ecm,
+        aging_go_ecm_topm10,
+        aging_kegg_ecm_topm10,
+        aging_er_ecm
+    ),
+    fill = TRUE,
+    use.names = TRUE
+)
+
+# add sex results
+
+aging_dt_ecm_sex <- merge.data.table(
+    aging_dt_ecm,
+    dt_ora_key_counts_diffsex[
+        ORA_REGULATION %in% c("UP", "DOWN")
+    ],
+    by = c("ORA_CATEGORY", "VALUE"),
+    all.x = TRUE,
+    all.y = FALSE,
+    sort = FALSE,
+    suffixes = c("_age", "_sex")
+)
+
+#most interesting new finding is
+
+dt_lri_mouse[LRI == "Alcam:Nrp1"]
 
 ###############################################
 ## New LRI of interest ####
