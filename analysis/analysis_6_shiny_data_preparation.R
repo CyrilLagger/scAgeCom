@@ -446,7 +446,7 @@ shiny_dt_go_reduced <- shiny_dt_go_reduced[
 
 ## Process the cross-tissue keyword counts table ####
 
-shiny_dt_ora_key_counts <- copy(dt_ora_key_counts)
+shiny_dt_ora_key_counts <- copy(dt_ora_key_counts[, 1:9])
 
 shiny_dt_ora_key_counts[
   data.table(
@@ -564,15 +564,6 @@ shiny_dt_ora_key_counts[
   ),
 ]
 
-# shiny_dt_ora_key_counts[
-#   ,
-#   `TMS FACS (mixed)` :=  NULL
-# ]
-# shiny_dt_ora_key_counts[
-#   ,
-#   `TMS Droplet (mixed)` :=  NULL
-# ]
-
 ## Process the cross-tissue keyword summary table ####
 
 shiny_dt_ora_key_summary <- copy(dt_ora_key_summary)
@@ -668,7 +659,7 @@ shiny_all_lris <- shiny_dt_cci_full[
 
 shiny_all_genes <- rbindlist(
   lapply(
-    scds_datasets,
+    scds_datasets_diffage,
     function(dataset) {
       rbindlist(
         lapply(
@@ -771,8 +762,8 @@ shiny_all_kegg_pws <- shiny_all_kegg_pws[KEGG_NAMES != ""]
 shiny_all_kegg_pws <- shiny_all_kegg_pws[KEGG_NAMES != "NA"]
 
 shiny_abbr_celltype <- lapply(
-  scd_dataset_names[
-    !grepl("mixed", scd_dataset_names)
+  scd_dataset_names_diffage[
+    !grepl("mixed", scd_dataset_names_diffage)
   ],
   function(dataset) {
     cell_types <- unique(

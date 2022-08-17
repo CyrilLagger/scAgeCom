@@ -1727,7 +1727,466 @@ plot_KEYWORD_summary(
   keyword = "Gpi1:Amfr"
 )
 
-## Figure 5 validation
+## Prepare Figure Upset Plot Validation dataset (Fig 5a) ####
+
+setnames(
+  val_dt_selection,
+  old = c(
+    "pancreas", "huvec", "macro", "mscat",
+    "neurons", "glia", "cardio"
+  ),
+  new = c(
+    "hPDE (Li 2022)",
+    "hUVEC (Zhao 2020)",
+    "mBMM (Meissner 2013)",
+    "mMSC-AT (Acar 2020)",
+    "mNeuron (Tushaus 2020)",
+    "mGlial (Tushaus 2020)",
+    "rCM (Kuhn 2020)"
+  )
+)
+
+figp_val_upset <- ComplexUpset::upset(
+  as.data.frame(val_dt_selection),
+  colnames(val_dt_selection)[-c(1, 9, 10)],
+  name = "Dataset Groupings by Frequency",
+  set_sizes = ComplexUpset::upset_set_size()
+   + ylab("# of LR genes"),
+  base_annotations = list(
+    "Intersection Size" = ComplexUpset::intersection_size(
+      counts = TRUE,
+      bar_number_threshold = 100,
+      text = list(size = 8),
+      colour = "coral",
+      fill = "coral"
+    ) + theme(
+      axis.title.y = element_text(
+        margin = margin(t = 0, r = -200, b = 0, l = 0)
+      )
+    )
+  ),
+  themes = ComplexUpset::upset_default_themes(
+    text = element_text(size = 40),
+    plot.title = element_text(size = 34)
+  ),
+  min_size = 8
+) + ggtitle(
+  "LR genes matching to secreted proteins"
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_val_upset.png"
+  ),
+  plot = figp_val_upset,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 3
+)
+
+## Prepare Figure ORA hUVEC family (Fig 5b) ####
+
+fig_ora_huvec_fam <- ggplot(
+  dt_val_huvec_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_huvec_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_huvec_fam$BH + min(dt_val_huvec_fam[BH != 0]$BH)
+    )))[1:4],
+  labels = round(fivenum(-log10(
+    dt_val_huvec_fam$BH + min(dt_val_huvec_fam[BH != 0]$BH)
+  )))[1:4],
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of hUVEC  "
+)  + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_huvec_fam.png"
+  ),
+  plot = fig_ora_huvec_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+## Prepare Figure ORA mBMMM family (Fig 5c) ####
+
+fig_ora_mbmm_fam <- ggplot(
+  dt_val_macro_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_macro_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_macro_fam$BH + min(dt_val_macro_fam[BH != 0]$BH)
+    )))[c(1, 2, 3, 5)],
+  labels = round(fivenum(-log10(
+    dt_val_macro_fam$BH + min(dt_val_macro_fam[BH != 0]$BH)
+  )))[c(1, 2, 3, 5)],
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mouse Bone Marrow Derived Macrophages"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_mbmm_fam.png"
+  ),
+  plot = fig_ora_mbmm_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+## Prepare Figure ORA mMSC-AT family (Fig 5d) ####
+
+fig_ora_mmscat_fam <- ggplot(
+  dt_val_mscat_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_mscat_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_mscat_fam$BH + min(dt_val_mscat_fam[BH != 0]$BH)
+    )))[c(1, 2, 3, 5)],
+  labels = round(fivenum(-log10(
+    dt_val_mscat_fam$BH + min(dt_val_mscat_fam[BH != 0]$BH)
+  )))[c(1, 2, 3, 5)],
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mouse MSC-AT"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_mmscat_fam.png"
+  ),
+  plot = fig_ora_mmscat_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+fig_ora_mmscat_at <- ggplot(
+  dt_val_mscat_at,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_mscat_at[BH != 0]$BH)
+    ),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_mscat_at$BH + min(dt_val_mscat_at[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_mscat_at$BH + min(dt_val_mscat_at[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mouse MSC-AT in AT"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_mmscat_at.png"
+  ),
+  plot = fig_ora_mmscat_at,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+## Prepare Figure ORA neuron family (Fig 5e) ####
+
+fig_ora_neuron_fam <- ggplot(
+  dt_val_neuron_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_neuron_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_neuron_fam$BH + min(dt_val_neuron_fam[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_neuron_fam$BH + min(dt_val_neuron_fam[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mouse neurons"
+)  + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_neuron_fam.png"
+  ),
+  plot = fig_ora_neuron_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+## Prepare Figure ORA glial family (Fig 5f) ####
+
+fig_ora_glial_fam <- ggplot(
+  dt_val_glial_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_glial_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_glial_fam$BH + min(dt_val_glial_fam[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_glial_fam$BH + min(dt_val_glial_fam[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mouse glial cells"
+)  + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_glial_fam.png"
+  ),
+  plot = fig_ora_glial_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+## Prepare Figure ORA cardio family (Fig 5g) ####
+
+## Prepare Figure ORA hpde family (Fig 5h) ####
+
+fig_ora_hpde_fam <- ggplot(
+  dt_val_pancreas_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_pancreas_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_pancreas_fam$BH + min(dt_val_pancreas_fam[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_pancreas_fam$BH + min(dt_val_pancreas_fam[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of human PDE"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_hpde_fam.png"
+  ),
+  plot = fig_ora_hpde_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+fig_ora_hpde_pancreas <- ggplot(
+  dt_val_pancreas_pct,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_pancreas_pct[BH != 0]$BH)
+    ),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_pancreas_pct$BH + min(dt_val_pancreas_pct[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_mscat_at$BH + min(dt_val_pancreas_pct[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+ "Secretome of human PDE"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_hpde_pancreas.png"
+  ),
+  plot = fig_ora_hpde_pancreas,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+dt_val_pancreas_pct
+
 
 ## Figure 6 ####
 

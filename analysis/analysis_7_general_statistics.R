@@ -76,6 +76,84 @@ dt_cci_rel[
 
 dt_ora_rel <- dt_ora_full[!grepl("mixed", dataset)]
 
+## Keep only relevant sex CCIs for analysis ####
+
+dt_cci_sex <- dt_cci_full_diffsex[!grepl("combined", dataset)]
+
+dt_cci_sex[
+  ,
+  scDiffCom_regulation := ifelse(
+    !REGULATION %in% c("UP", "DOWN"),
+    "NO",
+    REGULATION
+  )
+]
+
+dt_cci_sex[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family")
+  ],
+  on = c("tissue==new_tissue", "EMITTER_CELLTYPE==cell_ontology_final"),
+  EMITTER_CELLFAMILY := i.cell_family
+]
+dt_cci_sex[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family")
+  ],
+  on = c("tissue==new_tissue", "RECEIVER_CELLTYPE==cell_ontology_final"),
+  RECEIVER_CELLFAMILY := i.cell_family
+]
+dt_cci_sex[
+  ,
+  ER_CELLFAMILY := paste(
+    EMITTER_CELLFAMILY,
+    RECEIVER_CELLFAMILY,
+    sep = "_"
+  )
+]
+
+dt_cci_sex[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family_mid_2")
+  ],
+  on = c("tissue==new_tissue", "EMITTER_CELLTYPE==cell_ontology_final"),
+  EMITTER_CELLFAMILY_2 := i.cell_family_mid_2
+]
+dt_cci_sex[
+  dt_celltype_conversion[
+    ,
+    c("new_tissue", "cell_ontology_final", "cell_family_mid_2")
+  ],
+  on = c("tissue==new_tissue", "RECEIVER_CELLTYPE==cell_ontology_final"),
+  RECEIVER_CELLFAMILY_2 := i.cell_family_mid_2
+]
+dt_cci_sex[
+  ,
+  ER_CELLFAMILY_2 := paste(
+    EMITTER_CELLFAMILY_2,
+    RECEIVER_CELLFAMILY_2,
+    sep = "_"
+  )
+]
+
+dt_ora_sex <- dt_ora_full_diffsex[!grepl("combined", dataset)]
+
+## Full list of Seurat genes ####
+
+seurat_genes <- lapply(
+  seurats_analysis,
+  rownames
+)
+seurat_genes$calico <- unique(
+  c(seurat_genes$calico_kidney,
+  seurat_genes$calico_lung,
+  seurat_genes$calico_spleen
+  )
+)
+
 ## General LRI statistics ####
 
 dt_lri_human
@@ -205,22 +283,11 @@ NLRI_template[, sd(N)]
 
 ## LRI not detected at all and counts of detection for each LRI per dataset ####
 
-seurat_genes <- lapply(
-  seurats_analysis,
-  rownames
-)
-seurat_genes$calico <- unique(
-  c(seurat_genes$calico_kidney,
-  seurat_genes$calico_lung,
-  seurat_genes$calico_spleen
-  )
-)
-
 LRI_template <- LRI_mouse$LRI_curated[, 1:6]
 
 LRI_in_seurat <- lapply(
   seurat_genes,
-  function (i) {
+  function(i) {
     LRI_mouse$LRI_curated[
       LIGAND_1 %in% i &
         RECEPTOR_1 %in% i &

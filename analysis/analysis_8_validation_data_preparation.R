@@ -11,7 +11,12 @@
 ####################################################
 ##
 
-## Pancreas (human) secretomics (Li et al. 2022) ####
+## Library ####
+
+library(openxlsx)
+library(ggplot2)
+
+## hPDE secretomics (Li et al. 2022) ####
 
 # read spreadsheet
 val_pancreas <- openxlsx::read.xlsx(
@@ -414,28 +419,28 @@ setnames(
 )
 val_cardio_genes[
   ,
-  mgi_symbol := ifelse(
-    is.na(mgi_symbol),
+  mmusculus_homolog := ifelse(
+    is.na(mmusculus_homolog),
     gene,
-    mgi_symbol
+    mmusculus_homolog
   )
 ]
-val_cardio_genes[mgi_symbol != gene]
+val_cardio_genes[mmusculus_homolog != gene]
 
 # select genes that are in LRI
 val_cardio_lr <- sort(val_cardio_genes[
-  mgi_symbol %in% genes_lri_mouse
-]$mgi_symbol)
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
 
 # select genes that are in LRI and diff with hypoxia
 val_cardio_lr_hyp_up <- unique(val_cardio_genes[
   gene %in% val_cardio[diff_total == "UP"]$gene &
-  mgi_symbol %in% genes_lri_mouse
-]$mgi_symbol)
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
 val_cardio_lr_hyp_down <- unique(val_cardio_genes[
   gene %in% val_cardio[diff_total == "DOWN"]$gene &
-  mgi_symbol %in% genes_lri_mouse
-]$mgi_symbol)
+  mmusculus_homolog %in% genes_lri_mouse
+]$mmusculus_homolog)
 
 ## Brain mouse secretomics (Tushaus et al. 2020) ####
 
@@ -456,7 +461,9 @@ val_brain[
   ,
   paste0("is_detected_Astro_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Astro_", 1:6)
 ]
@@ -469,7 +476,9 @@ val_brain[
   ,
   paste0("is_detected_Microglia_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Microglia_", 1:6)
 ]
@@ -482,7 +491,9 @@ val_brain[
   ,
   paste0("is_detected_Neurons_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Neurons_", 1:6)
 ]
@@ -495,7 +506,9 @@ val_brain[
   ,
   paste0("is_detected_Oligodendrocytes_", 1:6) := lapply(
     .SD,
-    function(i) {!is.nan(i)}
+    function(i) {
+      !is.nan(i)
+    }
   ),
   .SDcols = paste0("log2_LFQ_Oligodendrocytes_", 1:6)
 ]
@@ -521,6 +534,15 @@ val_brain_lr <- lapply(
     sort(i[i %in% genes_lri_mouse])
   }
 )
+
+val_brain_lr$glia <- unique(
+  c(
+    val_brain_lr$astro,
+    val_brain_lr$micro,
+    val_brain_lr$oligo
+  )
+)
+names(val_brain_lr)
 
 ## SASP atlas (human) secretomics (Basisty et al., 2020) ####
 
@@ -645,7 +667,7 @@ hom_jax <- hom_jax[
 ][, c(1, 2, 4)]
 hom_jax <- hom_jax[
   Common.Organism.Name == "mouse, laboratory" |
-  (Common.Organism.Name == "human" & Symbol %in% 
+  (Common.Organism.Name == "human" & Symbol %in%
   val_sasp_genes$gene)
 ]
 hom_jax <- merge.data.table(
@@ -1207,14 +1229,41 @@ val_dt[
   )
 ]
 
+val_upset_keep <- c(
+  "pancreas", "huvec", "macro", "mscat",
+  "neurons", "glia", "cardio"
+)
+
+val_dt_selection <- val_dt[
+  ,
+  c("gene", val_upset_keep),
+  with = FALSE
+][,
+  tot := Reduce(`|`, lapply(.SD, function(x) {
+    x
+  })),
+  .SDcols = val_upset_keep
+][tot == TRUE]
+val_dt_selection[
+  ,
+  N := rowSums(.SD),
+  .SDcols = val_upset_keep
+]
+
+sort(val_dt_selection[N >= 6]$gene)
+
 ComplexUpset::upset(
-  as.data.frame(val_dt),
-  c(
-    "pancreas", "endo", "huvec", "macro", "mscat", "msccomb"
-    #"pancreas", "cardio", "macro", "astro",
-    #"micro", "neurons", "oligo", "fibro_xir_up",
-    #"epi_xir_up", "endo"
+  as.data.frame(
+    val_dt[
+      ,
+      c("gene", val_upset_keep),
+      with = FALSE
+    ][,
+     tot := Reduce(`|`, lapply(.SD, function(x) {x})),
+      .SDcols = val_upset_keep
+    ][tot == TRUE]
   ),
+  val_upset_keep,
   name = "xx",
   set_sizes = ComplexUpset::upset_set_size(),
   min_size = 6
@@ -1277,6 +1326,24 @@ dt_cci_rel[
   )
 ]
 
+dt_cci_sex <- merge.data.table(
+  dt_cci_sex,
+  dt_lri_mouse_val[, c("LRI", names(val_all)), with = FALSE],
+  by = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
+
+dt_cci_sex[
+  ,
+  dataset_tissue := paste(
+    dataset,
+    tissue,
+    sep = "_"
+  )
+]
+
 ## ORA function on validation #####
 
 run_ora_validation <- function(
@@ -1317,7 +1384,7 @@ run_ora_validation <- function(
   dt[, category_type := category]
   dt[, group_type := by_group]
   if (by_group == "none") {
-    dt[, group := "none" ]
+    dt[, group := "none"]
     setnames(
       dt,
       old = c(category),
@@ -1366,22 +1433,39 @@ dt_ora_validation_groups <- data.table(
 dt_ora_validation_groups <- setkey(
   data.table(val_set = names(val_all))[, c(k = 1, .SD)],
   k
-)[dt_ora_validation_groups[ ,c(k = 1, .SD)],
+)[dt_ora_validation_groups[, c(k = 1, .SD)],
 allow.cartesian = TRUE][, k := NULL]
 
 options(future.globals.maxSize = 15 * 1024^3)
 future::plan(multicore, workers = 20)
-#future::plan(sequential)
 
 dt_ora_validation_groups_p <- dt_ora_validation_groups[
   category %in% c(
     "EMITTER_CELLTYPE",
     "RECEIVER_CELLTYPE",
-    "ER_CELLTYPES",
+    #"ER_CELLTYPES",
     "ER_CELLFAMILY",
     "ER_CELLFAMILY_2"
   ) &
-  by_group == "dataset_tissue"
+  by_group %in% c(
+    "dataset_tissue",
+    "none",
+    "dataset"
+  )
+]
+
+dt_ora_validation_groups_p2 <- dt_ora_validation_groups[
+  category %in% c(
+    "EMITTER_CELLFAMILY",
+    "EMITTER_CELLFAMILY_2",
+    "RECEIVER_CELLFAMILY",
+    "RECEIVER_CELLFAMILY_2"
+  ) &
+  by_group %in% c(
+    "dataset_tissue",
+    "none",
+    "dataset"
+  )
 ]
 
 dt_cci_secr_validation <- rbindlist(
@@ -1399,12 +1483,313 @@ dt_cci_secr_validation <- rbindlist(
   use.names = TRUE
 )
 
-dt_cci_secr_validation
+dt_cci_secr_validation2 <- rbindlist(
+  future.apply::future_lapply(
+    seq_len(nrow(dt_ora_validation_groups_p2)),
+    function(i) {
+      run_ora_validation(
+        data = dt_cci_rel,
+        category = dt_ora_validation_groups_p2$category[[i]],
+        val_set = dt_ora_validation_groups_p2$val_set[[i]],
+        by_group = dt_ora_validation_groups_p2$by_group[[i]]
+      )
+    }
+  ),
+  use.names = TRUE
+)
+
+dt_cci_secr_validation_full <- rbindlist(
+  list(
+    dt_cci_secr_validation,
+    dt_cci_secr_validation2
+  )
+)
+
+dt_cci_secr_validation_full[
+   ,
+  recall := CAT_LR / (CAT_LR + CAT_notLR)
+]
 
 fwrite(
-  dt_cci_secr_validation,
+  dt_cci_secr_validation_full,
   paste0(
     path_scagecom_output,
     "cci_validation.csv"
   )
 )
+
+## Specific results of interest to select ####
+
+# huvec
+dt_val_huvec_fam <- dt_cci_secr_validation_full[
+  validation_set == "huvec" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+#macro
+dt_val_macro_fam <- dt_cci_secr_validation_full[
+  validation_set == "macro" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+#mscat
+dt_val_mscat_fam <- dt_cci_secr_validation_full[
+  validation_set == "mscat" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+dt_val_mscat_at <-   dt_cci_secr_validation_full[
+  validation_set == "mscat" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Adipose", group)]
+
+#neurons
+dt_val_neuron_fam <-   dt_cci_secr_validation_full[
+  validation_set == "neurons" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+#glial
+dt_val_glial_fam <-   dt_cci_secr_validation_full[
+  validation_set == "glia" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+#cardio
+dt_val_cardio_fam <-   dt_cci_secr_validation_full[
+  validation_set == "cardio" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+dt_val_cardio_heart <- dt_cci_secr_validation_full[
+  validation_set == "cardio" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Heart", group)]
+
+#pancreas
+dt_val_pancreas_fam <-   dt_cci_secr_validation_full[
+  validation_set == "pancreas" &
+  group_type == "none" &
+  category_type == "EMITTER_CELLFAMILY_2"
+][category != "leukocyte"]
+
+dt_val_pancreas_pct <-   dt_cci_secr_validation_full[
+  validation_set == "pancreas" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Pancreas", group)]
+
+## Rename validation in cci and related datasets ####
+
+dt_cci_age <- copy(dt_cci_rel)
+dt_cci_age[
+  ,
+  c(
+    "pancreas_hpde", "pancreas_can_up", "pancreas_can_down",
+    "cardio_hyp_up", "cardio_hyp_down", "macro_up", "macro_down",
+    "endo", "mscat_hfd", "msccomb", "astro", "micro", "oligo",
+    "fibro_ras_up", "fibro_ataz_up", "fibro_xir_up", "fibro_ras_down",
+    "fibro_xir_down", "epi_xir_up", "epi_xir_down"
+  ) := NULL
+]
+setnames(
+  dt_cci_age,
+  old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
+  new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
+)
+
+dt_cci_sex[
+  ,
+  c(
+    "pancreas_hpde", "pancreas_can_up", "pancreas_can_down",
+    "cardio_hyp_up", "cardio_hyp_down", "macro_up", "macro_down",
+    "endo", "mscat_hfd", "msccomb", "astro", "micro", "oligo",
+    "fibro_ras_up", "fibro_ataz_up", "fibro_xir_up", "fibro_ras_down",
+    "fibro_xir_down", "epi_xir_up", "epi_xir_down"
+  ) := NULL
+]
+setnames(
+  dt_cci_sex,
+  old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
+  new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
+)
+
+dt_secr_validation_final <- dt_cci_secr_validation_full[
+  validation_set %in% c(
+    "pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"
+  )
+]
+dt_secr_validation_final[
+  ,
+  validation_set := ifelse(
+    validation_set == "pancreas",
+    "hPDE",
+    ifelse(
+      validation_set == "cardio",
+      "rCM",
+      ifelse(
+        validation_set == "macro",
+        "mBBM",
+        ifelse(
+          validation_set == "huvec",
+          "hUVEC",
+          ifelse(
+            validation_set == "mscat",
+            "mMSC-AT",
+            ifelse(
+              validation_set == "neurons",
+              "mNeuron",
+              "mGlial"
+            )
+          )
+        )
+      )
+    )
+  )
+]
+table(dt_secr_validation_final$validation_set)
+
+saveRDS(
+  dt_secr_validation_final,
+  paste0(
+    path_scagecom_output,
+    "dt_secr_validation_final.rds"
+  )
+)
+fwrite(
+  dt_secr_validation_final,
+  paste0(
+    path_scagecom_output,
+    "dt_secr_validation_final.csv"
+  )
+)
+
+saveRDS(
+  dt_cci_age,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_age.rds"
+  )
+)
+fwrite(
+  dt_cci_age,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_age.csv"
+  )
+)
+
+saveRDS(
+  dt_cci_sex,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_sex.rds"
+  )
+)
+fwrite(
+  dt_cci_sex,
+  paste0(
+    path_scagecom_output,
+    "dt_cci_sex.csv"
+  )
+)
+
+dt_lri_mouse_val_clean <- copy(dt_lri_mouse_val)
+dt_lri_mouse_val_clean[
+  ,
+  c(
+    "pancreas_hpde", "pancreas_can_up", "pancreas_can_down",
+    "cardio_hyp_up", "cardio_hyp_down", "macro_up", "macro_down",
+    "endo", "mscat_hfd", "msccomb", "astro", "micro", "oligo",
+    "fibro_ras_up", "fibro_ataz_up", "fibro_xir_up", "fibro_ras_down",
+    "fibro_xir_down", "epi_xir_up", "epi_xir_down"
+  ) := NULL
+]
+setnames(
+  dt_lri_mouse_val_clean,
+  old = c("pancreas", "cardio", "macro", "huvec", "mscat", "neurons", "glia"),
+  new = c("hPDE", "rCM", "mBBM", "hUVEC", "mMSC-AT", "mNeuron", "mGlial")
+)
+
+dt_lri_mouse_val_clean[
+  dcast.data.table(
+    melt.data.table(
+      dt_lri_mouse_val_clean[
+        ,
+        c(
+          "LRI", "hPDE", "rCM", "mBBM", "hUVEC",
+          "mMSC-AT", "mNeuron", "mGlial"
+        )
+      ],
+      id.vars = "LRI"
+    )[
+      ,
+      value := value != "NO"
+    ][
+      value == TRUE
+    ],
+    LRI ~ .,
+    value.var = "variable",
+    fun.aggregate = function(i) {
+      paste(sort(i), collapse = "/")
+    }
+  ),
+  on = "LRI",
+  summary_val := i..
+]
+
+dt_lri_mouse_val_clean[
+  dcast.data.table(
+    melt.data.table(
+      dt_lri_mouse_val_clean[
+        ,
+        c(
+          "LRI", "L1_N_agepmid", "L2_N_agepmid",
+          "R1_N_agepmid", "R2_N_agepmid", "R3_N_agepmid"
+        )
+      ],
+      id.vars = "LRI"
+    )[
+      !is.na(value)
+    ],
+    LRI ~ .,
+    value.var = "value",
+    fun.aggregate = function(i) {
+      paste(i, collapse = "_")
+    }
+  ),
+  on = "LRI",
+  pubmed := i..
+]
+
+dt_lri_mouse_val_clean[
+  dcast.data.table(
+    melt.data.table(
+      dt_lri_mouse_val_clean[
+        ,
+        c(
+          "LRI", "HAGR_L1", "HAGR_L2",
+          "HAGR_R1", "HAGR_R2", "HAGR_R3"
+        )
+      ],
+      id.vars = "LRI"
+    )[
+      !is.na(value)
+    ],
+    LRI ~ .,
+    value.var = "value",
+    fun.aggregate = function(i) {
+      paste(i, collapse = "_")
+    }
+  ),
+  on = "LRI",
+  "HAGR" := i..
+]
