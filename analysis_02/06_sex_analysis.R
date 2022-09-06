@@ -205,3 +205,9 @@ perc_bronchial = sum(
 #   dt_lung$EMITTER_CELLTYPE_Sy == "bronchial smooth muscle cell" 
 #   | dt_lung$RECEIVER_CELLTYPE_Sy == "bronchial smooth muscle cell"
 # ) / dim(dt_lung)[1]
+
+## App:Lrp10
+dt[LIGAND_1_Af == "App" & RECEPTOR_1_Af == "Lrp10"]$SIGNATURE
+tab = table(dt_updown[LIGAND_1_Af == "App" & RECEPTOR_1_Af == "Lrp10"]$SIGNATURE)
+tab = tab[order(tab)]
+tab = tab / sum(tab)
