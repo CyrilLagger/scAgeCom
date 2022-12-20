@@ -188,7 +188,7 @@ pmid_aging <- rentrez::entrez_search(
     "aging[TIAB] OR longevity[TIAB] OR senescence[TIAB]",
     " OR age-related[TIAB] OR dementia[TIAB] OR alzheimer[TIAB]",
     " OR parkinson[TIAB] OR atherosclerosis[TIAB] OR stroke[TIAB]",
-    " OR arthritis[TIAB] or osteoporosis[TIAB] or cataract[TIAB]"
+    " OR arthritis[TIAB] OR osteoporosis[TIAB] OR cataract[TIAB]"
   ),
   retmax = 10000001
 )
