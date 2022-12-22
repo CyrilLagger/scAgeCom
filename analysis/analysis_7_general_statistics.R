@@ -325,7 +325,7 @@ dt_cci_rel[
     ifelse(
       L1_BH_P_VALUE_DE <= 0.05 & L1_LOGFC <= -log(1.5),
       "DOWN",
-      "NO"
+      "NOT DE"
     )
   )
 ]
@@ -340,7 +340,7 @@ dt_cci_rel[
       ifelse(
         L2_BH_P_VALUE_DE <= 0.05 & L2_LOGFC <= -log(1.5),
         "DOWN",
-        "NO"
+        "NOT DE"
       )
     )
   )
@@ -353,7 +353,7 @@ dt_cci_rel[
     ifelse(
       R1_BH_P_VALUE_DE <= 0.05 & R1_LOGFC <= -log(1.5),
       "DOWN",
-      "NO"
+      "NOT DE"
     )
   )
 ]
@@ -368,7 +368,7 @@ dt_cci_rel[
       ifelse(
         R2_BH_P_VALUE_DE <= 0.05 & R2_LOGFC <= -log(1.5),
         "DOWN",
-        "NO"
+        "NOT DE"
       )
     )
   )
@@ -384,7 +384,7 @@ dt_cci_rel[
       ifelse(
         R3_BH_P_VALUE_DE <= 0.05 & R3_LOGFC <= -log(1.5),
         "DOWN",
-        "NO"
+        "NOT DE"
       )
     )
   )
@@ -417,12 +417,12 @@ dt_cci_sdea_comp[
       l1_deg == l2_deg,
       l1_deg,
       ifelse(
-        l1_deg == "NO",
+        l1_deg == "NOT DE",
         l2_deg,
         ifelse(
-          l2_deg == "NO",
+          l2_deg == "NOT DE",
           l1_deg,
-          "NO"
+          "NOT DE"
         )
       )
     )
@@ -437,12 +437,12 @@ dt_cci_sdea_comp[
       r1_deg == r2_deg,
       r1_deg,
       ifelse(
-        r1_deg == "NO",
+        r1_deg == "NOT DE",
         r2_deg,
         ifelse(
-          r2_deg == "NO",
+          r2_deg == "NOT DE",
           r1_deg,
-          "NO"
+          "NOT DE"
         )
       )
     )
@@ -457,7 +457,6 @@ dt_sdea_comp_count <- dt_cci_sdea_comp[
   ,
   .N,
   by = c(
-    "dataset",
     "scDiffCom_regulation",
     "ligand_deg",
     "receptor_deg"
@@ -465,23 +464,23 @@ dt_sdea_comp_count <- dt_cci_sdea_comp[
 ]
 dt_sdea_comp_count[
   ,
-  pct := N / sum(N) * 100,
-  by = c("dataset")
+  pct := N / sum(N) * 100#,
+  #by = c("dataset")
 ]
 setnames(
   dt_sdea_comp_count,
   old = colnames(dt_sdea_comp_count),
-  new = c("dataset", "scDiffCom_regulation", "ligand_SDEA_regulation",
+  new = c("scDiffCom_regulation", "ligand_SDEA_regulation",
   "receptor_SDEA_regulation", "Number_of_LRIs", "Pct_of_LRIs")
 )
 
-dt_sdea_comp_count_list <- lapply(
-  unique(dt_sdea_comp_count$dataset),
-  function(i) {
-    dt_sdea_comp_count[dataset == i]
-  }
-)
-names(dt_sdea_comp_count_list) <- unique(dt_sdea_comp_count$dataset)
+# dt_sdea_comp_count_list <- lapply(
+#   unique(dt_sdea_comp_count$dataset),
+#   function(i) {
+#     dt_sdea_comp_count[dataset == i]
+#   }
+# )
+# names(dt_sdea_comp_count_list) <- unique(dt_sdea_comp_count$dataset)
 
 ## Distribution of OR GO Terms by GO levels ####
 
