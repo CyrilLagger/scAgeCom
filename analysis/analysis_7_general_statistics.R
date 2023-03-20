@@ -474,6 +474,14 @@ setnames(
   "receptor_SDEA_regulation", "Number_of_LRIs", "Pct_of_LRIs")
 )
 
+fwrite(
+  dt_sdea_comp_count,
+  paste0(
+    path_scagecom_output,
+    "Supplementary_Data_SDEA_comp.csv"
+  )
+)
+
 # dt_sdea_comp_count_list <- lapply(
 #   unique(dt_sdea_comp_count$dataset),
 #   function(i) {

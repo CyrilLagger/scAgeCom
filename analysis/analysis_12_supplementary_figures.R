@@ -17,7 +17,7 @@ dt_sdea_fig <- dt_cci_sdea_comp[
   ,
   c("dataset", "scDiffCom_regulation", "ligand_deg", "receptor_deg")
 ]
-dt_sdea_fig[, "CCI Not DE" := scDiffCom_regulation == "NOT DE"]
+dt_sdea_fig[, "CCI Not DE" := scDiffCom_regulation == "NO"]
 dt_sdea_fig[, "CCI Up" := scDiffCom_regulation == "UP"]
 dt_sdea_fig[, "CCI Down" := scDiffCom_regulation == "DOWN"]
 dt_sdea_fig[, "Ligand Not DE" := ligand_deg == "NOT DE"]
@@ -287,14 +287,14 @@ sfig_sdea_comp <- upset(
   name = "Category",
   breaks = c(
     "Consistent", "Resolve ambiguity",
-    "Additive effect", "Substractive effect",
+    "Additive effect", "Subtractive effect",
     "Inconsistent"
   ),
   values = c(
     "Consistent" = "#1e81b0",
     "Resolve ambiguity" = "#76b5c5",
     "Additive effect" = "#eab676",
-    "Substractive effect" = "#e28743",
+    "Subtractive effect" = "#e28743",
     "Inconsistent" = "#873e23"
   )
 ) + theme(
@@ -311,7 +311,7 @@ ggsave(
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 3
+  scale = 2
 )
 #manual save: 2100x1200
 

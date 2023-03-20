@@ -553,75 +553,68 @@ aging_dt_lipmed_sex <- merge.data.table(
 
 # App:Lrp10 sex-dependent
 
-dt_ora_key_summary[
-    VALUE == "App:Lrp10" &
-    grepl("TMS", dataset)
-]
-
-test <- merge.data.table(
-    dcast.data.table(
-        dt_ora_key_summary[
-            VALUE == "App:Lrp10" &
-            grepl("TMS", dataset)
-        ],
-        tissue ~ dataset,
-        value.var = "ORA_REGULATION"
-    ),
-    dcast.data.table(
-        dt_ora_key_summary_diffsex[
-            VALUE == "App:Lrp10" &
-            grepl("TMS", dataset) &
-            !grepl("combined", dataset)
-        ],
-        tissue ~ dataset,
-        value.var = "ORA_REGULATION"
-    ),
-    by = "tissue",
-    all = TRUE
-)
-
-dt_ora_key_summary_diffsex[
-    VALUE == "App:Lrp10" &
-    grepl("TMS", dataset) &
-    !grepl("combined", dataset)
-]
-
-dt_ora_key_summary_diffsex[
-    VALUE == "App:Lrp10" &
-    ORA_REGULATION %in% c("UP", "DOWN")
-]
-
-dt_ora_key_summary[
-    VALUE == "App" &
-    dataset_tissue %in% c(
-        "TMS FACS (male)_Brain",
-        "TMS FACS (female)_Brain"
+dt_cci_sexage_facs[
+    tissue == "Brain" &
+    LRI == "App:Lrp10" &
+    (
+        `TMS FACS (female)` %in% c("UP", "DOWN") |
+        `TMS FACS (male)` %in% c("UP", "DOWN") |
+        `TMS FACS (young)` %in% c("UP", "DOWN") |
+        `TMS FACS (old)` %in% c("UP", "DOWN")
     )
 ]
-
-dt_ora_key_summary_diffsex[
-    VALUE == "App" &
-    dataset_tissue %in% c(
-        "TMS FACS (young)_Brain",
-        "TMS FACS (old)_Brain"
+dt_cci_sexage_facs[
+    tissue == "Brain" &
+    LRI == "Apoe:Sdc4" &
+    (
+        `TMS FACS (female)` %in% c("UP", "DOWN") |
+        `TMS FACS (male)` %in% c("UP", "DOWN") |
+        `TMS FACS (young)` %in% c("UP", "DOWN") |
+        `TMS FACS (old)` %in% c("UP", "DOWN")
     )
 ]
+dt_cci_sexage_facs[tissue == "Brain" & LRI == "App:Lrp10"]
+dt_cci_sexage_facs[tissue == "Brain" & LRI == "Apoe:Sdc4"]
 
-dt_ora_key_summary[
-    VALUE == "Apoe" &
-    dataset_tissue %in% c(
-        "TMS FACS (male)_Brain",
-        "TMS FACS (female)_Brain"
+dt_cci_sexage_facs[
+    tissue == "Brain" &
+    grepl("App:", LRI, fixed = TRUE) &
+    (
+        `TMS FACS (female)` %in% c("UP", "DOWN") |
+        `TMS FACS (male)` %in% c("UP", "DOWN") |
+        `TMS FACS (young)` %in% c("UP", "DOWN") |
+        `TMS FACS (old)` %in% c("UP", "DOWN")
     )
-]
+][
+    ,
+    .N,
+    by = c(
+        "TMS FACS (female)",
+        "TMS FACS (male)",
+        "TMS FACS (young)",
+        "TMS FACS (old)"
+    )
+][order(-N)][1:10]
 
-dt_ora_key_summary_diffsex[
-    VALUE == "Apoe" &
-    dataset_tissue %in% c(
-        "TMS FACS (young)_Brain",
-        "TMS FACS (old)_Brain"
+dt_cci_sexage_facs[
+    tissue == "Brain" &
+    grepl("Apoe:", LRI, fixed = TRUE) &
+    (
+        `TMS FACS (female)` %in% c("UP", "DOWN") |
+        `TMS FACS (male)` %in% c("UP", "DOWN") |
+        `TMS FACS (young)` %in% c("UP", "DOWN") |
+        `TMS FACS (old)` %in% c("UP", "DOWN")
     )
-]
+][
+    ,
+    .N,
+    by = c(
+        "TMS FACS (female)",
+        "TMS FACS (male)",
+        "TMS FACS (young)",
+        "TMS FACS (old)"
+    )
+][order(-N)][1:10]
 
 #Apoe:Sdc4 is interesting based on longevity and lipid
 
