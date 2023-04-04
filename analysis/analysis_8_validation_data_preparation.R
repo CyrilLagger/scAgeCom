@@ -1252,6 +1252,7 @@ val_dt_selection[
 
 sort(val_dt_selection[N >= 6]$gene)
 
+# temporary figure just to test
 ComplexUpset::upset(
   as.data.frame(
     val_dt[
@@ -1518,6 +1519,13 @@ fwrite(
   )
 )
 
+dt_cci_secr_validation_full <- fread(
+  paste0(
+    path_scagecom_output,
+    "cci_validation.csv"
+  )
+)
+
 ## Specific results of interest to select ####
 
 # huvec
@@ -1554,12 +1562,24 @@ dt_val_neuron_fam <-   dt_cci_secr_validation_full[
   category_type == "EMITTER_CELLFAMILY_2"
 ][category != "leukocyte"]
 
+dt_val_neuron_brain <-   dt_cci_secr_validation_full[
+  validation_set == "neurons" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Brain", group)]
+
 #glial
 dt_val_glial_fam <-   dt_cci_secr_validation_full[
   validation_set == "glia" &
   group_type == "none" &
   category_type == "EMITTER_CELLFAMILY_2"
 ][category != "leukocyte"]
+
+dt_val_glial_brain <-   dt_cci_secr_validation_full[
+  validation_set == "glia" &
+  group_type == "dataset_tissue" &
+  category_type == "EMITTER_CELLTYPE"
+][grepl("Brain", group)]
 
 #cardio
 dt_val_cardio_fam <-   dt_cci_secr_validation_full[

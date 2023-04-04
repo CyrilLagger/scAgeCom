@@ -20,6 +20,7 @@ library(kableExtra)
 library(webshot2)
 library(htmlwidgets)
 library(shiny)
+library(ComplexUpset)
 
 ## Prepare Figure LRI distribution (Fig.1a) ####
 
@@ -1866,7 +1867,7 @@ fig_ora_mbmm_fam <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mouse Bone Marrow Derived Macrophages"
+  "Secretome of mBMM"
 ) + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -1885,7 +1886,7 @@ ggsave(
   scale = 1.5
 )
 
-## Prepare Figure ORA mMSC-AT family (Fig 5d) ####
+## Prepare Figure ORA mMSC-AT family and AT (Fig 5d) ####
 
 fig_ora_mmscat_fam <- ggplot(
   dt_val_mscat_fam,
@@ -1916,7 +1917,7 @@ fig_ora_mmscat_fam <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mouse MSC-AT"
+  "Secretome of mMSC-AT"
 ) + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -1965,7 +1966,7 @@ fig_ora_mmscat_at <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mouse MSC-AT in AT"
+  "Secretome of mMSC-AT in AT"
 ) + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -2015,7 +2016,7 @@ fig_ora_neuron_fam <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mouse neurons"
+  "Secretome of mNeuron"
 )  + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -2028,6 +2029,55 @@ ggsave(
     "fig_ora_neuron_fam.png"
   ),
   plot = fig_ora_neuron_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+fig_ora_neuron_brain <- ggplot(
+  dt_val_neuron_brain,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_neuron_brain[BH != 0]$BH)
+    ),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_neuron_brain$BH + min(dt_val_neuron_brain[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_neuron_brain$BH + min(dt_val_neuron_brain[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mNeuron in Brain samples"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_neuron_brain.png"
+  ),
+  plot = fig_ora_neuron_brain,
   width = 2100,
   height = 1200,
   units = "px",
@@ -2065,7 +2115,7 @@ fig_ora_glial_fam <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mouse glial cells"
+  "Secretome of mGlial"
 )  + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -2084,7 +2134,153 @@ ggsave(
   scale = 1.5
 )
 
+fig_ora_glial_brain <- ggplot(
+  dt_val_glial_brain,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_glial_brain[BH != 0]$BH)
+    ),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_glial_brain$BH + min(dt_val_glial_brain[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_glial_brain$BH + min(dt_val_glial_brain[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of mGlial in Brain samples"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_glial_brain.png"
+  ),
+  plot = fig_ora_glial_brain,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
 ## Prepare Figure ORA cardio family (Fig 5g) ####
+
+fig_ora_cardio_fam <- ggplot(
+  dt_val_cardio_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_cardio_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_cardio_fam$BH + min(dt_val_cardio_fam[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_cardio_fam$BH + min(dt_val_cardio_fam[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of rCM"
+)  + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_cardio_fam.png"
+  ),
+  plot = fig_ora_cardio_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
+
+fig_ora_cardio_heart <- ggplot(
+  dt_val_cardio_heart,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_cardio_heart[BH != 0]$BH)
+    ),
+    color = group
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+      dt_val_cardio_heart$BH + min(dt_val_cardio_heart[BH != 0]$BH)
+    ))),
+  labels = round(fivenum(-log10(
+    dt_val_cardio_heart$BH + min(dt_val_cardio_heart[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Family"
+#) + theme_minimal(
+) + ggtitle(
+  "Secretome of rCM in Heart samples"
+) + theme(
+  text = element_text(size = 14),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = 12)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_cardio_heart.png"
+  ),
+  plot = fig_ora_cardio_heart,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.5
+)
 
 ## Prepare Figure ORA hpde family (Fig 5h) ####
 
@@ -2117,7 +2313,7 @@ fig_ora_hpde_fam <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of human PDE"
+  "Secretome of hPDE"
 ) + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -2166,7 +2362,7 @@ fig_ora_hpde_pancreas <- ggplot(
   "Emitter Cell Family"
 #) + theme_minimal(
 ) + ggtitle(
- "Secretome of human PDE"
+ "Secretome of hPDE in Pancreas Samples"
 ) + theme(
   text = element_text(size = 14),
   legend.title = element_text(size = 12),
@@ -2186,7 +2382,6 @@ ggsave(
 )
 
 dt_val_pancreas_pct
-
 
 ## Figure 6 ####
 

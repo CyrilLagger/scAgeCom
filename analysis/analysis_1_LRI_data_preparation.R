@@ -188,18 +188,26 @@ pmid_aging <- rentrez::entrez_search(
     "aging[TIAB] OR longevity[TIAB] OR senescence[TIAB]",
     " OR age-related[TIAB] OR dementia[TIAB] OR alzheimer[TIAB]",
     " OR parkinson[TIAB] OR atherosclerosis[TIAB] OR stroke[TIAB]",
-    " OR arthritis[TIAB] or osteoporosis[TIAB] or cataract[TIAB]"
+    " OR arthritis[TIAB] OR osteoporosis[TIAB] OR cataract[TIAB]"
   ),
   retmax = 10000001
 )
 any(duplicated(pmid_aging$ids))
 
+#if not working because of new NCBI retmax
+pmid_aging_ids <- fread(
+  paste0(
+    path_scagecom_input,
+    "aging_pmid_ncbi.txt"
+  )
+)
+
 gene2pubmed_mouse_aging <- gene2pubmed_mouse[
-  PubMed_ID %in% pmid_aging$ids &
+  PubMed_ID %in% pmid_aging_ids$V1 &
     count_PubMed_ID <= 50
 ]
 gene2pubmed_human_aging <- gene2pubmed_human[
-  PubMed_ID %in% pmid_aging$ids &
+  PubMed_ID %in% pmid_aging_ids$V1 &
     count_PubMed_ID <= 50
 ]
 
