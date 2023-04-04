@@ -89,6 +89,7 @@ fun_process_scd <- function(
     FUN = function(
       tiss
     ) {
+      print(paste0(dataset_path, "/scdiffcom_", tiss, ".rds"))
       readRDS(paste0(dataset_path, "/scdiffcom_", tiss, ".rds"))
     }
   )
