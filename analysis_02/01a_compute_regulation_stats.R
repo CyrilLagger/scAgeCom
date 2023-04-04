@@ -149,7 +149,7 @@ for (dataset in DATASETS) {
       )
       res_scDiffCom = FilterCCI(res_scDiffCom, skip_ora = TRUE)
       
-      
+      # By shuffling seurat genes (columns).
       t = simulate_random_seurat_regulation(
         seurat_sample_obj, 
         lri_simple_in_seurat, 
