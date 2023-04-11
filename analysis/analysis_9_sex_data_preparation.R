@@ -96,6 +96,13 @@ fwrite(
     )
 )
 
+dt_md_tms_age_sex_dc <- fread(
+  paste0(
+    path_scagecom_output,
+    "Supplementary_DATA_sex_distribution.csv"
+  )
+)
+
 ## Extract CCIs detected in both sex and age analysis ####
 
 dt_cci_age[, tissue_cci := paste(tissue, CCI, sep = "_")]
