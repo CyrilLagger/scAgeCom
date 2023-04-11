@@ -2,8 +2,6 @@
 ##
 ## Project: scAgeCom
 ##
-## Last update - May 2022
-##
 ## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
 ## anais.equey@gmail.com
@@ -54,7 +52,7 @@ fig_dt_lri_mouse[
 figp_lri_upset_mouse <- ComplexUpset::upset(
   as.data.frame(fig_dt_lri_mouse),
   lri_dbs,
-  name = "Database Groupings by Frequency",
+  name = "",
   set_sizes = ComplexUpset::upset_set_size()
   + ylab("Database Size"),
   base_annotations = list(
@@ -84,7 +82,7 @@ figp_lri_upset_mouse
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_lri_upset_mouse.png"
+    "fig_lri_upset_mouse2.png"
   ),
   plot = figp_lri_upset_mouse,
   width = 2100,
@@ -702,12 +700,12 @@ fun_process_md <- function(
 }
 
 mds_processed <- lapply(
-  paths_scd_results,
+  paths_scd_results[grepl("diffage", paths_scd_results)],
   function(path) {
     fun_process_md(path)
   }
 )
-names(mds_processed) <- scd_dataset_names
+names(mds_processed) <- scd_dataset_names_diffage
 
 mds_age <- rbindlist(
   lapply(
@@ -826,14 +824,14 @@ fig_datasets_summary <- ggplot(
 ) + ylab(
   ""
 ) + theme(
-  text = element_text(size = 28),
-  axis.text = element_text(size = 28, colour = "black")
+  text = element_text(size = 32),
+  axis.text = element_text(size = 32, colour = "black")
 )
 fig_datasets_summary
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_datasets_summary.png"
+    "fig_datasets_summary2.png"
   ),
   plot = fig_datasets_summary,
   width = 2100,
@@ -847,7 +845,8 @@ ggsave(
 ## Prepare Figure Tissue Specific volcano (Fig. 4.a) ####
 
 fun_plot_volcano_cci <- function(
-  cci_table
+  cci_table,
+  title_volcano
 ) {
   dt <- copy(
     cci_table[
@@ -907,14 +906,14 @@ fun_plot_volcano_cci <- function(
     ),
     color = ~REGULATION,
     colors = stats::setNames(
-      c("red", "blue", "beige", "gray"),
+      c("red", "blue", "black", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
     marker = list(size = 10)
   ) %>% plotly::layout(
     title = list(
-      text = "",
-      font = list(size = 20),
+      text = title_volcano,
+      font = list(size = 30),
       xanchor = "left",
       x = 0.0
     ),
@@ -958,7 +957,8 @@ fun_plot_volcano_cci(
   dt_cci_full[
     dataset == "TMS Droplet (male)" &
       tissue == "Bladder"
-  ]
+  ],
+  "Bladder - TMS Droplet (male)"
 )
 
 ## Deprecated! Prepare Figure Tissue Specific scores (old Fig. 4.b) ####
