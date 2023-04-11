@@ -98,6 +98,9 @@ fwrite(
 
 ## Extract CCIs detected in both sex and age analysis ####
 
+dt_cci_age[, tissue_cci := paste(tissue, CCI, sep = "_")]
+dt_cci_sex[, tissue_cci := paste(tissue, CCI, sep = "_")]
+
 dt_cci_sexage_facs <- merge.data.table(
     dcast.data.table(
         dt_cci_age[
