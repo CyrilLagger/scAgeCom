@@ -11,14 +11,14 @@
 ####################################################
 ##
 
-## Add libraries ####
+## Load libraries ####
 
 library(scDiffCom)
 library(data.table)
 library(biomaRt)
 library(rentrez)
 
-## Specific paths ####
+## Define paths ####
 
 path_project <- "/workspace/postdoc_aging/projects/all_projects/"
 path_scagecom_input <- paste0(
@@ -211,7 +211,7 @@ gene2pubmed_human_aging <- gene2pubmed_human[
     count_PubMed_ID <= 50
 ]
 
-## Add number of pmid to LRI ####
+## Add number of pmids to LRIs ####
 
 pmid_aging_lri <- lapply(
   genes_lri_mouse,
