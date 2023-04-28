@@ -348,6 +348,15 @@ aging_dt_lri_immune <- merge.data.table(
 #careful H2-XX (HLA in human) should be more represented
 
 # add validation results
+
+dt_lri_mouse_val_clean$summary_val[grepl("Glial", dt_lri_mouse_val_clean$summary_val)]
+
+dt_lri_mouse_val_clean$summary_val <- ifelse(
+  dt_lri_mouse_val_clean$summary_val == "mGlial",
+  NA,
+  gsub("/mGlial", "", dt_lri_mouse_val_clean$summary_val, fixed = TRUE)
+)
+
 aging_dt_lri_immune <- merge.data.table(
   aging_dt_lri_immune,
   dt_lri_mouse_val_clean[, c(
@@ -407,6 +416,30 @@ dt_cci_age[
 sort(table(dt_cci_age[
     LRI == "Slpi:Plscr1" & REGULATION == "UP"
 ]$EMITTER_CELLTYPE))
+
+dt_cci_age[
+  LRI == "Slpi:Plscr1" & tissue == "Marrow" & REGULATION == "UP"
+][, "CCI"]
+
+dt_slpi_e <- dt_cci_age[
+  LRI == "Slpi:Plscr1" & tissue == "Marrow" & REGULATION == "UP"
+][, .N, c("EMITTER_CELLTYPE")][order(-N)]
+
+dt_slpi_r <- dt_cci_age[
+  LRI == "Slpi:Plscr1" & tissue == "Marrow" & REGULATION == "UP"
+][, .N, c("RECEIVER_CELLTYPE")][order(-N)]
+
+dt_slpi_r[dt_slpi_e, on = c("RECEIVER_CELLTYPE==EMITTER_CELLTYPE"), N_r := i.N]
+
+dt_slpi <- copy(dt_slpi_r)
+dt_slpi[is.na(dt_slpi)] <- 0
+dt_slpi <- dt_slpi[order(-N_r, -N)]
+setnames(
+  dt_slpi,
+  old = colnames(dt_slpi),
+  new = c("Cell Type", "# received from", "# emitted from")
+)
+
 
 sort(table(dt_cci_age[
     LRI == "Slpi:Plscr1" & REGULATION == "UP"
@@ -616,26 +649,6 @@ dt_cci_sexage_facs[
     )
 ][order(-N)][1:10]
 
-#Apoe:Sdc4 is interesting based on longevity and lipid
-
-
-# interest in the following up LRI for (not really lipid, move below)
-# cancer, angiongenesis, etc
-# L linked to vascualar aging, R not linked to aging much
-dt_lri_mouse[LRI == "Tgm2:Adgrg1"]
-# actually Tgm2:Itgb1 is down in 5 tissues, same or not?
-# other low Agrn:Itgb1, Ptdss1:Scarb1, Ptprm:Ptprm, Adam10:Tspan14
-# App:Slc45a3
-dt_lri_mouse[LRI == "Ptprm:Ptprm"]
-test <- dt_cci_rel[
-    LRI == "Ptprm:Ptprm" & REGULATION == "DOWN"
-]
-
-# compare to aging ref
-
-aging_lri_from_gokegg_lipmed <- dt_lri_mouse[
-    LRI %in% aging_lri_from_gokegg_lipmed
-]
 
 ## ECM ####
 
@@ -692,8 +705,7 @@ aging_kegg_ecm_topm10 <- dt_ora_key_counts[
 aging_er_ecm <- dt_ora_key_counts[
     ORA_CATEGORY == "ER_CELLFAMILIES" &
     ORA_REGULATION == "DOWN" &
-    grepl("connective", VALUE) &
-    `Overall (Union)` >= 7
+    `Overall (Union)` >= 4
 ]
 
 #select LRI based on go/kegg terms
@@ -793,133 +805,135 @@ aging_dt_ecm_sex <- merge.data.table(
     suffixes = c("_age", "_sex")
 )
 
-#most interesting new finding is
+# interesting new finding is
 
 dt_lri_mouse[LRI == "Alcam:Nrp1"]
 
-###############################################
-## New LRI of interest ####
+## Growth/development ####
 
-ORA_LIGAND_N[
-    ORA_REGULATION != "FLAT" &
-    LIGAND_1_agepmid <= 5 &
-    HAGR_L1 == FALSE &
-    N >= 5
-][1:20]
-ORA_RECEPTOR_N[
-    ORA_REGULATION != "FLAT" &
-    RECEPTOR_1_agepmid <= 5 &
-    HAGR_R1 == FALSE &
-    N >= 5
-][1:20]
+# select GO terms of interest in more than 10 tissues
+# from shiny_dt_ora_key_counts
 
-## Egfl7 #####
-
-ORA_LRI_N[
-    grepl("Egfl", VALUE)
+aging_go_dev_topm10 <- c(
+  "anatomical structure morphogenesis",
+  "cell morphogenesis",
+  "animal organ morphogenesis",
+  "cell morphogenesis involved in differentiation",
+  "developmental growth involved in morphogenesis",
+  "morphogenesis of an epithelium",
+  "tissue morphogenesis",
+  "response to growth factor",
+  "response to fibroblast growth factor",
+  "regulation of growth",
+  "regulation of cell cycle",
+  "Notch signaling pathway",
+  "regulation of angiogenesis",
+  "PI3K-Akt signaling pathway"
+)
+table(
+  aging_go_dev_topm10 %in% dt_ora_key_counts$VALUE
+)
+aging_go_dev_topm10 <- dt_ora_key_counts[
+  ORA_CATEGORY == "GO_TERMS" &
+    VALUE %in% aging_go_dev_topm10 &
+    ORA_REGULATION == "DOWN" &
+    `Overall (Union)` >= 2
 ]
 
-# Egfl7:Notch1/2/3 upregulated.
-# Egfl7 not aging characterized
-# Notch is linked to pubmed aging (thymocyte development, angiogenesis
-# down implies less regeneration in muscle, senescence, etc, LRI_mouse_pmid_aging$Notch1). Notch
-# is related to many processes.
-# Here: angiogenesis (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3286203/) and
-# (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3031397/)
-# neural stem cell renewal (https://www.nature.com/articles/ncb1896)
-# Egfl7 acts as a Notch antagonist (reduce target gene expression)/opposite as well
-#/depent on the micorenviornment
-# Overexpression of Egfl7 can lead to abnormal vessel patterning
-# In NSC, Egfl7 reduces proliferation and trigger differentiation,
-# here maybe a similar effect on MSC in adipose tissues
+# select KEGG pws of interest in more than 10 tissues
 
-ccis_egfl7_up <- data_4_tissue_specific_results$CCI_table[
-    LIGAND_1 == "Egfl7" &
-    `Age Regulation` == "UP"
+aging_kegg_dev_topm10 <- c(
+  "PI3K-Akt signaling pathway"
+)
+table(
+  aging_kegg_dev_topm10 %in% dt_ora_key_counts$VALUE
+)
+aging_kegg_dev_topm10 <- dt_ora_key_counts[
+  ORA_CATEGORY == "KEGG_PWS" &
+    VALUE %in% aging_kegg_dev_topm10 &
+    ORA_REGULATION == "DOWN" &
+    `Overall (Union)` >= 2
 ]
 
-#appears up-regulaed in adipose tissues, brain, heart and mammary gland a lot
-ccis_egfl7_up[, .N, by = c("Dataset", "Tissue")][order(-N)]
-#secreted by endothelial cells
-ccis_egfl7_up[, .N, by = c("Tissue", "Emitter Cell Type")][order(-N)]
-#towards MSC in adipose, endocardial cells and fibroblast of cardiac tissues in heart, T cells
-ccis_egfl7_up[, .N, by = c("Tissue", "Receiver Cell Type")][order(-N)][1:10]
-#towards pericyte and oligodendrocyte precursor cells in Brain
-ccis_egfl7_up[, .N, by = c("Tissue", "Receiver Cell Type")][order(-N)][11:20]
+#select LRI based on go/kegg terms
 
-ccis_egfl7_up[, .N,
- by = c("Dataset", "Tissue", "Emitter Cell Type", "Receiver Cell Type")
-][order(-N)][1:10]
-
-## F13a1 ####
-
-ORA_LRI_N[
-    grepl("F13a1", VALUE)
+aging_dt_lri_fom_go_dev <- dt_ora_key_counts[
+  ORA_CATEGORY == "LRI" &
+    VALUE %in% scDiffCom::LRI_mouse$LRI_curated_GO[
+      GO_ID %in% scDiffCom::gene_ontology_level[
+        NAME %in% aging_go_dev_topm10$VALUE
+      ]$ID
+    ]$LRI &
+    ORA_REGULATION == "DOWN"
+]
+aging_dt_lri_fom_kegg_dev <- dt_ora_key_counts[
+  ORA_CATEGORY == "LRI" &
+    VALUE %in% scDiffCom::LRI_mouse$LRI_curated_KEGG[
+      KEGG_NAME %in% aging_kegg_dev_topm10$VALUE
+    ]$LRI &
+    ORA_REGULATION == "DOWN"
 ]
 
-#downregulated with integrins (https://pubmed.ncbi.nlm.nih.gov/10816592/)
-#The interaction of α4β1 and α9β1 with FXIII could be biologically significant.
-# Both α4β1 and α9β1 are highly expressed on specific populations of leukocytes,
-# where they play a prominent role in transendothelial leukocyte migration.
-# As a member of the coagulation cascade, FXIII is likely to be enriched at sites
-# of vascular injury and inflammation, where its interaction with α4β1 and α9β1 
-#could promote leukocyte extravasation.
-LRI_mouse_dt[LIGAND_1 == "F13a1"]
-
-#not well documented with aging (AMD papers)
-LRI_combined_pmid_aging$F13a1
-
-ccis_f13a1_down <- data_4_tissue_specific_results$CCI_table[
-    LIGAND_1 == "F13a1" &
-    `Age Regulation` == "DOWN"
+aging_lri_from_gokegg_dev <- c(
+  "Psen1:Notch2", "Angpt1:Itgb1", "Psen1:Ncstn", "Postn:Itgb1",
+  "App:Notch2", "Tgfb3:Itgb1", "Jag1:Notch2", "Vegfa:Itgb1",
+  "Thbs1:Itga4", "Tgfb1:Itgb1", "Fgfr2:Cd44", "Gpi1:Amfr"
+)
+table(
+  aging_lri_from_gokegg_dev %in% dt_ora_key_counts$VALUE
+)
+aging_dt_lri_dev <- dt_ora_key_counts[
+  ORA_CATEGORY == "LRI" &
+    ORA_REGULATION == "DOWN" &
+    VALUE %in% aging_lri_from_gokegg_dev
 ]
 
-#appears down-regulaed in Marrow, adipose tissue and other
-ccis_f13a1_down[, .N, by = c("Dataset", "Tissue")][order(-N)]
-#secreted by (pro-)monocyte/macrophages/myeloid principally
-ccis_f13a1_down[, .N, by = c("Tissue", "Emitter Cell Type")][order(-N)]
-#towards immune cell types
-ccis_f13a1_down[, .N, by = c("Tissue", "Receiver Cell Type")][order(-N)]
+# add aging information
+aging_dt_lri_dev <- merge.data.table(
+  aging_dt_lri_dev,
+  dt_lri_mouse_val_clean[, c("LRI", "pubmed", "HAGR"), with = FALSE],
+  by.x = "VALUE",
+  by.y = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
 
-#not well documented interaction with integrins
+# add validation results
+aging_dt_lri_dev <- merge.data.table(
+  aging_dt_lri_dev,
+  dt_lri_mouse_val_clean[, c(
+    "LRI",
+    "summary_val"),
+    with = FALSE],
+  by.x = "VALUE",
+  by.y = "LRI",
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE
+)
 
-## Gpi1 ####
+# full table
+aging_dt_dev <- rbindlist(
+  list(
+    aging_dt_lri_dev,
+    aging_go_dev_topm10,
+    aging_kegg_dev_topm10
+  ),
+  fill = TRUE,
+  use.names = TRUE
+)
 
-ORA_LRI_N[
-    grepl("Gpi1", VALUE)
-]
+# add sex results
 
-LRI_combined_pmid_aging$Gpi1
-LRI_mouse_dt[LIGAND_1 == "Gpi1"]
-
-## Tln1 (probably false positive as intracellular with Itgb1) ####
-
-## Col6a2, H2-Q6 # to do ####
-
-## Slpi Plscr1 ####
-ORA_LRI_N[
-    grepl("Slpi", VALUE)
-]
-
-#Slpi with Plscr1 not linked to aging
-
-LRI_mouse_dt[LRI == "Slpi:Pls"]
-
-ccis_slpi_up <- data_4_tissue_specific_results$CCI_table[
-    LIGAND_1 == "Slpi" &
-    `Age Regulation` == "UP"
-]
-
-## Rpsa
-ORA_LRI_N[
-    grepl("Rpsa", VALUE)
-]
-
-ccis_rpsa_up <- data_4_tissue_specific_results$CCI_table[
-    RECEPTOR_1 == "Rpsa" &
-    `Age Regulation` == "UP"
-]
-
-## Gpc1
-
-## Tnfrsf21
+aging_dt_dev_sex <- merge.data.table(
+  aging_dt_dev,
+  dt_ora_key_counts_diffsex[
+    ORA_REGULATION %in% c("UP", "DOWN")
+  ],
+  by = c("ORA_CATEGORY", "VALUE"),
+  all.x = TRUE,
+  all.y = FALSE,
+  sort = FALSE,
+  suffixes = c("_age", "_sex")
+)
