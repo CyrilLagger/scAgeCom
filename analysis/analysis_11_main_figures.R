@@ -19,6 +19,7 @@ library(webshot2)
 library(htmlwidgets)
 library(shiny)
 library(ComplexUpset)
+library(plotly)
 
 ## Prepare Figure LRI distribution (Fig.1a) ####
 
@@ -887,7 +888,7 @@ fun_plot_volcano_cci <- function(
     l = 10,
     r = 10,
     b = 30,
-    t = 30,
+    t = 90,
     pad = 10
   )
   plotly::plot_ly(
@@ -909,7 +910,7 @@ fun_plot_volcano_cci <- function(
       c("red", "blue", "black", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
-    marker = list(size = 10)
+    marker = list(size = 8)
   ) %>% plotly::layout(
     title = list(
       text = title_volcano,
@@ -920,7 +921,7 @@ fun_plot_volcano_cci <- function(
     xaxis = list(
       title = list(
         text = "Log2(FC)",
-        font = list(size = 36),
+        font = list(size = 30),
         standoff = 30
       ),
       tickfont = list(
@@ -930,7 +931,7 @@ fun_plot_volcano_cci <- function(
     yaxis = list(
       title = list(
         text = "-Log10(Adj. p-value)",
-        font = list(size = 36),
+        font = list(size = 30),
         standoff = 40
       ),
       tickfont = list(
@@ -947,18 +948,27 @@ fun_plot_volcano_cci <- function(
       xanchor = "center",
       x = 0.5,
       y = 1.1,
-      font = list(size = 34)
+      font = list(size = 24)
     ),
     margin = m
   )
 }
 
-fun_plot_volcano_cci(
+fig4a_volcano <- fun_plot_volcano_cci(
   dt_cci_full[
     dataset == "TMS Droplet (male)" &
       tissue == "Bladder"
   ],
   "Bladder - TMS Droplet (male)"
+)
+
+save_image(
+  fig4a_volcano, 
+  paste0(
+   path_scagecom_output,
+   "fig4a.svg"
+  ),
+  scale = 1
 )
 
 ## Deprecated! Prepare Figure Tissue Specific scores (old Fig. 4.b) ####
@@ -1062,7 +1072,9 @@ fun_plot_scores_cci(
 ## Prepare Figure Tissue Specific lrfc (Fig. 4.b) ####
 
 fun_plot_lrfc_cci <- function(
-  cci_table
+  cci_table,
+  title_lrfc,
+  x_axis_label = "Ligand Log2(FC)"
 ) {
   dt <- copy(
     cci_table[
@@ -1081,7 +1093,7 @@ fun_plot_lrfc_cci <- function(
     l = 10,
     r = 10,
     b = 30,
-    t = 30,
+    t = 90,
     pad = 10
   )
   plotly::plot_ly(
@@ -1100,21 +1112,21 @@ fun_plot_lrfc_cci <- function(
     ),
     color = ~REGULATION,
     colors = stats::setNames(
-      c("red", "blue", "green", "gray"),
+      c("red", "blue", "black", "gray"),
       c("UP", "DOWN", "FLAT", "NSC")
     ),
-    marker = list(size = 10)
+    marker = list(size = 8)
   )  %>% plotly::layout(
     title = list(
-      text = "",
-      font = list(size = 20),
+      text = title_lrfc,
+      font = list(size = 30),
       xanchor = "left",
       x = 0.0
     ),
     xaxis = list(
       title = list(
-        text = "Ligand Log2(FC)",
-        font = list(size = 36),
+        text = x_axis_label,
+        font = list(size = 30),
         standoff = 30
       ),
       tickfont = list(
@@ -1124,7 +1136,7 @@ fun_plot_lrfc_cci <- function(
     yaxis = list(
       title = list(
         text = "Receptor Log2(FC)",
-        font = list(size = 36),
+        font = list(size = 30),
         standoff = 40
       ),
       tickfont = list(
@@ -1135,21 +1147,31 @@ fun_plot_lrfc_cci <- function(
       orientation = "h",
       xanchor = "center",
       x = 0.5,
-      y = 1.02,
-      font = list(size = 34)
+      y = 1.1,
+      font = list(size = 24)
     ),
     margin = m
   )
 }
 
-fun_plot_lrfc_cci(
+fig4b_lrfc <- fun_plot_lrfc_cci(
   dt_cci_full[
     dataset == "TMS Droplet (male)" &
       tissue == "Bladder"
-  ]
+  ],
+  "Bladder - TMS Droplet (male)"
 )
 
-## Prepare Figure Tissue Specific visnetwork (Fig. 4.e) ####
+save_image(
+  fig4b_lrfc, 
+  paste0(
+    path_scagecom_output,
+    "fig4b.svg"
+  ),
+  scale = 1
+)
+
+## Prepare Figure Tissue Specific visnetwork (Fig. 4.c) ####
 
 fun_plot_ora_visnetwork <- function(
   cci_table,
@@ -1259,7 +1281,7 @@ fun_plot_ora_visnetwork(
   shiny_abbr_celltype
 )
 
-## Prepare Figure Tissue Specific go treemap (Fig. 4.f) ####
+## Deprecated Prepare Figure Tissue Specific go treemap (old Fig. 4.f) ####
 
 fun_plot_ora_go_treemap <- function(
   go_reduced_table,
@@ -1381,8 +1403,6 @@ fun_plot_ora_go_treemap(
 )
 
 ## Deprecated! Prepare Figure Tissue Specific gene ORA (old Fig. 4.f) ####
-
-#TODO
 
 ## Deprecated! Prepare Figure Cross Tissue GO table (old Fig. 5a) ####
 
@@ -1605,7 +1625,7 @@ plot_keyword_summary(
   "Lgals3:Lag3"
 )
 
-## Prepare Figure Cross Tissue T cell summary (Fig 4f) ####
+## Prepare Figure Cross Tissue T cell summary (Fig 4e and 4f) ####
 
 plot_KEYWORD_summary <- function(
   ora_keyword_summary,
@@ -1649,7 +1669,7 @@ plot_KEYWORD_summary <- function(
         "Not Detected" = "gray",
         "UP" = "red",
         "DOWN" = "blue",
-        "FLAT" = "green"#,
+        "FLAT" = "black"#,
         #"UP:DOWN" = "yellow"
       )
     ) +
@@ -1706,84 +1726,48 @@ plot_KEYWORD_summary <- function(
   # )
 }
 
-plot_KEYWORD_summary(
-  ora_keyword_summary = shiny_results$ORA_KEYWORD_SUMMARY,
-  ora_keyword_template = shiny_results$ORA_KEYWORD_TEMPLATE,
+fig4e_tcell <- plot_KEYWORD_summary(
+  ora_keyword_summary = shiny_list_full$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_list_full$ORA_KEYWORD_TEMPLATE,
   category = "GO Term",
   keyword = "T cell differentiation"
 )
 #2000x1400
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig4e_tcell.png"
+  ),
+  plot = fig4e_tcell,
+  width = 2000,
+  height = 1400,
+  units = "px",
+  scale = 2.7
+)
 
-plot_KEYWORD_summary(
-  ora_keyword_summary = shiny_results$ORA_KEYWORD_SUMMARY,
-  ora_keyword_template = shiny_results$ORA_KEYWORD_TEMPLATE,
+fig4f_b2m <- plot_KEYWORD_summary(
+  ora_keyword_summary = shiny_list_full$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_list_full$ORA_KEYWORD_TEMPLATE,
   category = "Ligand-Receptor Interaction",
   keyword = "B2m:Cd3g"
-)
-
-plot_KEYWORD_summary(
-  ora_keyword_summary = shiny_results$ORA_KEYWORD_SUMMARY,
-  ora_keyword_template = shiny_results$ORA_KEYWORD_TEMPLATE,
-  category = "Ligand-Receptor Interaction",
-  keyword = "Gpi1:Amfr"
-)
-
-## Prepare Figure Upset Plot Validation dataset (Fig 5a) ####
-
-setnames(
-  val_dt_selection,
-  old = c(
-    "pancreas", "huvec", "macro", "mscat",
-    "neurons", "glia", "cardio"
-  ),
-  new = c(
-    "hPDE (Li 2022)",
-    "hUVEC (Zhao 2020)",
-    "mBMM (Meissner 2013)",
-    "mMSC-AT (Acar 2020)",
-    "mNeuron (Tushaus 2020)",
-    "mGlial (Tushaus 2020)",
-    "rCM (Kuhn 2020)"
-  )
-)
-
-figp_val_upset <- ComplexUpset::upset(
-  as.data.frame(val_dt_selection),
-  colnames(val_dt_selection)[-c(1, 9, 10)],
-  name = "Dataset Groupings by Frequency",
-  set_sizes = ComplexUpset::upset_set_size()
-   + ylab("# of LR genes"),
-  base_annotations = list(
-    "Intersection Size" = ComplexUpset::intersection_size(
-      counts = TRUE,
-      bar_number_threshold = 100,
-      text = list(size = 8),
-      colour = "coral",
-      fill = "coral"
-    ) + theme(
-      axis.title.y = element_text(
-        margin = margin(t = 0, r = -200, b = 0, l = 0)
-      )
-    )
-  ),
-  themes = ComplexUpset::upset_default_themes(
-    text = element_text(size = 40),
-    plot.title = element_text(size = 34)
-  ),
-  min_size = 8
-) + ggtitle(
-  "LR genes matching to secreted proteins"
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_val_upset.png"
+    "fig4f_b2m.png"
   ),
-  plot = figp_val_upset,
-  width = 2100,
-  height = 1200,
+  plot = fig4f_b2m,
+  width = 2000,
+  height = 1400,
   units = "px",
-  scale = 3
+  scale = 2.7
+)
+
+plot_KEYWORD_summary(
+  ora_keyword_summary = shiny_list_full$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_list_full$ORA_KEYWORD_TEMPLATE,
+  category = "Ligand-Receptor Interaction",
+  keyword = "Gpi1:Amfr"
 )
 
 ## Prepare Figure ORA hUVEC family (Fig 5b) ####
@@ -1814,26 +1798,26 @@ fig_ora_huvec_fam <- ggplot(
 ) + xlab(
   "Odds Ratio"
 ) + ylab(
-  "Emitter Cell Family"
+  "scAgeCom emitter cell-type family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of hUVEC  "
+  "Association with the hUVEC secretome"
 )  + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_huvec_fam.png"
+    "fig_ora_huvec_fam2.png"
   ),
   plot = fig_ora_huvec_fam,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
+  scale = 1.6
 )
 
 ## Prepare Figure ORA mBMMM family (Fig 5c) ####
@@ -1864,26 +1848,26 @@ fig_ora_mbmm_fam <- ggplot(
 ) + xlab(
   "Odds Ratio"
 ) + ylab(
-  "Emitter Cell Family"
+  "scAgeCom emitter cell-type family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mBMM"
+  "Association with the mBMM secretome"
 ) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_mbmm_fam.png"
+    "fig_ora_mbmm_fam2.png"
   ),
   plot = fig_ora_mbmm_fam,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
+  scale = 1.6
 )
 
 ## Prepare Figure ORA mMSC-AT family and AT (Fig 5d) ####
@@ -1914,75 +1898,26 @@ fig_ora_mmscat_fam <- ggplot(
 ) + xlab(
   "Odds Ratio"
 ) + ylab(
-  "Emitter Cell Family"
+  "scAgeCom emitter cell-type family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mMSC-AT"
+  "Association with the mMSC-AT secretome"
 ) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_mmscat_fam.png"
+    "fig_ora_mmscat_fam2.png"
   ),
   plot = fig_ora_mmscat_fam,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
-)
-
-fig_ora_mmscat_at <- ggplot(
-  dt_val_mscat_at,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_mscat_at[BH != 0]$BH)
-    ),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_mscat_at$BH + min(dt_val_mscat_at[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_mscat_at$BH + min(dt_val_mscat_at[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "Emitter Cell Family"
-#) + theme_minimal(
-) + ggtitle(
-  "Secretome of mMSC-AT in AT"
-) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
-)
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_ora_mmscat_at.png"
-  ),
-  plot = fig_ora_mmscat_at,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 1.5
+  scale = 1.6
 )
 
 ## Prepare Figure ORA neuron family (Fig 5e) ####
@@ -2013,78 +1948,30 @@ fig_ora_neuron_fam <- ggplot(
 ) + xlab(
   "Odds Ratio"
 ) + ylab(
-  "Emitter Cell Family"
+  "scAgeCom emitter cell-type family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of mNeuron"
+  "Association with the mNeuron secretome"
 )  + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_neuron_fam.png"
+    "fig_ora_neuron_fam2.png"
   ),
   plot = fig_ora_neuron_fam,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
+  scale = 1.6
 )
 
-fig_ora_neuron_brain <- ggplot(
-  dt_val_neuron_brain,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_neuron_brain[BH != 0]$BH)
-    ),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_neuron_brain$BH + min(dt_val_neuron_brain[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_neuron_brain$BH + min(dt_val_neuron_brain[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "Emitter Cell Family"
-#) + theme_minimal(
-) + ggtitle(
-  "Secretome of mNeuron in Brain samples"
-) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
-)
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_ora_neuron_brain.png"
-  ),
-  plot = fig_ora_neuron_brain,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 1.5
-)
 
-## Prepare Figure ORA glial family (Fig 5f) ####
+## (Deprecated) Prepare Figure ORA glial family ####
 
 fig_ora_glial_fam <- ggplot(
   dt_val_glial_fam,
@@ -2211,75 +2098,26 @@ fig_ora_cardio_fam <- ggplot(
 ) + xlab(
   "Odds Ratio"
 ) + ylab(
-  "Emitter Cell Family"
+  "scAgeCom emitter cell-type family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of rCM"
+  "Association with the rCM secretome"
 )  + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_cardio_fam.png"
+    "fig_ora_cardio_fam2.png"
   ),
   plot = fig_ora_cardio_fam,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
-)
-
-fig_ora_cardio_heart <- ggplot(
-  dt_val_cardio_heart,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_cardio_heart[BH != 0]$BH)
-    ),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_cardio_heart$BH + min(dt_val_cardio_heart[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_cardio_heart$BH + min(dt_val_cardio_heart[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "Emitter Cell Family"
-#) + theme_minimal(
-) + ggtitle(
-  "Secretome of rCM in Heart samples"
-) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
-)
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_ora_cardio_heart.png"
-  ),
-  plot = fig_ora_cardio_heart,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 1.5
+  scale = 1.6
 )
 
 ## Prepare Figure ORA hpde family (Fig 5h) ####
@@ -2310,82 +2148,90 @@ fig_ora_hpde_fam <- ggplot(
 ) + xlab(
   "Odds Ratio"
 ) + ylab(
-  "Emitter Cell Family"
+  "scAgeCom emitter cell-type family"
 #) + theme_minimal(
 ) + ggtitle(
-  "Secretome of hPDE"
+  "Association with the hPDE secretome"
 ) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_hpde_fam.png"
+    "fig_ora_hpde_fam2.png"
   ),
   plot = fig_ora_hpde_fam,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
+  scale = 1.6
 )
 
-fig_ora_hpde_pancreas <- ggplot(
-  dt_val_pancreas_pct,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_pancreas_pct[BH != 0]$BH)
-    ),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_pancreas_pct$BH + min(dt_val_pancreas_pct[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_mscat_at$BH + min(dt_val_pancreas_pct[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "Emitter Cell Family"
-#) + theme_minimal(
-) + ggtitle(
- "Secretome of hPDE in Pancreas Samples"
-) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
+## Figure 5 at once ####
+
+fig5_complete <- cowplot::plot_grid(
+  plotlist = list(
+    fig_ora_huvec_fam,
+    fig_ora_mbmm_fam,
+    fig_ora_neuron_fam,
+    fig_ora_mmscat_fam,
+    fig_ora_cardio_fam,
+    fig_ora_hpde_fam
+  ),
+  ncol = 2
 )
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_hpde_pancreas.png"
+    "fig_ora_complete_fam.png"
   ),
-  plot = fig_ora_hpde_pancreas,
+  plot = fig5_complete,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 1.5
+  scale = 3.2
 )
-
-dt_val_pancreas_pct
 
 ## Figure 6 ####
 
-ggplot(
+regulation_distr_long <- copy(shiny_tissue_counts_summary)
+setnames(
+  regulation_distr_long,
+  old = c("Flat CCIs", "Down CCIs", "UP CCIs", "NSC CCIs"),
+  new= c("FLAT", "DOWN", "UP", "NSC")
+)
+
+regulation_distr_long <- melt.data.table(
+  regulation_distr_long,
+  id.vars = c("Tissue", "Dataset"),
+  measure.vars = c("FLAT", "DOWN", "UP", "NSC"),
+  variable.name = "REGULATION",
+  value.name = "N"
+)
+
+regulation_distr_long <- regulation_distr_long[
+  ,
+  {
+  totwt = sum(N)
+  .SD[,.(pct=N/totwt), by = REGULATION ]
+  },
+  by = c("Tissue", "Dataset")
+]
+
+regulation_distr_long[, Dataset := factor(Dataset, levels = c(
+  "TMS FACS (male)", "TMS FACS (female)", "TMS Droplet (male)", "TMS Droplet (female)", "Calico Droplet (male)"
+  ))
+]
+
+regulation_distr_long[, REGULATION := factor(REGULATION, levels = c(
+  "UP", "DOWN", "FLAT", "NSC"
+))
+]
+
+fig6_complete <- ggplot(
   data = regulation_distr_long,
   aes(
     y = Tissue,
@@ -2398,7 +2244,7 @@ ggplot(
   alpha = 0.8
 ) + scale_fill_manual(
   "Age-Regulation",
-  values = c("UP" = "red", "DOWN" = "blue", "FLAT" = "green", "NSC" = "grey")
+  values = c("UP" = "red", "DOWN" = "blue", "FLAT" = "black", "NSC" = "grey")
 ) + facet_wrap(
   ~ Dataset,
   ncol = 5
@@ -2416,6 +2262,17 @@ ggplot(
   axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0)),
   panel.spacing = unit(2, "lines"),
   legend.position = c(0.905, 0.8)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_6_complete.png"
+  ),
+  plot = fig6_complete,
+  width = 3000,
+  height = 1800,
+  units = "px",
+  scale = 3.2
 )
 #manual save 3000x1800
 
