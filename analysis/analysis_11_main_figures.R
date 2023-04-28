@@ -6,7 +6,7 @@
 ## ursu_eugen@hotmail.com
 ## anais.equey@gmail.com
 ##
-## Create main figures for manuscript
+## Create (6) main figures for manuscript
 ##
 ####################################################
 ##
@@ -91,7 +91,6 @@ ggsave(
   units = "px",
   scale = 3
 )
-#manual save: 2100x1200
 
 ## Prepare Figure LRI functional annotation (Fig.1b) ####
 
@@ -464,7 +463,7 @@ figp_distr_de <- ggplot(
   axis.text.y = element_blank()
 )
 figp_distr_de
-#manual save 2000x1400
+
 ggsave(
   paste0(
     path_scagecom_output,
@@ -524,7 +523,7 @@ figp_distr_cond1 <- ggplot(
   axis.text.y = element_blank()
 ) + xlim(-0.5, 2.5)
 figp_distr_cond1
-#manual save 2000x1400
+
 ggsave(
   paste0(
     path_scagecom_output,
@@ -840,8 +839,6 @@ ggsave(
   units = "px",
   scale = 3
 )
-#manual save 2000x1400
-
 
 ## Prepare Figure Tissue Specific volcano (Fig. 4.a) ####
 
@@ -969,104 +966,6 @@ save_image(
    "fig4a.svg"
   ),
   scale = 1
-)
-
-## Deprecated! Prepare Figure Tissue Specific scores (old Fig. 4.b) ####
-
-fun_plot_scores_cci <- function(
-  cci_table
-) {
-  dt <- copy(
-    cci_table[
-      ,
-      c(
-        "EMITTER_CELLTYPE", "RECEIVER_CELLTYPE",
-        "LRI", "REGULATION", "CCI_SCORE_YOUNG", "CCI_SCORE_OLD"
-      )
-    ]
-  )
-  dt$REGULATION <- factor(
-    dt$REGULATION,
-    levels = c("UP", "DOWN", "FLAT", "NSC")
-  )
-  min_score <-  10 ^ (floor(
-    log10(
-      min(
-        min(dt[CCI_SCORE_YOUNG > 0]$CCI_SCORE_YOUNG),
-        min(dt[CCI_SCORE_OLD > 0]$CCI_SCORE_OLD)
-      )
-    )
-  ))
-  m <- list(
-    l = 10,
-    r = 10,
-    b = 30,
-    t = 30,
-    pad = 10
-  )
-  plotly::plot_ly(
-    data = dt,
-    type = "scatter",
-    mode = "markers",
-    x = ~log10(CCI_SCORE_YOUNG + min_score),
-    y = ~log10(CCI_SCORE_OLD + min_score),
-    text = ~paste(
-      "LRI: ",
-      LRI,
-      "<br>Emitter:",
-      EMITTER_CELLTYPE,
-      "<br>Receiver:",
-      RECEIVER_CELLTYPE
-    ),
-    color = ~REGULATION,
-    colors = stats::setNames(
-      c("red", "blue", "green", "gray"),
-      c("UP", "DOWN", "FLAT", "NSC")
-    ),
-    marker = list(size = 10)
-  ) %>% plotly::layout(
-    title = list(
-      text = "Interactive Score Plot",
-      font = list(size = 20),
-      xanchor = "left",
-      x = 0.0
-    ),
-    xaxis = list(
-      title = list(
-        text = "Log10(Young CCI Score)",
-        font = list(size = 36),
-        standoff = 30
-      ),
-      tickfont = list(
-        size = 24
-      )
-    ),
-    yaxis = list(
-      title = list(
-        text = "Log10(Old CCI Score)",
-        font = list(size = 36),
-        standoff = 40
-      ),
-      tickfont = list(
-        size = 24
-      )
-    ),
-    legend = list(
-      orientation = "h",
-      xanchor = "center",
-      x = 0.5,
-      y = 1.02,
-      font = list(size = 34)
-    ),
-    margin = m
-  )
-}
-
-fun_plot_scores_cci(
-  dt_cci_full[
-    dataset == "TMS Droplet (male)" &
-      tissue == "Bladder"
-  ]
 )
 
 ## Prepare Figure Tissue Specific lrfc (Fig. 4.b) ####
@@ -1281,350 +1180,6 @@ fun_plot_ora_visnetwork(
   shiny_abbr_celltype
 )
 
-## Deprecated Prepare Figure Tissue Specific go treemap (old Fig. 4.f) ####
-
-fun_plot_ora_go_treemap <- function(
-  go_reduced_table,
-  tissue_choice,
-  dataset_choice,
-  type_choice,
-  go_aspect_choice,
-  title_text,
-  domain = NULL,
-  min_size
-) {
-  ex_data <- go_reduced_table[
-    Dataset == dataset_choice &
-      Tissue == tissue_choice &
-      ASPECT == go_aspect_choice &
-      REGULATION == type_choice
-  ][, c("score", "term", "parentTerm")]
-  if (nrow(ex_data) == 0) return(NULL)
-  ex_data[, new_parent := ifelse(
-    term %in% parentTerm,
-    "",
-    parentTerm
-  )]
-  new_data <- data.table(
-    labels = c(ex_data$term, ex_data[new_parent == ""]$term),
-    parents = c(
-      ex_data$parentTerm,
-      rep("", length(ex_data[new_parent == ""]$term))
-    )
-  )
-  new_data[
-    ,
-    ids := sapply(
-      seq_len(nrow(.SD)),
-      function(i) {
-        if (labels[[i]] == parents[[i]]) {
-          res <- paste(labels[[i]], parents[[i]], sep = " - ")
-        } else {
-          res <- labels[[i]]
-        }
-        res
-      }
-    )
-  ]
-  new_data[
-    ,
-    score := sapply(
-      seq_len(nrow(.SD)),
-      function(i) {
-        if (parents[[i]] == "") {
-          res <- sum(ex_data[parentTerm == labels[[i]]]$score)
-        } else {
-          res <- ex_data[term == labels[[i]]]$score
-        }
-        res
-      }
-    )
-  ]
-  new_data[
-    ,
-    text := gsub(" ", "\n", labels)
-  ]
-  m <- list(
-    l = 5,
-    r = 5,
-    b = 5,
-    t = 30,
-    pad = 0
-  )
-  plotly::plot_ly(
-    new_data,
-    type = "treemap",
-    opacity = 1,
-    ids = ~ids,
-    parents = ~parents,
-    values = ~score,
-    labels = ~labels,
-    text = ~text,
-    textposition = "middle center",
-    branchvalues = "total",
-    hoverinfo = "label+value",
-    marker = list(
-      line = list(color = "black")
-    ),
-    textinfo = "text",
-    domain = domain
-  ) %>% plotly::layout(
-    title = list(
-      text = title_text,
-      font = list(size = 16),
-      xanchor = "left",
-      x = 0.0
-    ),
-    uniformtext = list(
-      minsize = min_size,
-      mode = "hide"
-    ),
-    margin = m
-  )
-}
-
-fun_plot_ora_go_treemap(
-  go_reduced_table = shiny_dt_go_reduced[
-  Dataset ==  "TMS Droplet (male)" &
-    Tissue == "Bladder" &
-    ASPECT == "biological_process" &
-    REGULATION == "UP" &
-    cluster %in% c(1, 2, 3, 4)
-],
-  tissue_choice = "Bladder",
-  dataset_choice = "TMS Droplet (male)",
-  type_choice = "UP",
-  go_aspect_choice = "biological_process",
-  title_text = paste0(
-    "Top GO Biological Processes - ",
-    "UP"
-  ),
-  min_size = 12
-)
-
-## Deprecated! Prepare Figure Tissue Specific gene ORA (old Fig. 4.f) ####
-
-## Deprecated! Prepare Figure Cross Tissue GO table (old Fig. 5a) ####
-
-fun_display_keyword_counts <- function(
-  ora_keyword_counts,
-  category,
-  regulation,
-  go_aspect = NULL
-) {
-  dt <- ora_keyword_counts[
-    ORA_CATEGORY == category &
-      ORA_REGULATION == regulation
-  ]
-  data.table::setnames(dt, old = "VALUE", new = category)
-  if (category == "GO Term") {
-    temp_aspect <- ifelse(
-      go_aspect == "Biological Process",
-      "biological_process",
-      ifelse(
-        go_aspect == "Molecular Function",
-        "molecular_function",
-        "cellular_component"
-      )
-    )
-    dt <- dt[ASPECT == temp_aspect]
-    dt <- dt[, -c(1,2,10)]
-    if (go_aspect == "Biological Process") {
-      category_label <- paste0("GO ", go_aspect, "es")
-    } else {
-      category_label <- paste0("GO ", go_aspect, "s")
-    }
-  } else {
-    dt <- dt[, -c(1,2,10,11)]
-    if(grepl("Family", category)){
-      category_label <- sub("Family", "Families", category)
-    } else {
-      category_label <- paste0(category, "s")
-    }
-  }
-  DT <- DT::datatable(
-    data = dt,
-    filter = list(
-      position ="top",
-      clear = FALSE,
-      plain = FALSE
-    ),
-    class = "display compact",
-    options =list(
-      pageLength = 5,
-      dom = '<"top"f>rt<"bottom"lip><"clear">',
-      columnDefs = list(
-        list(width = '300px', targets = c(1))
-      )
-    ),
-    caption = tags$caption(
-      style = paste0(
-        "caption-side: top; ",
-        "text-align: center; ",
-        "color: black; ",
-        "font-size: 120%;"
-      ),
-      paste0(
-        "Number of tissues in which ",
-        category_label,
-        " are over-represented among ",
-        regulation,
-        "-regulated cell-cell interactions"
-      )
-    )
-  ) %>% DT::formatStyle(
-    colnames(dt)[-1],
-    `text-align` = "center"
-  )
-  if (category == "GO Term") {
-    DT <- DT %>% DT::formatStyle(c(7), `border-right` = "solid 2px")
-  }
-  DT
-}
-
-fig_table_bp_up <- fun_display_keyword_counts(
-  shiny_dt_ora_key_counts,
-  category = "GO Term",
-  regulation = "UP",
-  go_aspect = "Biological Process"
-)
-fig_table_bp_up$width <- "650px"
-
-fig_table_bp_up_html <- "fig_table_BP_up.html"
-saveWidget(fig_table_bp_up, fig_table_bp_up_html)
-webshot(
-  fig_table_bp_up_html,
-  paste0(
-    path_scagecom_output,
-    "fig_table_BP_up.png"
-  ),
-  zoom = 3
-)
-
-
-
-
-table_LRI_down <- display_KEYWORD_counts(
-  shiny_results$ORA_KEYWORD_COUNTS,
-  category = "Ligand-Receptor Interaction",
-  regulation = "DOWN"
-)
-table_LRI_down$width <- "600px"
-
-table_LRI_down_html <- "table_LRI_down.html"
-saveWidget(table_LRI_down, table_LRI_down_html)
-webshot(
-  table_LRI_down_html,
-  "../../../../../table_LRI_down.png",
-  zoom = 3
-)
-
-table_L_down <- display_KEYWORD_counts(
-  shiny_results$ORA_KEYWORD_COUNTS,
-  category = "Receptor",
-  regulation = "DOWN"
-)
-table_L_down$width <- "600px"
-
-table_LRI_down_html <- "table_LRI_down.html"
-saveWidget(table_LRI_down, table_LRI_down_html)
-webshot(
-  table_LRI_down_html,
-  "../../../../../table_LRI_down.png",
-  zoom = 3
-)
-
-plot_keyword_summary <- function(
-  ora_keyword_summary,
-  ora_keyword_template,
-  category,
-  keyword
-) {
-  dt <- copy(ora_keyword_summary)[
-    ORA_CATEGORY == category
-  ]
-  if (!(keyword %in% dt$VALUE)) {
-    stop("`keyword` not found")
-  }
-  dt <- dt[
-    VALUE == keyword
-  ]
-  dt <- copy(ora_keyword_template)[
-    dt,
-    on = c("Tissue", "Dataset"),
-    Regulation := i.ORA_REGULATION
-  ]
-  dt[is.na(dt)] <- "Not Detected"
-  print(dt)
-  p <- ggplot(dt) +
-    geom_tile(
-      aes(
-        Dataset,
-        Tissue,
-        fill = Regulation,
-        width = 0.9,
-        height = 0.9
-      ),
-      colour = "black"
-    ) +
-    scale_fill_manual(
-      name = NULL,
-      values = c(
-        "Not Over-represented" = "white",
-        "Not Detected" = "gray",
-        "UP" = "red"
-      ),
-      drop = FALSE
-    ) +
-    ggtitle(
-      stringr::str_trunc(
-        paste0(
-          "Over-representation of ",
-          keyword
-        ),
-        70,
-        "right"
-      )
-    ) +
-    scale_x_discrete(
-      limits = c(
-        "TMS FACS (male)",
-        "TMS FACS (female)",
-        "TMS Droplet (male)",
-        "TMS Droplet (female)",
-        "Calico Droplet (male)"
-      ),
-      labels = c(
-        "TMS\nFACS\n(male)",
-        "TMS\nFACS\n(female)",
-        "TMS\nDroplet\n(male)",
-        "TMS\nDroplet\n(female)",
-        "Calico\nDroplet\n(male)"
-      )
-    ) +
-    scale_y_discrete(
-      limits = sort(
-        unique(dt$Tissue),
-        decreasing = TRUE
-      )
-    ) +
-    xlab("") +
-    ylab("") +
-    theme(text = element_text(size = 32)) +
-    theme(
-      axis.text = element_text(size = 32, face = "bold")
-    ) +
-    theme(legend.position = c(0.8, 0.8))
-  p
-}
-
-plot_keyword_summary(
-  shiny_dt_ora_key_summary,
-  shiny_dt_ora_key_template,
-  "Ligand-Receptor Interaction",
-  "Lgals3:Lag3"
-)
-
 ## Prepare Figure Cross Tissue T cell summary (Fig 4e and 4f) ####
 
 plot_KEYWORD_summary <- function(
@@ -1770,7 +1325,7 @@ plot_KEYWORD_summary(
   keyword = "Gpi1:Amfr"
 )
 
-## Prepare Figure ORA hUVEC family (Fig 5b) ####
+## Prepare Figure ORA hUVEC family (Fig 5a) ####
 
 fig_ora_huvec_fam <- ggplot(
   dt_val_huvec_fam,
@@ -1820,7 +1375,7 @@ ggsave(
   scale = 1.6
 )
 
-## Prepare Figure ORA mBMMM family (Fig 5c) ####
+## Prepare Figure ORA mBMMM family (Fig 5b) ####
 
 fig_ora_mbmm_fam <- ggplot(
   dt_val_macro_fam,
@@ -1870,7 +1425,7 @@ ggsave(
   scale = 1.6
 )
 
-## Prepare Figure ORA mMSC-AT family and AT (Fig 5d) ####
+## Prepare Figure ORA mMSC-AT family (Fig 5d) ####
 
 fig_ora_mmscat_fam <- ggplot(
   dt_val_mscat_fam,
@@ -1920,7 +1475,7 @@ ggsave(
   scale = 1.6
 )
 
-## Prepare Figure ORA neuron family (Fig 5e) ####
+## Prepare Figure ORA neuron family (Fig 5c) ####
 
 fig_ora_neuron_fam <- ggplot(
   dt_val_neuron_fam,
@@ -1971,106 +1526,7 @@ ggsave(
 )
 
 
-## (Deprecated) Prepare Figure ORA glial family ####
-
-fig_ora_glial_fam <- ggplot(
-  dt_val_glial_fam,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_glial_fam[BH != 0]$BH)
-    )
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_glial_fam$BH + min(dt_val_glial_fam[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_glial_fam$BH + min(dt_val_glial_fam[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "Emitter Cell Family"
-#) + theme_minimal(
-) + ggtitle(
-  "Secretome of mGlial"
-)  + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
-)
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_ora_glial_fam.png"
-  ),
-  plot = fig_ora_glial_fam,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 1.5
-)
-
-fig_ora_glial_brain <- ggplot(
-  dt_val_glial_brain,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_glial_brain[BH != 0]$BH)
-    ),
-    color = group
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_glial_brain$BH + min(dt_val_glial_brain[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_glial_brain$BH + min(dt_val_glial_brain[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "Emitter Cell Family"
-#) + theme_minimal(
-) + ggtitle(
-  "Secretome of mGlial in Brain samples"
-) + theme(
-  text = element_text(size = 14),
-  legend.title = element_text(size = 12),
-  legend.text = element_text(size = 12),
-  axis.text = element_text(size = 12)
-)
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_ora_glial_brain.png"
-  ),
-  plot = fig_ora_glial_brain,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 1.5
-)
-
-## Prepare Figure ORA cardio family (Fig 5g) ####
+## Prepare Figure ORA cardio family (Fig 5e) ####
 
 fig_ora_cardio_fam <- ggplot(
   dt_val_cardio_fam,
@@ -2120,7 +1576,7 @@ ggsave(
   scale = 1.6
 )
 
-## Prepare Figure ORA hpde family (Fig 5h) ####
+## Prepare Figure ORA hpde family (Fig 5f) ####
 
 fig_ora_hpde_fam <- ggplot(
   dt_val_pancreas_fam,
@@ -2170,7 +1626,7 @@ ggsave(
   scale = 1.6
 )
 
-## Figure 5 at once ####
+## Prepare Figure 5 at once ####
 
 fig5_complete <- cowplot::plot_grid(
   plotlist = list(
@@ -2195,7 +1651,7 @@ ggsave(
   scale = 3.2
 )
 
-## Figure 6 ####
+## Prepare Figure 6 ####
 
 regulation_distr_long <- copy(shiny_tissue_counts_summary)
 setnames(
@@ -2273,251 +1729,4 @@ ggsave(
   height = 1800,
   units = "px",
   scale = 3.2
-)
-#manual save 3000x1800
-
-## To remove? #####
-
-display_cci_table <- function(
-  cci_table
-) {
-  dt <- cci_table[
-    ,
-    3:12
-  ]
-  CCI_DT <- DT::datatable(
-    data = dt[, -c(9, 10)],
-    class = "display compact",
-    options = list(
-      pageLength = 10,
-      dom = '<"top"f>rt<"bottom"lip><"clear">'
-    ),
-    caption = tags$caption(
-      style = paste0(
-        "caption-side: top; text-align: center; ",
-        "color:black; font-size:120% ;"
-      ),
-      "Table of Cell-Cell Interactions"
-    ),
-    rownames = rownames,
-    extensions = c("Buttons")
-  ) %>% DT::formatStyle(
-    colnames(dt[, -c(9, 10)])[4:8],
-    `text-align` = "center"
-  )
-}
-
-plot_ora_local <- function(
-  ora_dt,
-  category,
-  regulation,
-  max_terms_show,
-  GO_aspect,
-  OR_threshold,
-  bh_p_value_threshold
-) {
-  VALUE <- ASPECT <- LEVEL <-
-    OR <- OR_UP <- OR_DOWN <- OR_FLAT <-
-    BH_PVAL <- BH_P_VALUE_UP <- BH_P_VALUE_DOWN <- BH_P_VALUE_FLAT <-
-    ORA_SCORE <- ORA_SCORE_UP <- ORA_SCORE_DOWN <- ORA_SCORE_FLAT <- NULL
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop(
-      paste0(
-        "Package \"ggplot2\" needed for this function to work.",
-        "Please install it."
-      ),
-      call. = FALSE
-    )
-  }
-  if (OR_threshold < 1) {
-    stop(
-      "'OR_thtreshold' muste be bigger than 1"
-    )
-  }
-  if (bh_p_value_threshold > 0.05) {
-    stop(
-      "'bh_p_value_threshold' must be smaller than 0.05"
-    )
-  }
-  dt <- data.table::copy(ora_dt)
-  if(regulation == "UP") {
-    dt[, OR := OR_UP]
-    dt[, BH_PVAL := BH_P_VALUE_UP]
-    dt[, ORA_SCORE := ORA_SCORE_UP]
-  } else if (regulation == "DOWN") {
-    dt[, OR := OR_DOWN]
-    dt[, BH_PVAL := BH_P_VALUE_DOWN]
-    dt[, ORA_SCORE := ORA_SCORE_DOWN]
-  } else if (regulation == "FLAT") {
-    dt[, OR := OR_FLAT]
-    dt[, BH_PVAL := BH_P_VALUE_FLAT]
-    dt[, ORA_SCORE := ORA_SCORE_FLAT]
-  } else {
-    stop("Can't find 'regulation' type")
-  }
-  if (category == "GO_TERMS") {
-    dt <- dt[
-      ASPECT == GO_aspect
-    ]
-    dt[, VALUE := paste0(
-      "(L",
-      LEVEL,
-      ") ",
-      VALUE
-    )]
-  }
-  dt <- dt[
-    OR > 1 &
-      BH_PVAL <= 0.05
-  ]
-  if (any(is.infinite(dt$OR))) {
-    extra_label_annotation <- " (* : infinite odds ratios are normalized)"
-    dt[
-      ,
-      VALUE := ifelse(
-        is.infinite(OR),
-        paste0("* ", VALUE),
-        VALUE
-      )
-    ]
-    dt_finite <- dt[is.finite(OR)]
-    if (nrow(dt_finite) > 0) {
-      dt[
-        ,
-        OR := ifelse(
-          is.infinite(OR),
-          1 + max(dt_finite$OR),
-          OR
-        )
-      ]
-    } else {
-      dt[, OR := 100]
-    }
-    dt[
-      ,
-      ORA_SCORE := -log10(BH_PVAL) * log2(OR)
-    ]
-  } else {
-    extra_label_annotation <- NULL
-  }
-  dt <- dt[
-    OR > OR_threshold &
-      BH_PVAL <= bh_p_value_threshold
-  ][order(-ORA_SCORE)]
-  n_row_tokeep <- min(max_terms_show, nrow(dt))
-  dt <- dt[1:n_row_tokeep]
-  dt$VALUE <- sapply(
-    dt$VALUE,
-    function(i) {
-      words <- strsplit(i, " ")[[1]]
-      n_words <- length(words)
-      if (n_words >= 5) {
-        if (n_words %% 2 == 0) {
-          mid <- n_words / 2
-        } else {
-          mid <- (n_words + 1) / 2
-        }
-        res <- paste0(
-          paste0(words[1:mid], collapse = " "),
-          "\n",
-          paste0(words[(mid + 1):length(words)], collapse = " ")
-        )
-      } else {
-        res <- i
-      }
-      res
-    }
-  )
-  category_label <- ifelse(
-    category == "LRI",
-    "Ligand-Receptor Interactions",
-    ifelse(
-      category == "LIGAND_COMPLEX",
-      "Ligand Genes",
-      ifelse(
-        category == "RECEPTOR_COMPLEX",
-        "Receptor Genes",
-        ifelse(
-          category == "ER_CELLTYPES",
-          "Emitter-Receiver Cell Types",
-          ifelse(
-            category == "EMITTER_CELLTYPE",
-            "Emitter Cell Types",
-            ifelse(
-              category == "RECEIVER_CELLTYPE",
-              "Receiver Cell Types",
-              ifelse(
-                category == "GO_TERMS",
-                ifelse(
-                  GO_aspect == "biological_process",
-                  "GO Biological Processes",
-                  ifelse(
-                    GO_aspect == "molecular_function",
-                    "GO Molecular Functions",
-                    "GO Cellular Components"
-                  )
-                ),
-                ifelse(
-                  category == "KEGG_PWS",
-                  "KEGG Pathways",
-                  category
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  )
-  ggplot(
-    dt,
-    aes(
-      ORA_SCORE,
-      stats::reorder(VALUE, ORA_SCORE)
-    )
-  ) +
-    geom_point(
-      aes(
-        size = -log10(BH_PVAL),
-        color = log2(OR)
-      )
-    ) +
-    scale_color_gradient(low = "orange", high = "red") +
-    scale_size_continuous(range = c(8, 10)) +
-    xlab(paste0("ORA score ", regulation)) +
-    ylab("") +
-    labs(
-      size = "-log10(Adj. P-Value)",
-      color = "log2(Odds Ratio)",
-      caption = extra_label_annotation
-    ) +
-    theme(text = element_text(size = 40)) +
-    theme(legend.position = c(0.8, 0.3)) +
-    theme(legend.title = element_text(size = 34)) +
-    theme(legend.text = element_text(size = 26)) +
-    theme(plot.title.position = "plot") +
-    ggtitle(
-      paste0(
-        "Top ",
-        n_row_tokeep,
-        " over-represented ",
-        regulation,
-        "-regulated ",
-        category_label
-      )
-    )
-}
-
-plot_ora_local(
-  ora_dt = ORA_table[
-    ORA_CATEGORY == "LRI" &
-      Dataset == "TMS Droplet (male)" &
-      Tissue == "Bladder"
-  ],
-  category = "LRI",
-  regulation = "UP",
-  max_terms_show = 20,
-  GO_aspect = NULL,
-  OR_threshold = 1,
-  bh_p_value_threshold = 0.045
 )
