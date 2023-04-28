@@ -11,6 +11,8 @@
 ####################################################
 ##
 
+## Note: running most of this script requires a large amount of RAM (>40GB) ####
+
 ## Add libraries ####
 
 library(Seurat)
@@ -739,7 +741,7 @@ identical(
   genes_seurat_mapped$calico_spleen$gene_res
 )
 
-## save renamed Seurat objects ####
+## Save Seurat objects with renamed cell types ####
 
 saveRDS(
   seurats_processed_renamed$tms_facs,
