@@ -11,7 +11,7 @@
 ####################################################
 ##
 
-## LRI database - general (Sup. Data 1) ####
+## LRI database - general (Sup. Data 1-6) ####
 
 supd_lri_human <- scDiffCom::LRI_human[c(1, 2, 3)]
 names(supd_lri_human) <- paste0(names(supd_lri_human), "_human")
@@ -26,7 +26,7 @@ openxlsx::write.xlsx(
   )
 )
 
-## Ligand/receptor - aging (Sup. Data 2) ####
+## Ligand/receptor - aging (Sup. Data 7) ####
 
 supd_lr_aging <- copy(pmid_aging_lri_n)
 supd_lr_aging[
@@ -45,6 +45,44 @@ openxlsx::write.xlsx(
   file = paste0(
     path_scagecom_output,
     "Supplementary_Data_LR_aging.xlsx"
+  )
+)
+
+## Cell number distribution (Sup. Data 8) #####
+
+supd_cell_number_distr <- copy(dt_md_tms_age_sex_dc)
+setnames(
+  supd_cell_number_distr,
+  old = c("dataset", "tissue", "cell_ontology_final",
+          "female_OLD", "female_YOUNG", "male_OLD", "male_YOUNG", 
+          "male_scd", "female_scd"),
+  new = c("Dataset", "Tissue", "Cell type",
+          "Cell Number (female old)", "Cell Number (female young)",
+          "Cell Number (male old)", "Cell Number (male young)", 
+          "Available in scAgeCom (male)", "Available in scAgeCom (female)"),
+)
+
+supd_cell_number_distr <- supd_cell_number_distr[
+  ,
+  c("Dataset", "Tissue", "Cell type",
+    "Cell Number (female old)", "Cell Number (female young)",
+    "Cell Number (male old)", "Cell Number (male young)", 
+    "Available in scAgeCom (male)", "Available in scAgeCom (female)")
+]
+
+setcolorder(
+  supd_cell_number_distr,
+  c("Dataset", "Tissue", "Cell type",
+    "Cell Number (female young)", "Cell Number (female old)", 
+    "Cell Number (male young)", "Cell Number (male old)",  
+    "Available in scAgeCom (female)", "Available in scAgeCom (male)")
+)
+
+openxlsx::write.xlsx(
+  supd_cell_number_distr,
+  file = paste0(
+    path_scagecom_output,
+    "Supplementary_Data_Cell_Number_Distr.xlsx"
   )
 )
 
@@ -272,6 +310,13 @@ dt_cci_classification <- dt_cci_classification[
 
 fwrite(
   dt_cci_classification,
+  paste0(
+    path_scagecom_output,
+    "Supplementary_Data_cci_classification.csv"
+  )
+)
+
+dt_cci_classification <- fread(
   paste0(
     path_scagecom_output,
     "Supplementary_Data_cci_classification.csv"
