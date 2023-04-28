@@ -11,7 +11,7 @@
 ####################################################
 ##
 
-## Keep only relevant CCIs for analysis ####
+## Keep only relevant (in the sense of the manuscript) CCIs for analysis ####
 
 dt_cci_rel <- dt_cci_full[!grepl("mixed", dataset)]
 
