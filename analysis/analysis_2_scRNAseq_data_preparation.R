@@ -11,7 +11,12 @@
 ####################################################
 ##
 
-## Note: running most of this script requires a large amount of RAM (>40GB) ####
+## Intro ####
+# This script load Seurat scRNA-seq datasets and does
+# some preprocessing such as renaming cell types such that they are uniform
+# across datasets.
+
+# Note: running most of this script requires a large amount of RAM (>40GB)
 
 ## Add libraries ####
 
