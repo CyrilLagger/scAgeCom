@@ -11,6 +11,11 @@
 ####################################################
 ##
 
+
+## Intro ####
+# This script read scDiffCom results and combine them
+# in tables for further cross-tissue down-stream analyses
+
 ## Create a tissue-counts table for all ORA keywords ####
 
 dt_ora_key_counts <- rbindlist(

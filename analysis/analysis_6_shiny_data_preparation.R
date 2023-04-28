@@ -11,6 +11,10 @@
 ####################################################
 ##
 
+## Intro ####
+# This script formats scDiffCom results into variables suitable for 
+# the app scAgeComShiny
+
 ## Add libraries ####
 
 library(rrvgo)

@@ -11,6 +11,10 @@
 ####################################################
 ##
 
+## Intro ####
+# This script read scDiffCom results and combine them
+# in tables for further tissue-specific down-stream analyses
+
 ## Retrieve scDiffCom results ####
 
 paths_scd_results <- list.dirs(
