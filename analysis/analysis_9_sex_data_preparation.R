@@ -230,6 +230,6 @@ sort(table(dt_cci_sexage_facs[
    `TMS FACS (female)` %in% c("DOWN", "FLAT")
 ]$LRI))
 
-## Consider only lung results ####
+## Consider for example lung results ####
 
 dt_cci_sexage_facs_lung <- dt_cci_sexage_facs[tissue == "Lung"]

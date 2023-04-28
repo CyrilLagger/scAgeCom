@@ -11,7 +11,7 @@
 ####################################################
 ##
 
-## Library ####
+## Load libraries ####
 
 library(openxlsx)
 library(ggplot2)

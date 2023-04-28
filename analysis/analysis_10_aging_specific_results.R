@@ -11,7 +11,7 @@
 ####################################################
 ##
 
-## Annotate ORA with HAGR and PMID ####
+## Annotate ORA results with HAGR and PMID ####
 
 dt_ora_lri <- dt_ora_rel[
     ORA_CATEGORY == "LRI" & ORA_REGULATION != "Not Over-represented",
