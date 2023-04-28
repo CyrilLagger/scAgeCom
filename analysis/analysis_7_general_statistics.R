@@ -201,6 +201,15 @@ dt_cci_rel[, .N, by = c("REGULATION")][
   , N / sum(N) * 100
 ]
 
+dt_cci_rel[ REGULATION == "NSC", .N, by = c("IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD")]
+
+dt_cci_rel[ REGULATION == "NSC", .N, by = c("IS_CCI_DETECTED_YOUNG", "IS_CCI_DETECTED_OLD")][
+  , N / sum(N) * 100
+]
+
+dt_cci_rel[dataset == "TMS FACS (male)" & tissue == "Lung", .N]
+dt_cci_rel[dataset == "TMS Droplet (male)" & tissue == "Lung", .N]
+
 ## Average LRI per ER_CELLTYPES ####
 
 dt_cci_rel[
