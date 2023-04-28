@@ -2,14 +2,286 @@
 ##
 ## Project: scAgeCom
 ##
-## cyril.lagger@liverpool.ac.uk
+## lagger.cyril@gmail.com
 ## ursu_eugen@hotmail.com
-## anais.equey@etu.univ-amu.fr
+## anais.equey@gmail.com
 ##
 ## additional figure preparation
 ##
 ####################################################
 ##
+
+## secretomics association Supplementary Figure ####
+
+## Prepare Figure Upset Plot Validation dataset
+
+setnames(
+  val_dt_selection,
+  old = c(
+    "pancreas", "huvec", "macro", "mscat",
+    "neurons", "glia", "cardio"
+  ),
+  new = c(
+    "hPDE (Li 2022)",
+    "hUVEC (Zhao 2020)",
+    "mBMM (Meissner 2013)",
+    "mMSC-AT (Acar 2020)",
+    "mNeuron (Tushaus 2020)",
+    "mGlial (Tushaus 2020)",
+    "rCM (Kuhn 2020)"
+  )
+)
+
+figp_val_upset <- ComplexUpset::upset(
+  as.data.frame(val_dt_selection),
+  colnames(val_dt_selection)[-c(1, 7, 9, 10)],
+  name = "",
+  set_sizes = ComplexUpset::upset_set_size()
+  + ylab("# of LR genes"),
+  base_annotations = list(
+    "Intersection Size" = ComplexUpset::intersection_size(
+      counts = TRUE,
+      bar_number_threshold = 100,
+      text = list(size = 8),
+      colour = "coral",
+      fill = "coral"
+    ) + theme(
+      axis.title.y = element_text(
+        margin = margin(t = 0, r = -200, b = 0, l = 0)
+      )
+    )
+  ),
+  themes = ComplexUpset::upset_default_themes(
+    text = element_text(size = 40),
+    plot.title = element_text(size = 32)
+  ),
+  min_size = 8
+) + ggtitle(
+  "Ligand/Receptor genes matched to secreted proteins"
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_val_upset2.png"
+  ),
+  plot = figp_val_upset,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 3
+)
+
+## mMSC-AT
+
+sfig_dt_val_mscat_at <- dt_val_mscat_at[, .(mean(OR), exp(mean(log(BH)))), by = "category"]
+
+fig_ora_mmscat_at <- ggplot(
+  sfig_dt_val_mscat_at,
+  aes(
+    x = V1,
+    y = reorder(category, V1),
+    size = -log10(
+      V2 + min(sfig_dt_val_mscat_at[V2 != 0]$V2)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+    sfig_dt_val_mscat_at$V2 + min(sfig_dt_val_mscat_at[V2 != 0]$V2)
+  ))),
+  labels = round(fivenum(-log10(
+    sfig_dt_val_mscat_at$V2 + min(sfig_dt_val_mscat_at[V2 != 0]$V2)
+  ))),
+  limit = c(0, 50)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Type from TMS Adipose Tissues"
+  #) + theme_minimal(
+) + ggtitle(
+  "Association with the mMSC-AT secretome"
+) + theme(
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 19)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_mmscat_at2.png"
+  ),
+  plot = fig_ora_mmscat_at,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.6
+)
+
+## mNeuron
+
+sfig_dt_val_neuron_brain <- dt_val_neuron_brain[, .(mean(OR), exp(mean(log(BH)))), by = "category"]
+
+fig_ora_neuron_brain <- ggplot(
+  sfig_dt_val_neuron_brain,
+  aes(
+    x = V1,
+    y = reorder(category, V1),
+    size = -log10(
+      V2 + min(sfig_dt_val_neuron_brain[V2 != 0]$V2)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+    sfig_dt_val_neuron_brain$V2 + min(sfig_dt_val_neuron_brain[V2 != 0]$V2)
+  ))),
+  labels = round(fivenum(-log10(
+    sfig_dt_val_neuron_brain$V2 + min(sfig_dt_val_neuron_brain[V2 != 0]$V2)
+  ))),
+  limit = c(0, 20)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Type from TMS Brain Samples"
+  #) + theme_minimal(
+) + ggtitle(
+  "Association with the mNeuron secretome"
+) + theme(
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 19)
+)
+
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_neuron_brain2.png"
+  ),
+  plot = fig_ora_neuron_brain,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.6
+)
+
+## rCM
+
+sfig_dt_val_cardio_heart <- dt_val_cardio_heart[, .(mean(OR), exp(mean(log(BH)))), by = "category"]
+
+fig_ora_cardio_heart <- ggplot(
+  sfig_dt_val_cardio_heart,
+  aes(
+    x = V1,
+    y = reorder(category, V1),
+    size = -log10(
+      V2 + min(sfig_dt_val_cardio_heart[V2 != 0]$V2)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+    sfig_dt_val_cardio_heart$V2 + min(sfig_dt_val_cardio_heart[V2 != 0]$V2)
+  ))),
+  labels = round(fivenum(-log10(
+    sfig_dt_val_cardio_heart$V2 + min(sfig_dt_val_cardio_heart[V2 != 0]$V2)
+  ))),
+  limit = c(0, 80)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Type from TMS Heart Samples"
+  #) + theme_minimal(
+) + ggtitle(
+  "Association with the rCM secretome"
+) + theme(
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 19)
+)
+
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_cardio_heart2.png"
+  ),
+  plot = fig_ora_cardio_heart,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.6
+)
+
+## hPDE
+
+sfig_dt_val_pancreas_pct <- dt_val_pancreas_pct[, .(mean(OR), exp(mean(log(BH)))), by = "category"]
+
+fig_ora_hpde_pancreas <- ggplot(
+  sfig_dt_val_pancreas_pct,
+  aes(
+    x = V1,
+    y = reorder(category, V1),
+    size = -log10(
+      V2 + min(sfig_dt_val_pancreas_pct[V2 != 0]$V2)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+    sfig_dt_val_pancreas_pct$V2 + min(sfig_dt_val_pancreas_pct[V2 != 0]$V2)
+  ))),
+  labels = round(fivenum(-log10(
+    sfig_dt_val_pancreas_pct$V2 + min(sfig_dt_val_pancreas_pct[V2 != 0]$V2)
+  ))),
+  limit = c(0, 20)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "Emitter Cell Type from TMS Pancreas Samples"
+  #) + theme_minimal(
+) + ggtitle(
+  "Association with the hPDE secretome"
+) + theme(
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 19)
+)
+
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_hpde_pancreas2.png"
+  ),
+  plot = fig_ora_hpde_pancreas,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.6
+)
+
 
 ## scDiffCom vs SDGA Supplementary Figure ####
 
@@ -55,8 +327,8 @@ sfig_sdea_comp <- upset(
   ),
   set_sizes = FALSE,
   themes = upset_default_themes(
-    text = element_text(size = 22),
-    plot.title = element_text(size = 22)
+    text = element_text(size = 30),
+    plot.title = element_text(size = 30)
   ),
   min_size = 0,
   max_size = 50000,
@@ -305,7 +577,7 @@ sfig_sdea_comp
 ggsave(
   paste0(
     path_scagecom_output,
-    "sfig_sdea_comp.png"
+    "sfig_sdea_comp2.png"
   ),
   plot = sfig_sdea_comp,
   width = 2100,
@@ -433,7 +705,7 @@ sf_immune_gokegg_sex %>% kbl(
 ) %>% kable_styling(
   font_size = 18
 ) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_immune_a_sex.png"),
+  paste0(path_scagecom_output, "sfig_immune_a_sex_2.png"),
   vwidth = 950,
   zoom = 2
 )
@@ -477,7 +749,7 @@ sf_immune_lri %>% kbl(
 ) %>% kable_styling(
   font_size = 18
 ) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_immune_b.png"),
+  paste0(path_scagecom_output, "sfig_immune_b2.png"),
   vwidth = 1350,
   zoom = 2
 )
@@ -537,7 +809,7 @@ sf_lipmed_gokegg %>% kbl(
 ) %>% kable_styling(
   font_size = 18
 ) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_lipmed_a.png"),
+  paste0(path_scagecom_output, "sfig_lipmed_a2.png"),
   vwidth = 750,
   zoom = 2
 )
@@ -612,38 +884,361 @@ sf_lipmed_lri[, -c(8)] %>% kbl(
 ) %>% kable_styling(
   font_size = 18
 ) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_lipmed_b.png"),
+  paste0(path_scagecom_output, "sfig_lipmed_b2.png"),
   vwidth = 1450,
   zoom = 2
 )
 
-## Extended Data LRI distribution (not included) ####
+## Apoe Brain
 
-ExtFig1 <- ggplot(
-  data = NLRI_template,
-  aes(
-    y = tissue,
-    x = N
-  )
-) + geom_boxplot(
-  outlier.shape = NA
-) + facet_wrap(
-  ~ dataset,
-  ncol = 5
-) + ggplot2::scale_y_discrete(
-    limits = sort(
-      unique(NLRI_table$tissue),
-      decreasing = TRUE
-    )
-) + xlab(
-  "Number of detected LRIs per cell-type pair"
-) + geom_jitter(
-  size = 0.2
-) + theme(
-  #text = element_text(size = 40, face = "bold"),
-  #axis.text.x = element_text(size = 30),
-  #axis.text.y = element_text(size = 36, face = "bold"),
-  #axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 0, l = 0)),
-  panel.spacing = unit(2, "lines")
+sfig_apoe_brain <- fun_plot_lrfc_cci(
+  dt_cci_full[
+    dataset == "TMS FACS (male)" &
+      tissue == "Brain" &
+      LIGAND_1 == "Apoe"
+  ],
+  "Brain - TMS FACS (male) - Apoe Ligand",
+  "Apoe Log2(FC)"
 )
-ExtFig1
+
+save_image(
+  sfig_apoe_brain, 
+  paste0(
+    path_scagecom_output,
+    "sfig_apoe_ligand2.svg"
+  ),
+  scale = 1,
+  width = 900,
+  height = 700
+)
+
+
+## ECM Supplementary figures ####
+
+# prepare GO/KEGG table
+sf_ecm_gokegg <- unique(
+  aging_dt_ecm_sex[
+    ORA_CATEGORY %in% c("GO_TERMS", "KEGG_PWS"),
+    c(
+      "ORA_CATEGORY",
+      "VALUE",
+      "ORA_REGULATION_age",
+      "Overall Male (Union)",
+      "Overall Female (Union)"
+    )
+  ]
+)[order(-`Overall Male (Union)`)]
+sf_ecm_gokegg[
+  ,
+  ORA_CATEGORY := ifelse(
+    ORA_CATEGORY == "GO_TERMS",
+    "GO",
+    "KEGG"
+  )
+]
+setnames(
+  sf_ecm_gokegg,
+  old = colnames(sf_ecm_gokegg),
+  new = c(
+    "Category",
+    "Term",
+    "Age Regulation",
+    "Over-represented in # male tissues",
+    "Over-represented in # female tissues"
+  )
+)
+# remove redundant terms
+
+sf_ecm_gokegg <- sf_ecm_gokegg[
+  !Term %in% c(
+    "extracellular region",
+    "focal adhesion",
+    "cell junction organization",
+    "cell-substrate junction",
+    "cell junction assembly",
+    "basement membrane organization",
+    "extracellular structure organization",
+    "extracellular matrix organization",
+    "biological adhesion"
+  )
+]
+
+sf_ecm_gokegg %>% kbl(
+  align = rep("c", 5)
+) %>% kable_styling(
+  "striped",
+  full_width = FALSE,
+  html_font = "arial"
+) %>% kable_styling(
+  font_size = 18
+) %>% save_kable(
+  paste0(path_scagecom_output, "sfig_ecm_a2.png"),
+  vwidth = 750,
+  zoom = 2
+)
+
+# prepare LRI table
+
+sf_ecm_lri <- unique(
+  aging_dt_ecm_sex[order(VALUE)][
+    ORA_CATEGORY %in% c("LRI"),
+    c(
+      "VALUE", "ORA_REGULATION_age",
+      "Overall Male (Union)",
+      "Overall Female (Union)",
+      "pubmed", "HAGR",
+      "summary_val"
+    )
+  ]
+)
+
+sf_ecm_lri[, summary_val := ifelse(
+  is.na(summary_val),
+  "",
+  summary_val
+)]
+
+setnames(
+  sf_ecm_lri,
+  old = colnames(sf_ecm_lri),
+  new = c(
+    "LRI",
+    "Age Regulation",
+    "Over-represented in # male tissues",
+    "Over-represented in # female tissues",
+    "Associated to # aging PubMed articles",
+    "In HAGR",
+    "Secretomics detection (either Ligand or Receptor)"
+  )
+)
+
+sf_ecm_lri[
+  ,
+  LRI_reg := paste(
+    LRI,
+    `Age Regulation`,
+    sep = "_"
+  )
+]
+
+sf_ecm_lri <- sf_ecm_lri[
+  !LRI_reg %in% c(
+    "Adam15:Itga9_DOWN",
+    "Adam15:Itgb1_DOWN",
+    "Adam9:Itgav_DOWN",
+    "Adam9:Itgb5_DOWN",
+    "Col4a1:Itga9_Itgb1_DOWN",
+    "Col4a1:Itgb1_Itga1_DOWN",
+    "Col4a2:Itga9_Itgb1_DOWN",
+    "Tgm2:Itgb1_DOWN",
+    "Col1a1:Sdc4_DOWN",
+    "Col1a2:Cd36_DOWN",
+    "Col1a2:Cd44_DOWN",
+    "Ccn4:Itgb1_DOWN",
+    "Col5a2:Itgb1_Itga1_DOWN",
+    "Col6a1:Cd44_DOWN"
+  )
+]
+
+sf_ecm_lri[is.na(sf_ecm_lri)] <- 0
+
+sf_ecm_lri[, -c(8)] %>% kbl(
+  align = rep("c", 7)
+) %>% kable_styling(
+  "striped",
+  full_width = FALSE,
+  html_font = "arial"
+) %>% kable_styling(
+  font_size = 18
+) %>% save_kable(
+  paste0(path_scagecom_output, "sfig_ecm_b2.png"),
+  vwidth = 1450,
+  zoom = 2
+)
+
+# prepare ER table
+
+sf_ecm_er <- unique(
+  aging_dt_ecm_sex[order(VALUE)][
+    ORA_CATEGORY %in% c("ER_CELLFAMILIES"),
+    c(
+      "VALUE", "ORA_REGULATION_age",
+      "Overall Male (Union)",
+      "Overall Female (Union)"
+    )
+  ]
+)
+
+setnames(
+  sf_ecm_er,
+  old = colnames(sf_ecm_er),
+  new = c(
+    "Emmitter-Receiver Cell Families",
+    "Age Regulation",
+    "Over-represented in # male tissues",
+    "Over-represented in # female tissues"
+  )
+)
+
+
+sf_ecm_er[is.na(sf_ecm_er)] <- 0
+
+sf_ecm_er %>% kbl(
+  align = rep("c", 7)
+) %>% kable_styling(
+  "striped",
+  full_width = FALSE,
+  html_font = "arial"
+) %>% kable_styling(
+  font_size = 18
+) %>% save_kable(
+  paste0(path_scagecom_output, "sfig_ecm_c2.png"),
+  vwidth = 1450,
+  zoom = 2
+)
+
+## Growth/Dev/Angio Supplementary figures ####
+
+# prepare GO/KEGG table
+sf_dev_gokegg <- unique(
+  aging_dt_dev_sex[
+    ORA_CATEGORY %in% c("GO_TERMS", "KEGG_PWS"),
+    c(
+      "ORA_CATEGORY",
+      "VALUE",
+      "ORA_REGULATION_age",
+      "Overall Male (Union)",
+      "Overall Female (Union)"
+    )
+  ]
+)[order(-`Overall Male (Union)`)]
+sf_dev_gokegg[
+  ,
+  ORA_CATEGORY := ifelse(
+    ORA_CATEGORY == "GO_TERMS",
+    "GO",
+    "KEGG"
+  )
+]
+setnames(
+  sf_dev_gokegg,
+  old = colnames(sf_dev_gokegg),
+  new = c(
+    "Category",
+    "Term",
+    "Age Regulation",
+    "Over-represented in # male tissues",
+    "Over-represented in # female tissues"
+  )
+)
+# remove redundant terms
+
+sf_dev_gokegg <- sf_dev_gokegg[
+  !Term %in% c(
+    "developmental growth involved in morphogenesis",
+    "tissue morphogenesis"
+  )
+]
+
+sf_dev_gokegg %>% kbl(
+  align = rep("c", 5)
+) %>% kable_styling(
+  "striped",
+  full_width = FALSE,
+  html_font = "arial"
+) %>% kable_styling(
+  font_size = 18
+) %>% save_kable(
+  paste0(path_scagecom_output, "sfig_dev_a2.png"),
+  vwidth = 750,
+  zoom = 2
+)
+
+# prepare LRI table
+
+sf_dev_lri <- unique(
+  aging_dt_dev_sex[order(VALUE)][
+    ORA_CATEGORY %in% c("LRI"),
+    c(
+      "VALUE", "ORA_REGULATION_age",
+      "Overall Male (Union)",
+      "Overall Female (Union)",
+      "pubmed", "HAGR",
+      "summary_val"
+    )
+  ]
+)
+
+sf_dev_lri[, summary_val := ifelse(
+  is.na(summary_val),
+  "",
+  summary_val
+)]
+
+setnames(
+  sf_dev_lri,
+  old = colnames(sf_dev_lri),
+  new = c(
+    "LRI",
+    "Age Regulation",
+    "Over-represented in # male tissues",
+    "Over-represented in # female tissues",
+    "Associated to # aging PubMed articles",
+    "In HAGR",
+    "Secretomics detection (either Ligand or Receptor)"
+  )
+)
+
+sf_dev_lri[
+  ,
+  LRI_reg := paste(
+    LRI,
+    `Age Regulation`,
+    sep = "_"
+  )
+]
+
+sf_dev_lri <- sf_dev_lri[
+  !LRI_reg %in% c(
+    ""
+  )
+]
+
+sf_dev_lri[is.na(sf_dev_lri)] <- 0
+
+sf_dev_lri[, -c(8)] %>% kbl(
+  align = rep("c", 7)
+) %>% kable_styling(
+  "striped",
+  full_width = FALSE,
+  html_font = "arial"
+) %>% kable_styling(
+  font_size = 18
+) %>% save_kable(
+  paste0(path_scagecom_output, "sfig_dev_b2.png"),
+  vwidth = 1450,
+  zoom = 2
+)
+
+## Slpi Supplementary Fig ###
+
+sfig_slpi <- plot_KEYWORD_summary(
+  ora_keyword_summary = shiny_list_full$ORA_KEYWORD_SUMMARY,
+  ora_keyword_template = shiny_list_full$ORA_KEYWORD_TEMPLATE,
+  category = "Ligand-Receptor Interaction",
+  keyword = "Slpi:Plscr1"
+)
+
+#2000x1400
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "sfig_slpi_a.png"
+  ),
+  plot = sfig_slpi,
+  width = 2000,
+  height = 1400,
+  units = "px",
+  scale = 2.7
+)
+
