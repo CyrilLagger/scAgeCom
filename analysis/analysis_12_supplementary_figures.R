@@ -6,7 +6,7 @@
 ## ursu_eugen@hotmail.com
 ## anais.equey@gmail.com
 ##
-## additional figure preparation
+## Supplementary Figure preparation
 ##
 ####################################################
 ##
@@ -1220,7 +1220,7 @@ sf_dev_lri[, -c(8)] %>% kbl(
   zoom = 2
 )
 
-## Slpi Supplementary Fig ###
+## Slpi Supplementary Figure ####
 
 sfig_slpi <- plot_KEYWORD_summary(
   ora_keyword_summary = shiny_list_full$ORA_KEYWORD_SUMMARY,
@@ -1229,7 +1229,6 @@ sfig_slpi <- plot_KEYWORD_summary(
   keyword = "Slpi:Plscr1"
 )
 
-#2000x1400
 ggsave(
   paste0(
     path_scagecom_output,
