@@ -11,6 +11,10 @@
 ####################################################
 ##
 
+## Intro ####
+# This script loads the ligand-receptor database from scDiffCom and
+# does some preprocessing such as adding aging-annotations to each gene
+
 ## Load libraries ####
 
 library(scDiffCom)
