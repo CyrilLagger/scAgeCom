@@ -11,6 +11,13 @@
 ####################################################
 ##
 
+## Intro ####
+# This script runs scDiffCom to perform both age-related differential analysis
+# (scAgeCom) and sex-differential analysis.
+
+# Note: the script is intended to be run on a server having enough RAM (>64GB)
+# and CPUs
+
 ## Add libraries ####
 
 library(future)
@@ -42,7 +49,7 @@ analysis_list <- list(
   "droplet_diffage_mixed"
 )
 
-## Do the analysis ####
+## Do the age-related analysis ####
 
 for (analysis in analysis_list) {
   message(paste0("Starting the analysis of ", analysis))
