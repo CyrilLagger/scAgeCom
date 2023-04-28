@@ -7,25 +7,27 @@ dt_cci_sex = readRDS("data/data_02-08-2022/dt_cci_sex.rds")
 # dt_secr_validation_final = readRDS("data/data_02-08-2022/dt_secr_validation_final.rds")
 # scAgeComShiny_data_02_08_2022 = readRDS("data/data_02-08-2022/scAgeComShiny_data_02_08_2022.rds")
 
+dt_cci_age_2 <- copy(dt_cci_age)
+dt_cci_sex_2 <- copy(dt_cci_sex)
 
 ## What dataset:tissue pairs are age and sex analyzable?
-dt_cci_age$dataset_src = sapply(strsplit(dt_cci_age$dataset, split=' \\('), function(elem) {elem[1]})
-dt_cci_age$dataset_sample_type = ifelse(
-  sapply(strsplit(dt_cci_age$dataset, split=' \\('), function(elem) {elem[2]}) == "male)",
+dt_cci_age_2$dataset_src = sapply(strsplit(dt_cci_age_2$dataset, split=' \\('), function(elem) {elem[1]})
+dt_cci_age_2$dataset_sample_type = ifelse(
+  sapply(strsplit(dt_cci_age_2$dataset, split=' \\('), function(elem) {elem[2]}) == "male)",
   "male",
   "female"
 )
-dt_cci_age$dataset_src_tissue = paste0(dt_cci_age$dataset_src, "_", dt_cci_age$tissue)
+dt_cci_age_2$dataset_src_tissue = paste0(dt_cci_age_2$dataset_src, "_", dt_cci_age_2$tissue)
 
-dt_cci_sex$dataset_src = sapply(strsplit(dt_cci_sex$dataset, split=' \\('), function(elem) {elem[1]})
-dt_cci_sex$dataset_sample_type = ifelse(
-  sapply(strsplit(dt_cci_sex$dataset, split=' \\('), function(elem) {elem[2]}) == "old)",
+dt_cci_sex_2$dataset_src = sapply(strsplit(dt_cci_sex_2$dataset, split=' \\('), function(elem) {elem[1]})
+dt_cci_sex_2$dataset_sample_type = ifelse(
+  sapply(strsplit(dt_cci_sex_2$dataset, split=' \\('), function(elem) {elem[2]}) == "old)",
   "old",
   "young"
 )
-dt_cci_sex$dataset_src_tissue = paste0(dt_cci_sex$dataset_src, "_", dt_cci_sex$tissue)
+dt_cci_sex_2$dataset_src_tissue = paste0(dt_cci_sex_2$dataset_src, "_", dt_cci_sex_2$tissue)
 
-ds_tissue_pairs = union(unique(dt_cci_age$dataset_src_tissue), unique(dt_cci_sex$dataset_src_tissue))
+ds_tissue_pairs = union(unique(dt_cci_age_2$dataset_src_tissue), unique(dt_cci_sex_2$dataset_src_tissue))
 
 dt_ds_tissue_counts = data.table()
 for (ds_tissue in ds_tissue_pairs) {
@@ -37,10 +39,10 @@ for (ds_tissue in ds_tissue_pairs) {
   ds_age_male = glue("{ds_src} (male)")
   ds_age_female = glue("{ds_src} (female)")
     
-  N_sex_old = dt_cci_sex[dataset == ds_sex_old & tissue == ts, .N]
-  N_sex_young = dt_cci_sex[dataset == ds_sex_young & tissue == ts, .N]
-  N_age_male = dt_cci_age[dataset == ds_age_male & tissue == ts, .N]
-  N_age_female = dt_cci_age[dataset == ds_age_female & tissue == ts, .N]
+  N_sex_old = dt_cci_sex_2[dataset == ds_sex_old & tissue == ts, .N]
+  N_sex_young = dt_cci_sex_2[dataset == ds_sex_young & tissue == ts, .N]
+  N_age_male = dt_cci_age_2[dataset == ds_age_male & tissue == ts, .N]
+  N_age_female = dt_cci_age_2[dataset == ds_age_female & tissue == ts, .N]
   
   v = data.table(
     dataset = ds_src, 
@@ -58,7 +60,7 @@ dt_ds_tissue_counts = dt_ds_tissue_counts[order(-N_total)]
 
 
 ## Finding the direction in sex analysis: F -> M
-# dt_cci_sex[, list(
+# dt_cci_sex_2[, list(
 #   L1_EXPRESSION_female, L2_EXPRESSION_female, R1_EXPRESSION_female, R2_EXPRESSION_female, R3_EXPRESSION_female, CCI_SCORE_female,
 #   L1_EXPRESSION_male, L2_EXPRESSION_male, R1_EXPRESSION_male, R2_EXPRESSION_male, R3_EXPRESSION_male, CCI_SCORE_male,
 #   LOGFC)]
@@ -66,10 +68,10 @@ dt_ds_tissue_counts = dt_ds_tissue_counts[order(-N_total)]
 
 ## Evaluate the relation: Sy + Am = Af + So
 
-dt_age_male = dt_cci_age[dataset_sample_type == "male"]
-dt_age_female = dt_cci_age[dataset_sample_type == "female"]
-dt_sex_young = dt_cci_sex[dataset_sample_type == "young"]
-dt_sex_old = dt_cci_sex[dataset_sample_type == "old"]
+dt_age_male = dt_cci_age_2[dataset_sample_type == "male"]
+dt_age_female = dt_cci_age_2[dataset_sample_type == "female"]
+dt_sex_young = dt_cci_sex_2[dataset_sample_type == "young"]
+dt_sex_old = dt_cci_sex_2[dataset_sample_type == "old"]
 
 dt_age = merge(
   x = dt_age_male,
@@ -144,6 +146,14 @@ dt_updown$SIGNATURE = paste0(
   substr(dt_updown$REGULATION_Sy, 1, 1),
   substr(dt_updown$REGULATION_Am, 1, 1),
   substr(dt_updown$REGULATION_Af, 1, 1)
+)
+
+fwrite(
+  dt_regulation_counts_updown,
+  paste0(
+    path_scagecom_output,
+    "dt_regulation_counts_updown.csv"
+  )
 )
 
 ## Patterns by Dataset_src : Tissue
