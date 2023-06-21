@@ -83,13 +83,13 @@ figp_lri_upset_mouse
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_lri_upset_mouse2.png"
+    "fig_lri_upset_mouse3.pdf"
   ),
   plot = figp_lri_upset_mouse,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 3
+  width = 88,
+  height = 50,
+  units = "mm",
+  scale = 6
 )
 
 ## Prepare Figure LRI functional annotation (Fig.1b) ####
@@ -124,22 +124,26 @@ fig_seurat_mammary$cell_ontology_final <- ifelse(
 )
 
 fig_seurat_mammary <- RunTSNE(fig_seurat_mammary, reduction = "PCA")
+fig_seurat_mammary <- RunUMAP(fig_seurat_mammary, dims=1:15, reduction = "PCA")
 Idents(fig_seurat_mammary) <- fig_seurat_mammary$cell_ontology_final
 
 fig_tsne_celltype <- DimPlot(
   fig_seurat_mammary,
   reduction = "tsne",
-  pt.size = 3,
-  cols = c("grey", "blue", "brown", "red"),
-) + theme(text = element_text(size = 40))
+  pt.size = 1,
+  cols = c("blue", "brown", "red", "grey"),
+) + theme(text = element_text(size = 30))
 
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_tsne_celltype.png"
+    "fig_tsne_celltype2.pdf"
   ),
   fig_tsne_celltype,
-  scale = 1
+  width = 30,
+  height = 30,
+  units = "mm",
+  scale = 6
 )
 
 Idents(fig_seurat_mammary) <- fig_seurat_mammary$age_group
@@ -831,13 +835,13 @@ fig_datasets_summary
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_datasets_summary2.png"
+    "fig_datasets_summary3.pdf"
   ),
   plot = fig_datasets_summary,
   width = 2100,
   height = 1400,
   units = "px",
-  scale = 3
+  scale = 3.2
 )
 
 ## Prepare Figure Tissue Specific volcano (Fig. 4.a) ####
@@ -1180,6 +1184,27 @@ fun_plot_ora_visnetwork(
   shiny_abbr_celltype
 )
 
+## Prepare Figure Tissue Specific LRI ORA (Fig. 4.d) ####
+
+fig4d_data <- readRDS(
+  "../data_scAgeCom/output/scDiffCom_14_05_2022/scdiffcom_droplet_diffage_male/scdiffcom_Bladder.rds"
+)
+fig4d_fig <- PlotORA(
+  fig4d_data, "LRI", "UP", 10
+) +  theme(text = element_text(size = 20))
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig4d.pdf"
+  ),
+  plot = fig4d_fig,
+  width = 1580,
+  height = 1400,
+  units = "px",
+  scale = 1.4
+)
+
+
 ## Prepare Figure Cross Tissue T cell summary (Fig 4e and 4f) ####
 
 plot_KEYWORD_summary <- function(
@@ -1291,7 +1316,7 @@ fig4e_tcell <- plot_KEYWORD_summary(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig4e_tcell.png"
+    "fig4e_tcell.pdf"
   ),
   plot = fig4e_tcell,
   width = 2000,
@@ -1309,7 +1334,7 @@ fig4f_b2m <- plot_KEYWORD_summary(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig4f_b2m.png"
+    "fig4f.pdf"
   ),
   plot = fig4f_b2m,
   width = 2000,
@@ -1366,7 +1391,7 @@ fig_ora_huvec_fam <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_huvec_fam2.png"
+    "fig_ora_huvec_fam2.pdf"
   ),
   plot = fig_ora_huvec_fam,
   width = 2100,
@@ -1416,7 +1441,7 @@ fig_ora_mbmm_fam <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_mbmm_fam2.png"
+    "fig_ora_mbmm_fam2.pdf"
   ),
   plot = fig_ora_mbmm_fam,
   width = 2100,
@@ -1424,6 +1449,57 @@ ggsave(
   units = "px",
   scale = 1.6
 )
+
+## Prepare Figure ORA neuron family (Fig 5c) ####
+
+fig_ora_neuron_fam <- ggplot(
+  dt_val_neuron_fam,
+  aes(
+    x = OR,
+    y = reorder(category, OR),
+    size = -log10(
+      BH + min(dt_val_neuron_fam[BH != 0]$BH)
+    )
+  )
+) + geom_point(
+) + geom_vline(
+  xintercept = 1,
+  linetype = "dashed",
+  size = 1.5
+) + scale_size(
+  name = "-log10(Adj. P-Value)",
+  breaks = round(fivenum(-log10(
+    dt_val_neuron_fam$BH + min(dt_val_neuron_fam[BH != 0]$BH)
+  ))),
+  labels = round(fivenum(-log10(
+    dt_val_neuron_fam$BH + min(dt_val_neuron_fam[BH != 0]$BH)
+  ))),
+  limit = c(0, 500)
+) + xlab(
+  "Odds Ratio"
+) + ylab(
+  "scAgeCom emitter cell-type family"
+  #) + theme_minimal(
+) + ggtitle(
+  "Association with the mNeuron secretome"
+)  + theme(
+  text = element_text(size = 18),
+  legend.title = element_text(size = 16),
+  legend.text = element_text(size = 16),
+  axis.text = element_text(size = 18)
+)
+ggsave(
+  paste0(
+    path_scagecom_output,
+    "fig_ora_neuron_fam2.pdf"
+  ),
+  plot = fig_ora_neuron_fam,
+  width = 2100,
+  height = 1200,
+  units = "px",
+  scale = 1.6
+)
+
 
 ## Prepare Figure ORA mMSC-AT family (Fig 5d) ####
 
@@ -1466,7 +1542,7 @@ fig_ora_mmscat_fam <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_mmscat_fam2.png"
+    "fig_ora_mmscat_fam2.pdf"
   ),
   plot = fig_ora_mmscat_fam,
   width = 2100,
@@ -1474,57 +1550,6 @@ ggsave(
   units = "px",
   scale = 1.6
 )
-
-## Prepare Figure ORA neuron family (Fig 5c) ####
-
-fig_ora_neuron_fam <- ggplot(
-  dt_val_neuron_fam,
-  aes(
-    x = OR,
-    y = reorder(category, OR),
-    size = -log10(
-      BH + min(dt_val_neuron_fam[BH != 0]$BH)
-    )
-  )
-) + geom_point(
-) + geom_vline(
-  xintercept = 1,
-  linetype = "dashed",
-  size = 1.5
-) + scale_size(
-  name = "-log10(Adj. P-Value)",
-  breaks = round(fivenum(-log10(
-      dt_val_neuron_fam$BH + min(dt_val_neuron_fam[BH != 0]$BH)
-    ))),
-  labels = round(fivenum(-log10(
-    dt_val_neuron_fam$BH + min(dt_val_neuron_fam[BH != 0]$BH)
-  ))),
-  limit = c(0, 500)
-) + xlab(
-  "Odds Ratio"
-) + ylab(
-  "scAgeCom emitter cell-type family"
-#) + theme_minimal(
-) + ggtitle(
-  "Association with the mNeuron secretome"
-)  + theme(
-  text = element_text(size = 18),
-  legend.title = element_text(size = 16),
-  legend.text = element_text(size = 16),
-  axis.text = element_text(size = 18)
-)
-ggsave(
-  paste0(
-    path_scagecom_output,
-    "fig_ora_neuron_fam2.png"
-  ),
-  plot = fig_ora_neuron_fam,
-  width = 2100,
-  height = 1200,
-  units = "px",
-  scale = 1.6
-)
-
 
 ## Prepare Figure ORA cardio family (Fig 5e) ####
 
@@ -1567,7 +1592,7 @@ fig_ora_cardio_fam <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_cardio_fam2.png"
+    "fig_ora_cardio_fam2.pdf"
   ),
   plot = fig_ora_cardio_fam,
   width = 2100,
@@ -1617,7 +1642,7 @@ fig_ora_hpde_fam <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_hpde_fam2.png"
+    "fig_ora_hpde_fam2.pdf"
   ),
   plot = fig_ora_hpde_fam,
   width = 2100,
@@ -1722,7 +1747,7 @@ fig6_complete <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_6_complete.png"
+    "fig_6_complete.pdf"
   ),
   plot = fig6_complete,
   width = 3000,

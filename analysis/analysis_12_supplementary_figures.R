@@ -11,6 +11,8 @@
 ####################################################
 ##
 
+library(gt)
+
 ## secretomics association Supplementary Figure ####
 
 ## Prepare Figure Upset Plot Validation dataset
@@ -62,7 +64,7 @@ figp_val_upset <- ComplexUpset::upset(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_val_upset2.png"
+    "fig_val_upset2.pdf"
   ),
   plot = figp_val_upset,
   width = 2100,
@@ -114,7 +116,7 @@ fig_ora_mmscat_at <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_mmscat_at2.png"
+    "fig_ora_mmscat_at2.pdf"
   ),
   plot = fig_ora_mmscat_at,
   width = 2100,
@@ -167,7 +169,7 @@ fig_ora_neuron_brain <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_neuron_brain2.png"
+    "fig_ora_neuron_brain2.pdf"
   ),
   plot = fig_ora_neuron_brain,
   width = 2100,
@@ -220,7 +222,7 @@ fig_ora_cardio_heart <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_cardio_heart2.png"
+    "fig_ora_cardio_heart2.pdf"
   ),
   plot = fig_ora_cardio_heart,
   width = 2100,
@@ -273,7 +275,7 @@ fig_ora_hpde_pancreas <- ggplot(
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_ora_hpde_pancreas2.png"
+    "fig_ora_hpde_pancreas2.pdf"
   ),
   plot = fig_ora_hpde_pancreas,
   width = 2100,
@@ -577,13 +579,13 @@ sfig_sdea_comp
 ggsave(
   paste0(
     path_scagecom_output,
-    "sfig_sdea_comp2.png"
+    "sfig_sdea_comp2.pdf"
   ),
   plot = sfig_sdea_comp,
   width = 2100,
   height = 1200,
   units = "px",
-  scale = 2
+  scale = 2.5
 )
 #manual save: 2100x1200
 
@@ -678,37 +680,28 @@ sf_immune_gokegg <- sf_immune_gokegg[
   !Term %in% sf_immune_remove
 ]
 
-sf_immune_gokegg %>% kbl(
-  align = rep("c", 4)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_immune_a.png"),
-  vwidth = 750,
-  zoom = 2
-)
-
 sf_immune_gokegg_sex <- sf_immune_gokegg_sex[
   !Term %in% sf_immune_remove
 ]
 
-sf_immune_gokegg_sex %>% kbl(
-  align = rep("c", 5)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_immune_a_sex_2.png"),
-  vwidth = 950,
-  zoom = 2
-)
+sf_immune_gokegg_sex_gt <- gt(sf_immune_gokegg_sex) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = c(3,4,5)
+  ) |>
+  cols_width(
+    Term ~ px(150),
+    starts_with("Over") ~ px(100),
+    starts_with("Age") ~ px(60)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_immune_a_sex_4.pdf"))
 
 # prepare LRI table
 
@@ -740,19 +733,30 @@ setnames(
   )
 )
 
-sf_immune_lri %>% kbl(
-  align = rep("c", 6)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_immune_b2.png"),
-  vwidth = 1350,
-  zoom = 2
-)
+sf_immune_lri[is.na(sf_immune_lri)] <- ""
+
+sf_immune_lri_gt <- gt(sf_immune_lri) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:6
+  ) |>
+  cols_width(
+    starts_with("Over") ~ px(100),
+    starts_with("Associated") ~ px(110),
+    starts_with("Secretomics") ~ px(180),
+    starts_with("Age") ~ px(60),
+    starts_with("LRI") ~ px(100),
+    starts_with("In HAGR") ~ px(80)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_immune_LRI_4.pdf"))
+
 
 ## Lipid Metabolism Supplementary Figure ####
 
@@ -800,19 +804,24 @@ sf_lipmed_gokegg <- sf_lipmed_gokegg[
   )
 ]
 
-sf_lipmed_gokegg %>% kbl(
-  align = rep("c", 5)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_lipmed_a2.png"),
-  vwidth = 750,
-  zoom = 2
-)
+sf_lipmed_gokegg_gt <- gt(sf_lipmed_gokegg) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = c(3,4,5)
+  ) |>
+  cols_width(
+    Term ~ px(150),
+    starts_with("Over") ~ px(100),
+    starts_with("Age") ~ px(60)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_lipmed_a3.pdf"))
 
 # prepare LRI table
 
@@ -873,21 +882,37 @@ sf_lipmed_lri <- sf_lipmed_lri[
   )
 ]
 
-sf_lipmed_lri[is.na(sf_lipmed_lri)] <- 0
+sf_lipmed_lri$`Over-represented in # male tissues`[
+  is.na(sf_lipmed_lri$`Over-represented in # male tissues`)
+] <- 0
+sf_lipmed_lri$`Over-represented in # female tissues`[
+  is.na(sf_lipmed_lri$`Over-represented in # female tissues`)
+] <- 0
 
-sf_lipmed_lri[, -c(8)] %>% kbl(
-  align = rep("c", 7)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_lipmed_b2.png"),
-  vwidth = 1450,
-  zoom = 2
-)
+sf_lipmed_lri[is.na(sf_lipmed_lri)] <- ""
+
+sf_lipmed_lri_gt <- gt(sf_lipmed_lri[, - c(8)]) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:7
+  ) |>
+  cols_width(
+    starts_with("Over") ~ px(85),
+    starts_with("Associated") ~ px(110),
+    starts_with("Secretomics") ~ px(180),
+    starts_with("Age") ~ px(60),
+    starts_with("LRI") ~ px(100),
+    starts_with("In HAGR") ~ px(80)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_lipmed_b3.pdf"))
+
 
 ## Apoe Brain
 
@@ -905,13 +930,12 @@ save_image(
   sfig_apoe_brain, 
   paste0(
     path_scagecom_output,
-    "sfig_apoe_ligand2.svg"
+    "sfig_apoe_ligand3.svg"
   ),
   scale = 1,
   width = 900,
   height = 700
 )
-
 
 ## ECM Supplementary figures ####
 
@@ -963,19 +987,25 @@ sf_ecm_gokegg <- sf_ecm_gokegg[
   )
 ]
 
-sf_ecm_gokegg %>% kbl(
-  align = rep("c", 5)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_ecm_a2.png"),
-  vwidth = 750,
-  zoom = 2
-)
+sf_ecm_gokegg_gt <- gt(sf_ecm_gokegg) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = c(3,4,5)
+  ) |>
+  cols_width(
+    Term ~ px(150),
+    starts_with("Over") ~ px(100),
+    starts_with("Age") ~ px(60)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_ecm_a3.pdf"))
+
 
 # prepare LRI table
 
@@ -1042,19 +1072,27 @@ sf_ecm_lri <- sf_ecm_lri[
 
 sf_ecm_lri[is.na(sf_ecm_lri)] <- 0
 
-sf_ecm_lri[, -c(8)] %>% kbl(
-  align = rep("c", 7)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_ecm_b2.png"),
-  vwidth = 1450,
-  zoom = 2
-)
+sf_ecm_lri_gt <- gt(sf_ecm_lri[, - c(8)]) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:7
+  ) |>
+  cols_width(
+    starts_with("Over") ~ px(85),
+    starts_with("Associated") ~ px(110),
+    starts_with("Secretomics") ~ px(180),
+    starts_with("Age") ~ px(60),
+    starts_with("LRI") ~ px(100),
+    starts_with("In HAGR") ~ px(80)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_ecm_b3.pdf"))
 
 # prepare ER table
 
@@ -1083,19 +1121,25 @@ setnames(
 
 sf_ecm_er[is.na(sf_ecm_er)] <- 0
 
-sf_ecm_er %>% kbl(
-  align = rep("c", 7)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_ecm_c2.png"),
-  vwidth = 1450,
-  zoom = 2
-)
+
+sf_ecm_er_gt <- gt(sf_ecm_er) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = c(2,3,4)
+  ) |>
+  cols_width(
+    starts_with("Over") ~ px(100),
+    starts_with("Age") ~ px(60)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_ecm_c3.pdf"))
+
 
 ## Growth/Dev/Angio Supplementary figures ####
 
@@ -1140,19 +1184,25 @@ sf_dev_gokegg <- sf_dev_gokegg[
   )
 ]
 
-sf_dev_gokegg %>% kbl(
-  align = rep("c", 5)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_dev_a2.png"),
-  vwidth = 750,
-  zoom = 2
-)
+sf_dev_gokegg_gt <- gt(sf_dev_gokegg) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = c(3,4,5)
+  ) |>
+  cols_width(
+    Term ~ px(150),
+    starts_with("Over") ~ px(100),
+    starts_with("Age") ~ px(60)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_dev_a3.pdf"))
+
 
 # prepare LRI table
 
@@ -1206,19 +1256,28 @@ sf_dev_lri <- sf_dev_lri[
 
 sf_dev_lri[is.na(sf_dev_lri)] <- 0
 
-sf_dev_lri[, -c(8)] %>% kbl(
-  align = rep("c", 7)
-) %>% kable_styling(
-  "striped",
-  full_width = FALSE,
-  html_font = "arial"
-) %>% kable_styling(
-  font_size = 18
-) %>% save_kable(
-  paste0(path_scagecom_output, "sfig_dev_b2.png"),
-  vwidth = 1450,
-  zoom = 2
-)
+sf_dev_lri_gt <- gt(sf_dev_lri[, - c(8)]) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:7
+  ) |>
+  cols_width(
+    starts_with("Over") ~ px(85),
+    starts_with("Associated") ~ px(110),
+    starts_with("Secretomics") ~ px(180),
+    starts_with("Age") ~ px(60),
+    starts_with("LRI") ~ px(100),
+    starts_with("In HAGR") ~ px(80)
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sf_dev_lri.pdf"))
+
 
 ## Slpi Supplementary Figure ####
 
@@ -1232,7 +1291,7 @@ sfig_slpi <- plot_KEYWORD_summary(
 ggsave(
   paste0(
     path_scagecom_output,
-    "sfig_slpi_a.png"
+    "sfig_slpi.pdf"
   ),
   plot = sfig_slpi,
   width = 2000,
