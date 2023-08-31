@@ -130,9 +130,9 @@ Idents(fig_seurat_mammary) <- fig_seurat_mammary$cell_ontology_final
 fig_tsne_celltype <- DimPlot(
   fig_seurat_mammary,
   reduction = "tsne",
-  pt.size = 1,
+  pt.size = 0.5,
   cols = c("blue", "brown", "red", "grey"),
-) + theme(text = element_text(size = 30))
+) + theme(text = element_text(size = 26))
 
 ggsave(
   paste0(
@@ -141,7 +141,7 @@ ggsave(
   ),
   fig_tsne_celltype,
   width = 30,
-  height = 30,
+  height = 25,
   units = "mm",
   scale = 6
 )
@@ -151,16 +151,19 @@ Idents(fig_seurat_mammary) <- fig_seurat_mammary$age_group
 fig_tsne_cond <- Seurat::DimPlot(
   fig_seurat_mammary,
   reduction = "tsne",
-  pt.size = 1
-) + theme(text = element_text(size = 40))
+  pt.size = 0.5
+) + theme(text = element_text(size = 26))
 
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_tsne_cond.png"
+    "fig_tsne_cond2.pdf"
   ),
   fig_tsne_cond,
-  scale = 1
+  width = 30,
+  height = 25,
+  units = "mm",
+  scale = 6
 )
 
 ## Prepare Figure Workflow pre-processing (Fig.2.1) ####
@@ -189,17 +192,31 @@ colnames(fig_sc_data) <- c(
     "Cell",
     1:(ncol(fig_sc_data) - 2)
   ),
-  "...", "Cell N"
+  "....", "Cell N"
 )
 rownames(fig_sc_data) <- c(
   paste(
     "Gene",
     1:(nrow(fig_sc_data) - 2)
   ),
-  "...", "Gene M"
+  "....", "Gene M"
 )
-fig_sc_data$... <- "..."
-fig_sc_data[3, 1:4] <- "..."
+fig_sc_data$.... <- "...."
+fig_sc_data[3, 1:4] <- "...."
+
+fig_sc_data_gt <- gt(fig_sc_data, rownames_to_stub = TRUE) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:5
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_workflow_ncounts.pdf"))
 
 fig_aggr_group <- paste(
   seurat_sample_tms_liver$cell_type,
@@ -218,82 +235,37 @@ fig_sc_aggr <- round(
   fig_sc_aggr,
   1
 )
-colnames(fig_sc_aggr) <- c("Cond1", "Cond2", "...", "Cond1", "Cond2")
+fig_sc_aggr <- as.data.frame(fig_sc_aggr)
+
+colnames(fig_sc_aggr) <- c("Cell Type 1 Cond1", "Cell Type 1 Cond2", "....", "Cell Type 4 Cond1", "Cell Type 4 Cond2")
 rownames(fig_sc_aggr) <- c(
   paste(
     "Gene",
     1:(nrow(fig_sc_aggr) - 2)
   ),
-  "...",
+  "....",
   "Gene M"
 )
-fig_sc_aggr[3, ] <- "..."
-fig_sc_aggr[, 3] <- "..."
+fig_sc_aggr[3, ] <- "...."
+fig_sc_aggr[, 3] <- "...."
 
-cbind(
-  fig_sc_data,
-  fig_sc_aggr
-) %>%
-  kbl(
-    caption = paste0(
-      "<span style = 'font-size: 50px;",
-      "font-weight: bold;'>Averaged expression</span>"
-    ),
-    align = rep("c", 5)
-  ) %>%
-  kable_styling(
-    "striped",
-    full_width = FALSE
-  ) %>%
-  add_header_above(
-    c(" " = 5, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)
-  ) %>%
-  kable_styling(
-    font_size = 50
-  )
 
-fig_sc_aggr %>%
-  kbl(
-    caption = paste0(
-      "<span style = 'font-size: 70px;",
-      "font-weight: bold;'>Averaged expression</span>"
-    ),
-    align = rep("c", 5)
-  ) %>%
-  kable_styling("striped", full_width = FALSE) %>%
-  add_header_above(
-    c(" " = 1, "Cell Type 1" = 2, " " = 1, "Cell Type 4" = 2)
-  ) %>%
-  kable_styling(font_size = 60) %>%
-  column_spec(1:6, bold = T) %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_sc_aggr.png"
-    ),
-    zoom = 2,
-    vwidth = 1200
-  )
-
-fig_sc_data %>%
-  kbl(
-    caption = paste0(
-      "<span style = 'font-size: 70px; ",
-      "font-weight: bold;'>Normalized counts</span>"
-    ),
-    align = rep("c", 4)
-  ) %>%
-  kable_styling("striped", full_width = FALSE) %>%
-  kable_styling(font_size = 60) %>%
-  column_spec(1:5, bold = T) %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_sc_data.png"
-    ),
-    zoom = 2,
-    vwidth = 1200
-  )
+fig_sc_agg_gt <- gt(fig_sc_aggr, rownames_to_stub = TRUE) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:6
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |>
+  cols_width(
+    starts_with("Cell") ~ px(60)
+  ) |> 
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_workflow_agg.pdf"))
 
 ## Prepare Figure Workflow LRI (Fig.2.2) ####
 
@@ -301,30 +273,24 @@ fig_LRI_rd_data <- as.data.frame(
   scDiffCom::LRI_mouse$LRI_curated[c(1, 643, 2, 3573), c(2, 3, 1, 4, 5, 6)]
 )
 fig_LRI_rd_data[is.na(fig_LRI_rd_data)] <- ""
-fig_LRI_rd_data[c(1, 3), ] <- "..."
+fig_LRI_rd_data[c(1, 3), ] <- "...."
 fig_LRI_rd_data[, 3] <- "\u00A0 \u00A0"
-colnames(fig_LRI_rd_data) <- c("L1", "L2", "\u00A0 \u00A0  ", "R1", "R2", "R3")
+colnames(fig_LRI_rd_data) <- c("Ligand 1", "Ligand 2", "\u00A0 \u00A0  ", "Receptor 1", "Receptor 2", "Receptor 3")
 
-fig_LRI_rd_data %>%
-  kbl(
-    caption = paste0(
-      "<span style = 'font-size: 50px; ",
-      "font-weight: bold'>Ligand-Receptor Interactions</span>"
-    ),
-    align = rep("l", 5)
-  ) %>%
-  kable_styling("striped", full_width = FALSE) %>%
-  add_header_above(c("Ligand" = 2, "\u00A0" = 1, "Receptor" = 3)) %>%
-  kable_styling(font_size = 50) %>%
-  column_spec(1:5, bold = T) %>%
-  column_spec(3, width = "5cm") %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_lri_rd_data.png"
-    ),
-    zoom = 3
-  )
+fig_LRI_rd_data_gt <- gt(fig_LRI_rd_data) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:6
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |>
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_workflow_lri_rd_data.pdf"))
+
 
 ## Prepare Figure Workflow potential CCIs (Fig.2.3) ####
 
@@ -377,12 +343,26 @@ fig_cci_pot <- data.frame(
   lapply(fig_cci_pot, as.character),
   stringsAsFactors = FALSE
 )
-fig_cci_pot[c(1, 3, 5), ] <- "..."
+fig_cci_pot[c(1, 3, 5), ] <- "...."
 colnames(fig_cci_pot) <- c(
   "Emitter", "Receiver", "LRI",
   "Score Cond1", "Score Cond2", "Log FC"
 )
 fig_cci_pot
+
+fig_cci_pot_gt <- gt(fig_cci_pot) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:6
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |>
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_workflow_cci_pot.pdf"))
 
 fig_cci_pot %>%
   kbl(
@@ -453,17 +433,17 @@ figp_distr_de <- ggplot(
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[55, 1001] + 0.8,
+  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_DE[55, 1001] + 0.35,
   y = 42,
   label = "True Difference",
-  size = 22
+  size = 32
 ) + xlab(
   "Score(Cond2) - Score(Cond1)"
 ) + ylab(
   "Frequency"
 ) + theme(
-  text = element_text(size = 80),
-  axis.text.x = element_text(size = 80),
+  text = element_text(size = 100),
+  axis.text.x = element_text(size = 100),
   axis.text.y = element_blank()
 )
 figp_distr_de
@@ -471,10 +451,13 @@ figp_distr_de
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_distr_de.png"
+    "fig_distr_de2.pdf"
   ),
-  figp_distr_de,
-  scale = 0.7
+  plot = figp_distr_de,
+  width = 1580,
+  height = 1400,
+  units = "px",
+  scale = 6
 )
 
 fig_distr_cond1 <- data.frame(
@@ -507,23 +490,23 @@ figp_distr_cond1 <- ggplot(
   "segment",
   x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[55, 1001],
   xend = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[55, 1001],
-  y = 22,
+  y = 35,
   yend = 0.5,
   size = 3,
   arrow = arrow(length = unit(0.5, "cm"))
 ) + annotate(
   "text",
-  x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[55, 1001],
-  y = 25,
+  x = 0.33 + GetDistributions(fig_aging_example)$DISTRIBUTIONS_YOUNG[55, 1001],
+  y = 38,
   label = "True Score 1",
-  size = 22
+  size = 32
 ) + xlab(
   "Score(Cond1)"
 ) + ylab(
   "Frequency"
 ) + theme(
-  text = element_text(size = 80),
-  axis.text.x = element_text(size = 80),
+  text = element_text(size = 100),
+  axis.text.x = element_text(size = 100),
   axis.text.y = element_blank()
 ) + xlim(-0.5, 2.5)
 figp_distr_cond1
@@ -531,10 +514,13 @@ figp_distr_cond1
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_distr_cond1.png"
+    "fig_distr_cond1_b.pdf"
   ),
-  figp_distr_cond1,
-  scale = 0.7
+  plot = figp_distr_cond1,
+  width = 1580,
+  height = 1400,
+  units = "px",
+  scale = 6
 )
 
 fig_distr_cond2 <- data.frame(
@@ -575,14 +561,14 @@ figp_distr_cond2 <- ggplot(
   x = GetDistributions(fig_aging_example)$DISTRIBUTIONS_OLD[55, 1001] - 0.3,
   y = 25,
   label = "True Score 2",
-  size = 22
+  size = 32
 ) + xlab(
   "Score(Cond2)"
 ) + ylab(
   "Frequency"
 ) + theme(
-  text = element_text(size = 80),
-  axis.text.x = element_text(size = 80),
+  text = element_text(size = 100),
+  axis.text.x = element_text(size = 100),
   axis.text.y = element_blank()
 ) + xlim(-0.5, 3)
 figp_distr_cond2
@@ -590,10 +576,13 @@ figp_distr_cond2
 ggsave(
   paste0(
     path_scagecom_output,
-    "fig_distr_cond2.png"
+    "fig_distr_cond2_b.pdf"
   ),
-  figp_distr_cond2,
-  scale = 0.7
+  plot = figp_distr_cond2,
+  width = 1580,
+  height = 1400,
+  units = "px",
+  scale = 6
 )
 
 ## Prepare Figure Workflow CCI final (Fig.2.6) ####
@@ -648,33 +637,26 @@ fig_cci_table_final <- data.frame(
 
 fig_cci_table_final <- fig_cci_table_final[c(1, 4, 5, 9, 10), ]
 
-fig_cci_table_final[c(1, 3, 5), ] <- "..."
+fig_cci_table_final[c(1, 3, 5), ] <- "...."
 colnames(fig_cci_table_final) <- c(
   "Emitter", "Receiver", "LRI", "Log FC", "Adj. p-value", "Regulation"
 )
 
 fig_cci_table_final
 
-fig_cci_table_final %>%
-  kbl(
-    caption = paste0(
-      "<span style = 'font-size: 70px;font-weight: bold;",
-      "'>Detected cell-cell interactions</span>"
-    ),
-    align = rep("c", 6),
-    row.names = FALSE
-  ) %>%
-  kable_styling("striped", full_width = FALSE) %>%
-  kable_styling(font_size = 55) %>%
-  column_spec(1:6, bold = T) %>%
-  save_kable(
-    file = paste0(
-      path_scagecom_output,
-      "fig_cci_table_final.png"
-    ),
-    zoom = 2,
-    vwidth = 2100
-  )
+fig_cci_table_final_dt <- gt(fig_cci_table_final) |>
+  fmt_auto() |>
+  cols_align(
+    align = "center",
+    columns = 1:6
+  ) |>
+  opt_table_font(
+    font = list("Arial")
+  ) |>
+  tab_options(
+    table.font.size = 10
+  ) |>
+  gtsave(paste0(path_scagecom_output, "sfig_workflow_final_dt.pdf"))
 
 ## Prepare Figure Dataset summary (Fig.3) ####
 
