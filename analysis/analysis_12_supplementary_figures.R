@@ -73,6 +73,14 @@ ggsave(
   scale = 3
 )
 
+fwrite(
+  val_dt_selection,
+  paste0(
+    path_scagecom_output,
+    "dt_source_data_secretome_upset_edfig1a.csv"
+  )
+)
+
 ## mMSC-AT
 
 sfig_dt_val_mscat_at <- dt_val_mscat_at[, .(mean(OR), exp(mean(log(BH)))), by = "category"]
@@ -284,6 +292,51 @@ ggsave(
   scale = 1.6
 )
 
+# save source data
+
+
+dt_source_data_validation_edfig1bcde <- rbindlist(
+  l = list(
+    neuron = sfig_dt_val_neuron_brain[
+      ,
+      TMS_samples := "Brain"
+    ],
+    mMSCAT = sfig_dt_val_mscat_at[
+      ,
+      TMS_samples := "Adipose Tissues"
+    ],
+    rCM = sfig_dt_val_cardio_heart[
+      ,
+      TMS_samples := "Heart"
+    ],
+    hPDE = sfig_dt_val_pancreas_pct[
+      ,
+      TMS_samples := "Pancreas"
+    ]
+  ),
+  idcol = "cell_line"
+)
+
+setnames(
+  dt_source_data_validation_edfig1bcde,
+  old = c("V1", "V2"),
+  new = c("OR", "BH")
+)
+
+
+setcolorder(
+  dt_source_data_validation_edfig1bcde,
+  c("cell_line", "category", "TMS_samples", "OR", "BH")
+)
+
+
+fwrite(
+  dt_source_data_validation_edfig1bcde,
+  paste0(
+    path_scagecom_output,
+    "dt_source_data_validation_edfig1bcde.csv"
+  )
+)
 
 ## scDiffCom vs SDGA Supplementary Figure ####
 
@@ -588,6 +641,14 @@ ggsave(
   scale = 2.5
 )
 #manual save: 2100x1200
+
+fwrite(
+  dt_sdea_fig,
+  paste0(
+    path_scagecom_output,
+    "dt_source_data_sdea_edfig2.csv"
+  )
+)
 
 ## Immune processes Supplementary Figure ####
 

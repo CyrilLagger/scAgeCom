@@ -1737,3 +1737,12 @@ ggsave(
   units = "px",
   scale = 3.2
 )
+
+fwrite(
+  regulation_distr_long,
+  paste0(
+    path_scagecom_output,
+    "dt_source_data_regulation_distr_fig6.csv"
+  )
+)
+
