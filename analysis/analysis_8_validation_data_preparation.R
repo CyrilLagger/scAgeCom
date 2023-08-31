@@ -1607,6 +1607,50 @@ dt_val_pancreas_pct <-   dt_cci_secr_validation_full[
   category_type == "EMITTER_CELLTYPE"
 ][grepl("Pancreas", group)]
 
+#all selected for source data
+
+dt_source_data_validation_fig5 <- rbindlist(
+  l = list(
+    hUVEC = dt_val_huvec_fam,
+    mBMM = dt_val_macro_fam,
+    neuron = dt_val_neuron_fam,
+    mMSCAT = dt_val_mscat_fam,
+    rCM = dt_val_cardio_fam,
+    hPDE = dt_val_pancreas_fam
+  ),
+  idcol = "cell_line"
+)
+
+dt_source_data_validation_fig5[
+  ,
+  category_type := NULL
+]
+dt_source_data_validation_fig5[
+  ,
+  group := NULL
+]
+dt_source_data_validation_fig5[
+  ,
+  group_type := NULL
+]
+dt_source_data_validation_fig5[
+  ,
+  validation_set := NULL
+]
+dt_source_data_validation_fig5[
+  ,
+  recall := NULL
+]
+
+fwrite(
+  dt_source_data_validation_fig5,
+  paste0(
+    path_scagecom_output,
+    "dt_source_data_validation_fig5.csv"
+  )
+)
+
+
 ## Rename validation in cci and related datasets ####
 
 dt_cci_age <- copy(dt_cci_rel)
