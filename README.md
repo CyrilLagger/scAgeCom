@@ -2,7 +2,7 @@
 
 This repository contains the scripts used to produce the data of scAgeCom,
 our "Murine Atlas of Age-related Changes in Intercellular Communication" 
-([preprint](https://www.biorxiv.org/content/10.1101/2021.08.13.456238v1)). The
+([Nature Aging paper](https://www.nature.com/articles/s43587-023-00514-x)). The
 complete 58 datasets are publicly available as R rds files on
 [figshare](http://doi.org/10.6084/m9.figshare.17074964).
 
